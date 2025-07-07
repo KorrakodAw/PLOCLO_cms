@@ -20,7 +20,7 @@ export default function Navbar({ children }: NavbarProps) {
           <NavLink href="/editProgram">Edit Program</NavLink>
           <NavLink href="/editCourse">Edit Course</NavLink>
           <NavLink href="/viewChart">View Chart</NavLink>
-          <NavLink href="/aboutData">About Data</NavLink>
+          <NavLink href="/aboutData">About</NavLink>
           <NavLink href="/manageAccount">Manage Account</NavLink>
         </ul>
       </nav>

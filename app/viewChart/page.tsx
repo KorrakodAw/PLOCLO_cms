@@ -1,4 +1,4 @@
-export default function viewChart() {
+export default function ViewChart() {
   return (
     <div>
       <>Test View Chart</>

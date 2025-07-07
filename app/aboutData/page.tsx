@@ -1,7 +1,7 @@
-export default function aboutData() {
+export default function AboutData() {
   return (
     <div>
-      <>Test About</>
+      <p className="text-2xl font-extralight">About</p>
     </div>
   );
 }
