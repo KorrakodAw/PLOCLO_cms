@@ -25,8 +25,17 @@ export default function RootLayout({
       <body
         className={`${kanit.variable} antialiased flex`} // Added 'flex' to body for layout
       >
-        <Navbar />
-        <div className="flex-1 ml-64 p-8">{children}</div>
+        <div className="flex min-h-screen">
+          {/* Sidebar */}
+          <aside className="w-52 min-h-screen bg-white shadow fixed top-0 left-0">
+            <Navbar />
+          </aside>
+
+          {/* Content Area */}
+          <main className="flex-1 ml-50 p-6 bg-white overflow-x-auto">
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   );

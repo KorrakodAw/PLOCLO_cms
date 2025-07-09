@@ -1,6 +1,6 @@
 export default function ViewChart() {
   return (
-    <div>
+    <div className="w-full px-4 overflow-x-auto">
       <>Test View Chart</>
     </div>
   );

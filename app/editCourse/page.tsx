@@ -16,7 +16,7 @@ export default function EditCourse() {
     { label: "Cambridge", value: "cambridge" },
   ];
   return (
-    <div>
+    <div className="w-full px-4 overflow-x-auto">
       <p className="font-extralight text-2xl">Course Information</p>
       <div className="max-w-200 flex gap-3 mt-5">
         <DropdownSelect

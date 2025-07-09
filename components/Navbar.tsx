@@ -11,7 +11,7 @@ interface NavbarProps {
 
 export default function Navbar({ children }: NavbarProps) {
   return (
-    <aside className="bg w-52 min-h-screen p-6 shadow-2xl fixed top-0 left-0 z-10">
+    <aside className="w-52 min-h-screen p-6 shadow-2xl fixed top-0 left-0 z-10">
       <Link href="/" className="text-[40px] font-extrabold mb-8 text-black">
         PLOCLO
       </Link>

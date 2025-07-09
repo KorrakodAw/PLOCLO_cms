@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import DropdownSelect from "../../components/DropdownSelect";
 import TabButton from "../../components/TabButton";
+import ProgramManagement from "./ProgramManagement";
 
 export default function EditProgram() {
   const [university, setUniversity] = useState("");
@@ -25,7 +26,7 @@ export default function EditProgram() {
   ];
 
   return (
-    <div className="w-full">
+    <div className="w-full px-4 overflow-x-auto">
       <p className="font-extralight text-2xl">Program Information</p>
       <div className="flex gap-3 mt-5 px-3 py-2">
         {tabs.map((tab) => (
@@ -64,6 +65,7 @@ export default function EditProgram() {
           options={options}
         />
       </div>
+      {activeTab === "general" && <ProgramManagement />}
     </div>
   );
 }
