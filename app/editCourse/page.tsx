@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import DropdownSelect from "../../components/DropdownSelect";
+import CourseManagement from "./courseManage";
 
 export default function EditCourse() {
   const [university, setUniversity] = useState("");
@@ -50,6 +51,7 @@ export default function EditCourse() {
           options={options}
         />
       </div>
+      <CourseManagement />
     </div>
   );
 }

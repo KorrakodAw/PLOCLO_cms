@@ -1,56 +1,72 @@
 import AddButton from "../../components/AddButton";
 
-const mockPrograms = [
+const mockCourse = [
   {
-    programId: 305173,
-    programNameEN: "Computer Science",
-    programNameTH: "วิทยาการคอมพิวเตอร์",
-    programAbbreviationEN: "CS",
-    programAbbreviationTH: "วคศ",
+    courseId: 401201,
+    courseNameEN: "Artificial Intelligence",
+    courseNameTH: "ปัญญาประดิษฐ์",
+    courseAbbreviationEN: "AI",
+    courseAbbreviationTH: "ปปด",
+    year: 2025,
+  },
+  {
+    courseId: 401202,
+    courseNameEN: "Data Science",
+    courseNameTH: "วิทยาการข้อมูล",
+    courseAbbreviationEN: "DS",
+    courseAbbreviationTH: "วดข",
+    year: 2025,
+  },
+  {
+    courseId: 401203,
+    courseNameEN: "Cybersecurity",
+    courseNameTH: "ความมั่นคงทางไซเบอร์",
+    courseAbbreviationEN: "CY",
+    courseAbbreviationTH: "คมซ",
     year: 2024,
   },
   {
-    programId: 305174,
-    programNameEN: "Mechanical Engineering",
-    programNameTH: "วิศวกรรมเครื่องกล",
-    programAbbreviationEN: "ME",
-    programAbbreviationTH: "วศก",
+    courseId: 401204,
+    courseNameEN: "Digital Marketing",
+    courseNameTH: "การตลาดดิจิทัล",
+    courseAbbreviationEN: "DM",
+    courseAbbreviationTH: "กตด",
     year: 2023,
   },
   {
-    programId: 305175,
-    programNameEN: "Business Administration",
-    programNameTH: "บริหารธุรกิจ",
-    programAbbreviationEN: "BA",
-    programAbbreviationTH: "บบช",
-    year: 2022,
+    courseId: 401205,
+    courseNameEN: "Robotics Engineering",
+    courseNameTH: "วิศวกรรมหุ่นยนต์",
+    courseAbbreviationEN: "RE",
+    courseAbbreviationTH: "วศห",
+    year: 2023,
   },
 ];
 
-export default function ProgramManagement() {
+export default function CourseManagement() {
   return (
     <div className=" mt-5">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-extralight">Program Management</h1>
+        <h1 className="text-2xl font-extralight">Course Management</h1>
         <AddButton
-          buttonText="Create New Program"
+          buttonText="Create New course"
           placeholderText={{
-            code: "Program Id",
-            nameEn: "Program Name (EN)",
-            nameTh: "Program Name (TH)",
-            abbrEn: "Program abbreviation (EN)",
-            abbrTh: "Program abbreviation (TH)",
+            code: "Course Id",
+            nameEn: "Course Name (EN)",
+            nameTh: "Course Name (TH)",
+            abbrEn: "Course abbreviation (EN)",
+            abbrTh: "Course abbreviation (TH)",
             year: "Year",
           }}
           submitButtonText={{
-            insert: "Insert Program",
-            upload: "Upload Program (Excel)",
+            insert: "Insert Course",
+            upload: "Upload Course (Excel)",
           }}
         />
       </div>
 
       <hr className="my-3" />
-      <p className="text-xl font-extralight">Program</p>
+      <p className="text-xl font-extralight">Course</p>
 
       {/* Table */}
       <div className="overflow-x-auto mt-5">
@@ -58,19 +74,19 @@ export default function ProgramManagement() {
           <thead className="bg-gray-100 border-b border-gray-300">
             <tr>
               <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program Id
+                Course Id
               </th>
               <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program Name (EN)
+                Course Name (EN)
               </th>
               <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program Name (TH)
+                Course Name (TH)
               </th>
               <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program abbreviation (EN)
+                Course abbreviation (EN)
               </th>
               <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program abbreviation (TH)
+                Course abbreviation (TH)
               </th>
               <th className="text-left px-4 py-2 border-r border-gray-300">
                 Year
@@ -80,25 +96,25 @@ export default function ProgramManagement() {
           </thead>
 
           <tbody>
-            {mockPrograms.map((program) => (
-              <tr key={program.programId} className="hover:bg-gray-50">
+            {mockCourse.map((course) => (
+              <tr key={course.courseId} className="hover:bg-gray-50">
                 <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programId}
+                  {course.courseId}
                 </td>
                 <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programNameEN}
+                  {course.courseNameEN}
                 </td>
                 <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programNameTH}
+                  {course.courseNameTH}
                 </td>
                 <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programAbbreviationEN}
+                  {course.courseAbbreviationEN}
                 </td>
                 <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programAbbreviationTH}
+                  {course.courseAbbreviationTH}
                 </td>
                 <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.year}
+                  {course.year}
                 </td>
                 <td className="px-4 py-2 border-b border-gray-300">
                   <button className="text-blue-600 hover:underline mr-2">
