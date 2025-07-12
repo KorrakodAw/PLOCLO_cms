@@ -45,8 +45,8 @@ const mockCourse = [
 
 export default function CourseManagement() {
   return (
-    <div className=" mt-5">
-      <div className="flex justify-between">
+    <div className="mt-5">
+      <div className=" flex justify-between">
         <h1 className="text-2xl font-extralight">Course Management</h1>
         <AddButton
           buttonText="Create New course"

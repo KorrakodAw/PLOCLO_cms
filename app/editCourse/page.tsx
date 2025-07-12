@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import DropdownSelect from "../../components/DropdownSelect";
 import CourseManagement from "./courseManage";
@@ -17,8 +18,9 @@ export default function EditCourse() {
     { label: "Cambridge", value: "cambridge" },
   ];
   return (
-    <div className="w-full px-4 overflow-x-auto">
+    <div className="w-[1100px] px-4 h-full">
       <p className="font-extralight text-2xl">Course Information</p>
+
       <div className="max-w-200 flex gap-3 mt-5">
         <DropdownSelect
           label="University"
