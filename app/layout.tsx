@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Kanit } from "next/font/google";
 import "./globals.css";
-import Navbar from "../components/Navbar"; // Ensure this path is correct based on your structure
+import ClientWrapper from "../components/ClientWrapper"; // 👈 ใช้ component ใหม่
 
 const kanit = Kanit({
   weight: ["300", "400", "500", "600", "700"],
@@ -22,20 +22,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${kanit.variable} antialiased flex`} // Added 'flex' to body for layout
-      >
-        <div className="flex min-h-screen">
-          {/* Sidebar */}
-          <aside className="w-52 min-h-screen bg-white shadow fixed top-0 left-0">
-            <Navbar />
-          </aside>
-
-          {/* Content Area */}
-          <main className="flex-1 ml-50 p-6 bg-white overflow-x-auto">
-            {children}
-          </main>
-        </div>
+      <body className={`${kanit.variable} antialiased`}>
+        <ClientWrapper>{children}</ClientWrapper>
       </body>
     </html>
   );
