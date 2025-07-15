@@ -1,4 +1,33 @@
 import AddButton from "../../components/AddButton";
+import { Table, Column } from "../../components/Table";
+
+interface Program {
+  programId: number;
+  programNameEN: string;
+  programNameTH: string;
+  programAbbreviationEN: string;
+  programAbbreviationTH: string;
+  year: number;
+}
+
+const programColumns: Column<Program>[] = [
+  { header: "Program Id", accessor: "programId" },
+  { header: "Name (EN)", accessor: "programNameEN" },
+  { header: "Name (TH)", accessor: "programNameTH" },
+  { header: "Abbrev. (EN)", accessor: "programAbbreviationEN" },
+  { header: "Abbrev. (TH)", accessor: "programAbbreviationTH" },
+  { header: "Year", accessor: "year" },
+  // {
+  //   header: "Manage",
+  //   accessor: "programId",
+  //   render: (id) => (
+  //     <>
+  //       <button className="text-blue-600 hover:underline mr-2">Edit</button>
+  //       <button className="text-red-600 hover:underline">Delete</button>
+  //     </>
+  //   ),
+  // },
+];
 
 const mockPrograms = [
   {
@@ -48,71 +77,10 @@ export default function ProgramManagement() {
           }}
         />
       </div>
-
       <hr className="my-3" />
       <p className="text-xl font-extralight">Program</p>
-
       {/* Table */}
-      <div className="overflow-x-auto mt-5">
-        <table className=" border border-gray-300 text-sm">
-          <thead className="bg-gray-100 border-b border-gray-300">
-            <tr>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program Id
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program Name (EN)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program Name (TH)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program abbreviation (EN)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Program abbreviation (TH)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Year
-              </th>
-              <th className="text-left px-4 py-2">Manage</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {mockPrograms.map((program) => (
-              <tr key={program.programId} className="hover:bg-gray-50">
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programId}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programNameEN}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programNameTH}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programAbbreviationEN}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.programAbbreviationTH}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {program.year}
-                </td>
-                <td className="px-4 py-2 border-b border-gray-300">
-                  <button className="text-blue-600 hover:underline mr-2">
-                    Edit
-                  </button>
-                  <button className="text-red-600 hover:underline">
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table<Program> columns={programColumns} data={mockPrograms} />;
     </div>
   );
 }

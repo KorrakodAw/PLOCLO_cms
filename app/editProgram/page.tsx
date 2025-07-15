@@ -28,7 +28,7 @@ export default function EditProgram() {
   ];
 
   return (
-    <div className="w-[1100px] px-4 h-full">
+    <div className="max-w-[1100px] px-4 h-full">
       <p className="font-extralight text-2xl">Program Information</p>
       <div className="flex gap-3 mt-5 px-3 py-2">
         {tabs.map((tab) => (

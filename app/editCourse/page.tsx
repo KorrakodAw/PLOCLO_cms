@@ -18,7 +18,7 @@ export default function EditCourse() {
     { label: "Cambridge", value: "cambridge" },
   ];
   return (
-    <div className="w-[1100px] px-4 h-full">
+    <div className="max-w-[1100px] px-4 h-full">
       <p className="font-extralight text-2xl">Course Information</p>
 
       <div className="max-w-200 flex gap-3 mt-5">

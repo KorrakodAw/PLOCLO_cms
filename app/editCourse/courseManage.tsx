@@ -1,4 +1,33 @@
 import AddButton from "../../components/AddButton";
+import { Table, Column } from "../../components/Table";
+
+interface Course {
+  courseId: number;
+  courseNameEN: string;
+  courseNameTH: string;
+  courseAbbreviationEN: string;
+  courseAbbreviationTH: string;
+  year: number;
+}
+
+const courseColumns: Column<Course>[] = [
+  { header: "course Id", accessor: "courseId" },
+  { header: "Name (EN)", accessor: "courseNameEN" },
+  { header: "Name (TH)", accessor: "courseNameTH" },
+  { header: "Abbrev. (EN)", accessor: "courseAbbreviationEN" },
+  { header: "Abbrev. (TH)", accessor: "courseAbbreviationTH" },
+  { header: "Year", accessor: "year" },
+  // {
+  //   header: "Manage",
+  //   accessor: "courseId",
+  //   render: (id) => (
+  //     <>
+  //       <button className="text-blue-600 hover:underline mr-2">Edit</button>
+  //       <button className="text-red-600 hover:underline">Delete</button>
+  //     </>
+  //   ),
+  // },
+];
 
 const mockCourse = [
   {
@@ -64,71 +93,10 @@ export default function CourseManagement() {
           }}
         />
       </div>
-
       <hr className="my-3" />
       <p className="text-xl font-extralight">Course</p>
-
       {/* Table */}
-      <div className="overflow-x-auto mt-5">
-        <table className=" border border-gray-300 text-sm">
-          <thead className="bg-gray-100 border-b border-gray-300">
-            <tr>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Course Id
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Course Name (EN)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Course Name (TH)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Course abbreviation (EN)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Course abbreviation (TH)
-              </th>
-              <th className="text-left px-4 py-2 border-r border-gray-300">
-                Year
-              </th>
-              <th className="text-left px-4 py-2">Manage</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {mockCourse.map((course) => (
-              <tr key={course.courseId} className="hover:bg-gray-50">
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {course.courseId}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {course.courseNameEN}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {course.courseNameTH}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {course.courseAbbreviationEN}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {course.courseAbbreviationTH}
-                </td>
-                <td className="px-4 py-2 border-b border-r border-gray-300">
-                  {course.year}
-                </td>
-                <td className="px-4 py-2 border-b border-gray-300">
-                  <button className="text-blue-600 hover:underline mr-2">
-                    Edit
-                  </button>
-                  <button className="text-red-600 hover:underline">
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table<Course> columns={courseColumns} data={mockCourse} />
     </div>
   );
 }
