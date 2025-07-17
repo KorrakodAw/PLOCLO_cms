@@ -6,8 +6,10 @@ import TabButton from "../../components/TabButton";
 import ProgramManagement from "./ProgramManagement";
 import AddPlo from "./AddPlo";
 import AddStudent from "./AddStudent";
+import { useTranslation } from "react-i18next";
 
 export default function EditProgram() {
+  const { t } = useTranslation("common");
   const [university, setUniversity] = useState("");
   const [faculty, setFaculty] = useState("");
   const [program, setProgram] = useState("");
@@ -15,9 +17,9 @@ export default function EditProgram() {
   const [activeTab, setActiveTab] = useState("general");
 
   const tabs = [
-    { id: "general", label: "General Information" },
-    { id: "plo", label: "Program Learning Outcomes (PLO)" },
-    { id: "add-student", label: "Add Student To Program" },
+    { id: "general", label: t("general information") },
+    { id: "plo", label: t("program learning outcomes (PLO)") },
+    { id: "add-student", label: t("add student to program") },
   ];
 
   const options = [
@@ -29,7 +31,7 @@ export default function EditProgram() {
 
   return (
     <div className="max-w-[1100px] px-4 h-full">
-      <p className="font-extralight text-2xl">Program Information</p>
+      <p className="font-extralight text-2xl">{t("program information")}</p>
       <div className="flex gap-3 mt-5 px-3 py-2">
         {tabs.map((tab) => (
           <TabButton
@@ -43,25 +45,25 @@ export default function EditProgram() {
       <hr />
       <div className="max-w-200 flex gap-3 mt-5">
         <DropdownSelect
-          label="University"
+          label={t("university")}
           value={university}
           onChange={(e) => setUniversity(e.target.value)}
           options={options}
         />
         <DropdownSelect
-          label="Faculty"
+          label={t("faculty")}
           value={faculty}
           onChange={(e) => setFaculty(e.target.value)}
           options={options}
         />
         <DropdownSelect
-          label="Program"
+          label={t("program")}
           value={program}
           onChange={(e) => setProgram(e.target.value)}
           options={options}
         />
         <DropdownSelect
-          label="Year"
+          label={t("year")}
           value={year}
           onChange={(e) => setYear(e.target.value)}
           options={options}

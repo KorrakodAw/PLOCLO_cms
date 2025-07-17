@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Kanit } from "next/font/google";
 import "./globals.css";
 import ClientWrapper from "../components/ClientWrapper"; // 👈 ใช้ component ใหม่
+import I18nProvider from "../i18nProvider";
 
 const kanit = Kanit({
   weight: ["300", "400", "500", "600", "700"],
@@ -23,7 +24,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${kanit.variable} antialiased`}>
-        <ClientWrapper>{children}</ClientWrapper>
+        <I18nProvider>
+          <ClientWrapper>{children}</ClientWrapper>
+        </I18nProvider>
       </body>
     </html>
   );

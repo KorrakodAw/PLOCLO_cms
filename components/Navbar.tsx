@@ -4,6 +4,8 @@ import Link from "next/link";
 import React, { ReactNode } from "react";
 import NavLink from "../components/NavLink";
 import { usePathname } from "next/navigation";
+import LanguageSwitcher from "../components/LanguageSwitcher";
+import { useTranslation } from "next-i18next";
 
 interface NavbarProps {
   children?: ReactNode;
@@ -12,6 +14,8 @@ interface NavbarProps {
 export default function Navbar({ children }: NavbarProps) {
   const pathname = usePathname();
   const isActive = pathname === "/";
+  const { t } = useTranslation("common");
+
   return (
     <aside className="w-52 min-h-screen p-6 shadow-2xl fixed top-0 left-0 z-10">
       <Link
@@ -21,13 +25,14 @@ export default function Navbar({ children }: NavbarProps) {
       >
         PLOCLO
       </Link>
+      <LanguageSwitcher />
       <nav className="mt-10">
         <ul className="">
-          <NavLink href="/editProgram">Edit Program</NavLink>
-          <NavLink href="/editCourse">Edit Course</NavLink>
-          <NavLink href="/viewChart">View Chart</NavLink>
-          <NavLink href="/aboutData">About</NavLink>
-          <NavLink href="/manageAccount">Manage Account</NavLink>
+          <NavLink href="/editProgram">{t("edit program")}</NavLink>
+          <NavLink href="/editCourse">{t("edit course")}</NavLink>
+          <NavLink href="/viewChart">{t("view chart")}</NavLink>
+          <NavLink href="/aboutData">{t("about")}</NavLink>
+          <NavLink href="/manageAccount">{t("manage account")}</NavLink>
         </ul>
       </nav>
       {children}

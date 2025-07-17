@@ -1,5 +1,6 @@
 import AddButton from "../../components/AddButton";
 import { Table, Column } from "../../components/Table";
+import { useTranslation } from "next-i18next";
 
 interface Program {
   programId: number;
@@ -57,14 +58,15 @@ const mockPrograms = [
 ];
 
 export default function ProgramManagement() {
+  const { t } = useTranslation("common");
   return (
     <div className=" mt-5">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-extralight">Program Management</h1>
+        <h1 className="text-2xl font-extralight">{t("program management")}</h1>
         <AddButton
-          buttonText="Create New Program"
+          buttonText={t("create new program")}
           placeholderText={{
-            code: "Program Id",
+            code: t("Program Id"),
             nameEn: "Program Name (EN)",
             nameTh: "Program Name (TH)",
             abbrEn: "Program abbreviation (EN)",
@@ -78,7 +80,7 @@ export default function ProgramManagement() {
         />
       </div>
       <hr className="my-3" />
-      <p className="text-xl font-extralight">Program</p>
+      <p className="text-xl font-extralight">{t("program")}</p>
       {/* Table */}
       <Table<Program> columns={programColumns} data={mockPrograms} />
     </div>

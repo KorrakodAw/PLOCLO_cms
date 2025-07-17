@@ -1,12 +1,14 @@
 import AddButton from "../../components/AddButton";
+import { useTranslation } from "react-i18next";
 
 export default function AddPlo() {
+  const { t } = useTranslation("common");
   return (
     <div className="mt-5">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-extralight">PLO Management</h1>
+        <h1 className="text-2xl font-extralight">{t("plo management")}</h1>
         <AddButton
-          buttonText="Create New PLO"
+          buttonText={t("create new plo")}
           placeholderText={{
             code: "PLO Code",
             nameEn: "PLO Name (EN)",
@@ -23,7 +25,7 @@ export default function AddPlo() {
       </div>
 
       <hr className="my-3" />
-      <h1 className="text-2xl font-extralight">PLO List</h1>
+      <h1 className="text-xl font-extralight">{t("plo list")}</h1>
     </div>
   );
 }
