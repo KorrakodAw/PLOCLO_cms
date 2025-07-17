@@ -80,7 +80,7 @@ export default function ProgramManagement() {
       <hr className="my-3" />
       <p className="text-xl font-extralight">Program</p>
       {/* Table */}
-      <Table<Program> columns={programColumns} data={mockPrograms} />;
+      <Table<Program> columns={programColumns} data={mockPrograms} />
     </div>
   );
 }
