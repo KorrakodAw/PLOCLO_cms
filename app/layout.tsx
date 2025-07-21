@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Kanit } from "next/font/google";
 import "./globals.css";
-import ClientWrapper from "../components/ClientWrapper"; // 👈 ใช้ component ใหม่
+import ClientWrapper from "../components/ClientWrapper"; 
 import I18nProvider from "../i18nProvider";
 
 const kanit = Kanit({
@@ -31,3 +31,4 @@ export default function RootLayout({
     </html>
   );
 }
+

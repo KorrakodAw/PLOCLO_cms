@@ -18,7 +18,7 @@ export default function LanguageSwitcher() {
     <select
       onChange={handleChange}
       value={i18n.language}
-      className="px-5 py-2 outline-none focus:outline-none focus:ring-0 hover:shadow-xl "
+      className="px-5 py-2 outline-none focus:outline-none focus:ring-0 hover:shadow-xl"
     >
       {LANGUAGES.map(({ code, labelKey }) => (
         <option key={code} value={code}>
