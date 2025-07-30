@@ -32,5 +32,7 @@
   "course management": "Course Management",
   "create new course": "Create New Course",
   "course": "Course",
-  "all":"All"
+  "all":"All",
+  "course id":"Course ID",
+  "program id":"Program ID"
 }

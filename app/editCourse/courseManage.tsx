@@ -11,26 +11,7 @@ interface Course {
   year: number;
 }
 
-const courseColumns: Column<Course>[] = [
-  { header: "course Id", accessor: "courseId" },
-  { header: "Name (EN)", accessor: "courseNameEN" },
-  { header: "Name (TH)", accessor: "courseNameTH" },
-  { header: "Abbrev. (EN)", accessor: "courseAbbreviationEN" },
-  { header: "Abbrev. (TH)", accessor: "courseAbbreviationTH" },
-  { header: "Year", accessor: "year" },
-  // {
-  //   header: "Manage",
-  //   accessor: "courseId",
-  //   render: (id) => (
-  //     <>
-  //       <button className="text-blue-600 hover:underline mr-2">Edit</button>
-  //       <button className="text-red-600 hover:underline">Delete</button>
-  //     </>
-  //   ),
-  // },
-];
-
-const mockCourse = [
+const mockCourse: Course[] = [
   {
     courseId: 401201,
     courseNameEN: "Artificial Intelligence",
@@ -74,7 +55,20 @@ const mockCourse = [
 ];
 
 export default function CourseManagement() {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
+  const lang = i18n.language;
+
+  const courseColumns: Column<Course>[] = [
+    { header: t("course id"), accessor: "courseId" },
+    lang === "en"
+      ? { header: "Name", accessor: "courseNameEN" }
+      : { header: "ชื่อหลักสูตร", accessor: "courseNameTH" },
+    lang === "en"
+      ? { header: "Abbrev.", accessor: "courseAbbreviationEN" }
+      : { header: "ชื่อย่อ", accessor: "courseAbbreviationTH" },
+    { header: t("year"), accessor: "year" },
+  ];
+
   return (
     <div className="mt-5">
       <div className=" flex justify-between">

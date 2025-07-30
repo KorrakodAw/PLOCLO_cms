@@ -2,6 +2,7 @@ import AddButton from "../../components/AddButton";
 import { Table, Column } from "../../components/Table";
 import { useTranslation } from "next-i18next";
 
+
 interface Program {
   programId: number;
   programNameEN: string;
@@ -11,26 +12,7 @@ interface Program {
   year: number;
 }
 
-const programColumns: Column<Program>[] = [
-  { header: "Program Id", accessor: "programId" },
-  { header: "Name (EN)", accessor: "programNameEN" },
-  { header: "Name (TH)", accessor: "programNameTH" },
-  { header: "Abbrev. (EN)", accessor: "programAbbreviationEN" },
-  { header: "Abbrev. (TH)", accessor: "programAbbreviationTH" },
-  { header: "Year", accessor: "year" },
-  // {
-  //   header: "Manage",
-  //   accessor: "programId",
-  //   render: (id) => (
-  //     <>
-  //       <button className="text-blue-600 hover:underline mr-2">Edit</button>
-  //       <button className="text-red-600 hover:underline">Delete</button>
-  //     </>
-  //   ),
-  // },
-];
-
-const mockPrograms = [
+const mockPrograms: Program[] = [
   {
     programId: 305173,
     programNameEN: "Computer Science",
@@ -58,9 +40,22 @@ const mockPrograms = [
 ];
 
 export default function ProgramManagement() {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
+  const lang = i18n.language;
+
+  const programColumns: Column<Program>[] = [
+    { header:t("program id"), accessor: "programId" },
+    lang === "en"
+      ? { header: "Name", accessor: "programNameEN" }
+      : { header: "ชื่อแผนการเรียน", accessor: "programNameTH" },
+    lang === "en"
+      ? { header: "Abbrev.", accessor: "programAbbreviationEN" }
+      : { header: "ชื่อย่อ", accessor: "programAbbreviationTH" },
+    { header: t("year"), accessor: "year" },
+  ];
+
   return (
-    <div className=" mt-5">
+    <div className="mt-5">
       <div className="flex justify-between">
         <h1 className="text-2xl font-extralight">{t("program management")}</h1>
         <AddButton
@@ -81,7 +76,6 @@ export default function ProgramManagement() {
       </div>
       <hr className="my-3" />
       <p className="text-xl font-extralight">{t("program")}</p>
-      {/* Table */}
       <Table<Program> columns={programColumns} data={mockPrograms} />
     </div>
   );
