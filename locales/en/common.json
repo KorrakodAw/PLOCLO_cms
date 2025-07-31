@@ -32,7 +32,10 @@
   "course management": "Course Management",
   "create new course": "Create New Course",
   "course": "Course",
-  "all":"All",
-  "course id":"Course ID",
-  "program id":"Program ID"
+  "all": "All",
+  "course id": "Course ID",
+  "program id": "Program ID",
+  "welcome": "Welcome",
+  "you are logged in": "You are logged in",
+  "logout":"Logout"
 }
