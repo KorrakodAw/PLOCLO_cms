@@ -30,7 +30,7 @@ export default function Login() {
   return (
     <div className="flex items-center justify-center">
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-md p-5">
-        <h2 className="text-2xl font-bold text-center mb-6 text-orange-500">
+        <h2 className="text-2xl font-bold text-center mb-6 text-orange-400">
           {t("login")}
         </h2>
 
@@ -77,7 +77,7 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition duration-200"
+            className="w-full bg-orange-400 text-white py-2 rounded-lg hover:bg-orange-500 transition duration-200"
           >
             {t("sign in")}
           </button>

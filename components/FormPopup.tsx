@@ -17,20 +17,24 @@ interface FormPopupProps {
     insert?: string;
     upload?: string;
   };
+  showAbbreviationInputs?: boolean; // เพิ่ม
+  showYearInput?: boolean; // เพิ่ม
 }
 
 export default function FormPopup({
   onClose,
   placeholderText,
   submitButtonText = {},
+  showAbbreviationInputs = false, // ค่าเริ่มต้น
+  showYearInput = false, // ค่าเริ่มต้น
 }: FormPopupProps) {
   const {
-    code = "Course Code",
-    nameEn = "Course Name (EN)",
-    nameTh = "Course Name (TH)",
-    abbrEn = "Abbreviation EN",
-    abbrTh = "Abbreviation TH",
-    year = "Year",
+    code = "",
+    nameEn = "",
+    nameTh = "",
+    abbrEn = "",
+    abbrTh = "",
+    year = "",
   } = placeholderText;
 
   const { insert = "Insert", upload = "Upload" } = submitButtonText;
@@ -82,8 +86,7 @@ export default function FormPopup({
 
       {/* Modal */}
       <div className="relative z-10 bg-white p-6 rounded shadow-lg w-2/3 max-w-3xl">
-        <div className="flex justify-between items-center mb-5">
-          <h3 className="text-xl font-bold">Add Program</h3>
+        <div className="flex justify-end items-center mb-5">
           <X
             onClick={onClose}
             className="text-gray-600 hover:text-black cursor-pointer"
@@ -113,46 +116,48 @@ export default function FormPopup({
             </div>
           ))}
 
-          {/* Abbreviation inputs */}
-          <div className="flex gap-2 mb-4">
-            {[
-              { name: "abbrEn", placeholder: abbrEn },
-              { name: "abbrTh", placeholder: abbrTh },
-            ].map(({ name, placeholder }) => (
-              <div key={name} className="w-full">
-                <input
-                  type="text"
-                  name={name}
-                  placeholder={placeholder}
-                  value={formData[name as keyof typeof formData]}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 rounded border ${
-                    errors[name] ? "border-red-500" : "border"
-                  }`}
-                />
-                {errors[name] && (
-                  <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
-                )}
-              </div>
-            ))}
-          </div>
+          {showAbbreviationInputs && (
+            <div className="flex gap-2 mb-4">
+              {[
+                { name: "abbrEn", placeholder: abbrEn },
+                { name: "abbrTh", placeholder: abbrTh },
+              ].map(({ name, placeholder }) => (
+                <div key={name} className="w-full">
+                  <input
+                    type="text"
+                    name={name}
+                    placeholder={placeholder}
+                    value={formData[name as keyof typeof formData]}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 rounded border ${
+                      errors[name] ? "border-red-500" : "border"
+                    }`}
+                  />
+                  {errors[name] && (
+                    <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
-          {/* Year input */}
-          <div className="mb-4">
-            <input
-              type="text"
-              name="year"
-              placeholder={year}
-              value={formData.year}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 rounded border ${
-                errors.year ? "border-red-500" : "border"
-              }`}
-            />
-            {errors.year && (
-              <p className="text-red-500 text-sm mt-1">{errors.year}</p>
-            )}
-          </div>
+          {showYearInput && (
+            <div className="mb-4">
+              <input
+                type="text"
+                name="year"
+                placeholder={year}
+                value={formData.year}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 rounded border ${
+                  errors.year ? "border-red-500" : "border"
+                }`}
+              />
+              {errors.year && (
+                <p className="text-red-500 text-sm mt-1">{errors.year}</p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-between gap-2">
             <button

@@ -56,7 +56,7 @@ export default function EditCourse() {
     <div className="max-w-[1100px] px-4 h-full">
       <p className="font-extralight text-2xl">{t("course information")}</p>
 
-      <div className="max-w-200 flex gap-3 mt-5">
+      <div className="max-w-200 flex gap-3 mt-5 items-center">
         <DropdownSelect
           label={t("university")}
           value={university}
@@ -87,6 +87,18 @@ export default function EditCourse() {
           onChange={(e) => setSemester(e.target.value)}
           options={semesterOptions}
         />
+        <button
+          onClick={() => {
+            setUniversity("");
+            setFaculty("");
+            setProgram("");
+            setYear("");
+            setSemester("");
+          }}
+          className="text-white bg-orange-300 hover:bg-orange-400 h-5 flex ml-3 items-center p-2 rounded-full"
+        >
+          Clear
+        </button>
       </div>
       <CourseManagement />
     </div>

@@ -17,12 +17,17 @@ interface AddButtonProp {
     insert?: string;
     upload?: string;
   };
+
+  showAbbreviationInputs?: boolean;
+  showYearInput?: boolean;
 }
 
 export default function AddButton({
-  buttonText = "Add Program",
+  buttonText = "Button",
   placeholderText = {},
   submitButtonText = {},
+  showAbbreviationInputs = true,
+  showYearInput = true,
 }: AddButtonProp) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -40,6 +45,8 @@ export default function AddButton({
           onClose={() => setIsOpen(false)}
           placeholderText={placeholderText}
           submitButtonText={submitButtonText}
+          showAbbreviationInputs={showAbbreviationInputs}
+          showYearInput={showYearInput}
         />
       )}
     </>

@@ -2,7 +2,6 @@ import AddButton from "../../components/AddButton";
 import { Table, Column } from "../../components/Table";
 import { useTranslation } from "next-i18next";
 
-
 interface Program {
   programId: number;
   programNameEN: string;
@@ -44,7 +43,7 @@ export default function ProgramManagement() {
   const lang = i18n.language;
 
   const programColumns: Column<Program>[] = [
-    { header:t("program id"), accessor: "programId" },
+    { header: t("program id"), accessor: "programId" },
     lang === "en"
       ? { header: "Name", accessor: "programNameEN" }
       : { header: "ชื่อแผนการเรียน", accessor: "programNameTH" },

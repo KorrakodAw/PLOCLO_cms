@@ -68,7 +68,7 @@ export default function EditProgram() {
         ))}
       </div>
       <hr />
-      <div className="max-w-200 flex gap-3 mt-5">
+      <div className="max-w-200 flex gap-3 mt-5 items-center">
         <DropdownSelect
           label={t("university")}
           value={university}
@@ -93,6 +93,17 @@ export default function EditProgram() {
           onChange={(e) => setYear(e.target.value)}
           options={yearOptions}
         />
+        <button
+          onClick={() => {
+            setUniversity("");
+            setFaculty("");
+            setProgram("");
+            setYear("");
+          }}
+          className="text-white bg-orange-300 hover:bg-orange-400 h-5 flex ml-3 items-center p-2 rounded-full"
+        >
+          Clear
+        </button>
       </div>
       {activeTab === "general" && <ProgramManagement />}
       {activeTab === "plo" && <AddPlo />}

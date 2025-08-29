@@ -13,14 +13,13 @@ export default function AddStudent() {
             code: "Student Code",
             nameEn: "Student Name (EN)",
             nameTh: "Student Name (TH)",
-            abbrEn: "Student abbreviation (EN)",
-            abbrTh: "Student abbreviation (TH)",
-            year: "Year",
           }}
           submitButtonText={{
             insert: "Insert Student",
             upload: "Upload Student (Excel)",
           }}
+          showAbbreviationInputs={false}
+          showYearInput={false}
         />
       </div>
 
