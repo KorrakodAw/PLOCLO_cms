@@ -7,6 +7,7 @@ import ProgramManagement from "./ProgramManagement";
 import AddPlo from "./AddPlo";
 import AddStudent from "./AddStudent";
 import { useTranslation } from "react-i18next";
+import ProtectedRoute from "../../components/ProtectedRoute";
 
 export default function EditProgram() {
   const { t } = useTranslation("common");
@@ -55,59 +56,61 @@ export default function EditProgram() {
   ];
 
   return (
-    <div className="max-w-[1100px] px-4 h-full">
-      <p className="font-extralight text-2xl">{t("program information")}</p>
-      <div className="flex gap-3 mt-5 px-3 py-2">
-        {tabs.map((tab) => (
-          <TabButton
-            key={tab.id}
-            label={tab.label}
-            isActive={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
+    <ProtectedRoute roles={["admin", "instructor"]}>
+      <div className="max-w-[1100px] px-4 h-full">
+        <p className="font-extralight text-2xl ">{t("program information")}</p>
+        <div className="flex gap-3 mt-5 px-3 py-2 ">
+          {tabs.map((tab) => (
+            <TabButton
+              key={tab.id}
+              label={tab.label}
+              isActive={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+            />
+          ))}
+        </div>
+        <hr />
+        <div className="max-w-200 flex gap-3 mt-5 items-center ">
+          <DropdownSelect
+            label={t("university")}
+            value={university}
+            onChange={(e) => setUniversity(e.target.value)}
+            options={universityOptions}
           />
-        ))}
+          <DropdownSelect
+            label={t("faculty")}
+            value={faculty}
+            onChange={(e) => setFaculty(e.target.value)}
+            options={facultyOptions}
+          />
+          <DropdownSelect
+            label={t("program")}
+            value={program}
+            onChange={(e) => setProgram(e.target.value)}
+            options={programOptions}
+          />
+          <DropdownSelect
+            label={t("year")}
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            options={yearOptions}
+          />
+          <button
+            onClick={() => {
+              setUniversity("");
+              setFaculty("");
+              setProgram("");
+              setYear("");
+            }}
+            className="text-white bg-orange-300 hover:bg-orange-400 h-5 flex ml-3 items-center p-2 rounded-full cursor-pointer"
+          >
+            {t("clear")}
+          </button>
+        </div>
+        {activeTab === "general" && <ProgramManagement />}
+        {activeTab === "plo" && <AddPlo />}
+        {activeTab === "add-student" && <AddStudent />}
       </div>
-      <hr />
-      <div className="max-w-200 flex gap-3 mt-5 items-center">
-        <DropdownSelect
-          label={t("university")}
-          value={university}
-          onChange={(e) => setUniversity(e.target.value)}
-          options={universityOptions}
-        />
-        <DropdownSelect
-          label={t("faculty")}
-          value={faculty}
-          onChange={(e) => setFaculty(e.target.value)}
-          options={facultyOptions}
-        />
-        <DropdownSelect
-          label={t("program")}
-          value={program}
-          onChange={(e) => setProgram(e.target.value)}
-          options={programOptions}
-        />
-        <DropdownSelect
-          label={t("year")}
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-          options={yearOptions}
-        />
-        <button
-          onClick={() => {
-            setUniversity("");
-            setFaculty("");
-            setProgram("");
-            setYear("");
-          }}
-          className="text-white bg-orange-300 hover:bg-orange-400 h-5 flex ml-3 items-center p-2 rounded-full"
-        >
-          Clear
-        </button>
-      </div>
-      {activeTab === "general" && <ProgramManagement />}
-      {activeTab === "plo" && <AddPlo />}
-      {activeTab === "add-student" && <AddStudent />}
-    </div>
+    </ProtectedRoute>
   );
 }

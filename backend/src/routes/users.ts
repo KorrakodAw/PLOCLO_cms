@@ -3,9 +3,11 @@ import { pool } from "../db";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { authenticateToken, AuthRequest } from "../middleware/authMiddleware";
+import { authorizeRoles } from "../middleware/roleMiddleware";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "changeme";
+const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
 
 // ===== REGISTER =====
 router.post("/register", async (req, res) => {
@@ -14,7 +16,7 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await pool.query(
       "INSERT INTO users (username,email,password_hash,role) VALUES ($1,$2,$3,$4) RETURNING id, username, email, role, created_at",
-      [username, email, hashedPassword, role || "user"]
+      [username, email, hashedPassword, role || "student"]
     );
     res.status(201).json(result.rows[0]);
   } catch (err: any) {
@@ -83,6 +85,34 @@ router.get("/", authenticateToken, async (_req, res) => {
   res.json(result.rows);
 });
 
+// PATCH /api/users/:id/role
+router.patch("/:id/role", authenticateToken, async (req: AuthRequest, res) => {
+  const requester = req.user; // จาก middleware
+  const { id } = req.params;
+  const { role } = req.body;
+
+  // ตรวจสอบว่า requester เป็น admin
+  if (requester?.role !== "admin") {
+    return res
+      .status(403)
+      .json({ error: "Forbidden: only admin can change roles" });
+  }
+
+  try {
+    const result = await pool.query(
+      "UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, email, role",
+      [role, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json({ message: "Role updated successfully", user: result.rows[0] });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 // Get user by ID
 router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.params.id;
@@ -120,6 +150,16 @@ router.put("/:id", authenticateToken, async (req: AuthRequest, res) => {
   );
   res.json(result.rows[0]);
 });
+
+// instructor และ admin ใช้ได้
+router.get(
+  "/users",
+  authenticateToken,
+  authorizeRoles("admin", "instructor"),
+  (req, res) => {
+    res.json({ message: "Welcome instructor/admin" });
+  }
+);
 
 // Delete user
 router.delete("/:id", authenticateToken, async (req: AuthRequest, res) => {

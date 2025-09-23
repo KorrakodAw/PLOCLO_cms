@@ -17,7 +17,10 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
   const pathname = usePathname();
   const isActive = pathname === "/";
   const { t } = useTranslation("common");
-  const { logout } = useAuth();
+
+  // 👇 ดึง role มาจาก context
+  const { logout, user } = useAuth();
+  // สมมติ user = { id: 1, role: "admin" }
 
   return (
     <aside className="w-52 min-h-screen p-6 shadow-2xl fixed top-0 left-0 z-10">
@@ -30,31 +33,37 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
       </Link>
       <LanguageSwitcher />
       <nav className="mt-10">
-        <ul className="">
+        <ul>
           {isLoggedIn && (
             <>
-              <NavLink href="/editProgram">{t("edit program")}</NavLink>
-              <NavLink href="/editCourse">{t("edit course")}</NavLink>
+              {/* ✅ เฉพาะ Admin */}
+              {["admin", "instructor"].includes(user?.role || "") && (
+                <>
+                  <NavLink href="/editProgram">{t("edit program")}</NavLink>
+                  <NavLink href="/editCourse">{t("edit course")}</NavLink>
+                  <NavLink href="/manageAccount">{t("manage account")}</NavLink>
+                </>
+              )}
+
+              {/* ✅ ทุก role เข้าได้ */}
               <NavLink href="/viewChart">{t("view chart")}</NavLink>
-              <NavLink href="/manageAccount">{t("manage account")}</NavLink>
             </>
           )}
 
           <NavLink href="/aboutData">{t("about")}</NavLink>
+
           {isLoggedIn && (
-            <>
-              <button
-                onClick={logout}
-                className={`p-3 block font-normal mt-20 transition-all duration-200 transform hover:translate-x-2
-        ${
-          isActive
-            ? "text-black hover:text-red-500 hover:shadow-2xl hover:rounded-b-md"
-            : ""
-        }`}
-              >
-                {t("logout")}
-              </button>
-            </>
+            <button
+              onClick={logout}
+              className={`p-3 block font-normal mt-20 transition-all duration-200 transform hover:translate-x-2
+              ${
+                isActive
+                  ? "text-black hover:text-red-500 hover:shadow-2xl hover:rounded-b-md"
+                  : ""
+              }`}
+            >
+              {t("logout")}
+            </button>
           )}
         </ul>
       </nav>

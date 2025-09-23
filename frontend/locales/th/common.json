@@ -37,5 +37,6 @@
   "program id": "รหัสแผนการศึกษา",
   "welcome": "ยินดีตอนรับ",
   "you are logged in": "คุณเข้าสู่ระบบแล้ว",
-  "logout": "ออกจากระบบ"
+  "logout": "ออกจากระบบ",
+  "clear":"CLEAR"
 }

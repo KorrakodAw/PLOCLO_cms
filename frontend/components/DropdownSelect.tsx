@@ -24,7 +24,7 @@ const DropdownSelect: React.FC<DropdownSelectProps> = ({
       <select
         value={value}
         onChange={onChange}
-        className="bg-gray-500 p w-full max-w-md font-extralight text-white rounded text-center"
+        className="bg-gray-500 p w-full max-w-md font-extralight text-white rounded text-center cursor-pointer"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>

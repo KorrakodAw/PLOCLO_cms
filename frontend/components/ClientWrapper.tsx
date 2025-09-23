@@ -27,7 +27,7 @@ export default function ClientWrapper({
     "/editCourse",
     "/editProgram",
     "/manageAccount",
-    "viewChart",
+    "/viewChart",
   ];
 
   useEffect(() => {

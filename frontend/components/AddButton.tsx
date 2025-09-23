@@ -35,7 +35,7 @@ export default function AddButton({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="bg-orange-300 text-white px-4 py-2 rounded hover:bg-orange-400 transition"
+        className="bg-orange-300 text-white px-4 py-2 rounded hover:bg-orange-400 transition cursor-pointer"
       >
         {buttonText}
       </button>

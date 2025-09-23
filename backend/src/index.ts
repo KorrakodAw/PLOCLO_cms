@@ -3,6 +3,7 @@ import express from "express";
 import morgan from "morgan";
 import cors from "cors";
 import usersRouter from "./routes/users";
+import programRoutes from "./routes/program";
 
 const app = express();
 app.use(morgan("dev"));
@@ -17,7 +18,6 @@ app.use(
 );
 
 app.use("/api/users", usersRouter);
-
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.use("/api/program", programRoutes);
 
 app.listen(5000, () => console.log("API on http://localhost:5000"));

@@ -37,5 +37,6 @@
   "program id": "Program ID",
   "welcome": "Welcome",
   "you are logged in": "You are logged in",
-  "logout":"Logout"
+  "logout":"Logout",
+  "clear":"CLEAR"
 }

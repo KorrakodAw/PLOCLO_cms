@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiClient } from "../../utils/apiClient";
+import ProtectedRoute from "../../components/ProtectedRoute";
 
 interface User {
   id: number;
@@ -48,32 +49,34 @@ export default function ManageAccount() {
   if (loading) return <p>Loading users...</p>;
 
   return (
-    <div className="p-5">
-      <h1 className="text-2xl font-extralight mb-4">Manage Account</h1>
-      <table className="min-w-full border border-gray-200">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="px-4 py-2 border">ID</th>
-            <th className="px-4 py-2 border">Username</th>
-            <th className="px-4 py-2 border">Email</th>
-            <th className="px-4 py-2 border">Role</th>
-            <th className="px-4 py-2 border">Created At</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.id} className="hover:bg-gray-50">
-              <td className="px-4 py-2 border">{u.id}</td>
-              <td className="px-4 py-2 border">{u.username}</td>
-              <td className="px-4 py-2 border">{u.email}</td>
-              <td className="px-4 py-2 border">{u.role}</td>
-              <td className="px-4 py-2 border">
-                {new Date(u.created_at).toLocaleString()}
-              </td>
+    <ProtectedRoute roles={["admin", "instructor"]}>
+      <div className="p-5">
+        <h1 className="text-2xl font-extralight mb-4">Manage Account</h1>
+        <table className="min-w-full border border-gray-200">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="px-4 py-2 border">ID</th>
+              <th className="px-4 py-2 border">Username</th>
+              <th className="px-4 py-2 border">Email</th>
+              <th className="px-4 py-2 border">Role</th>
+              <th className="px-4 py-2 border">Created At</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id} className="hover:bg-gray-50">
+                <td className="px-4 py-2 border">{u.id}</td>
+                <td className="px-4 py-2 border">{u.username}</td>
+                <td className="px-4 py-2 border">{u.email}</td>
+                <td className="px-4 py-2 border">{u.role}</td>
+                <td className="px-4 py-2 border">
+                  {new Date(u.created_at).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </ProtectedRoute>
   );
 }

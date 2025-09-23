@@ -1,4 +1,3 @@
-// authMiddleware.ts
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
@@ -6,7 +5,9 @@ export interface AuthRequest extends Request {
   user?: any;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || "changeme";
+// บังคับว่า JWT_SECRET เป็น string
+const JWT_SECRET = process.env.JWT_SECRET as string;
+if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
 
 export function authenticateToken(
   req: AuthRequest,
@@ -14,9 +15,11 @@ export function authenticateToken(
   next: NextFunction
 ) {
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  const token = authHeader?.split(" ")[1];
+
   if (!token) return res.status(401).json({ error: "Access denied" });
 
+  // token แน่ใจแล้วว่าไม่ undefined
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: "Invalid token" });
     req.user = user;
