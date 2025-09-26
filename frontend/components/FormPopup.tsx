@@ -2,31 +2,38 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
+import * as XLSX from "xlsx";
+
+interface FormData {
+  code: string;
+  nameEn: string;
+  nameTh: string;
+  abbrEn: string;
+  abbrTh: string;
+  year: string;
+}
 
 interface FormPopupProps {
   onClose: () => void;
-  placeholderText: {
-    code?: string;
-    nameEn?: string;
-    nameTh?: string;
-    abbrEn?: string;
-    abbrTh?: string;
-    year?: string;
-  };
+  onSubmit: (data: FormData) => Promise<void> | void;
+  onSubmitExcel?: (rows: any[]) => Promise<void> | void;
+  placeholderText: Partial<FormData>;
   submitButtonText?: {
     insert?: string;
     upload?: string;
   };
-  showAbbreviationInputs?: boolean; // เพิ่ม
-  showYearInput?: boolean; // เพิ่ม
+  showAbbreviationInputs?: boolean;
+  showYearInput?: boolean;
 }
 
 export default function FormPopup({
   onClose,
+  onSubmit,
+  onSubmitExcel,
   placeholderText,
   submitButtonText = {},
-  showAbbreviationInputs = false, // ค่าเริ่มต้น
-  showYearInput = false, // ค่าเริ่มต้น
+  showAbbreviationInputs = false,
+  showYearInput = false,
 }: FormPopupProps) {
   const {
     code = "",
@@ -39,7 +46,7 @@ export default function FormPopup({
 
   const { insert = "Insert", upload = "Upload" } = submitButtonText;
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     code: "",
     nameEn: "",
     nameTh: "",
@@ -48,31 +55,62 @@ export default function FormPopup({
     year: "",
   });
 
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setErrors({ ...errors, [e.target.name]: "" }); // clear error on typing
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const validate = () => {
-    const newErrors: { [key: string]: string } = {};
+    const newErrors: Record<string, string> = {};
     Object.entries(formData).forEach(([key, value]) => {
-      if (!value.trim()) {
-        newErrors[key] = "This field is required.";
-      }
+      if (!value.trim()) newErrors[key] = "This field is required.";
     });
     return newErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-    } else {
-      console.log("Form submitted:", formData);
+      return;
+    }
+    try {
+      setLoading(true);
+      await onSubmit(formData); // 👈 delegate to parent
       onClose();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit form");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      console.log("Excel Data:", rows);
+
+      if (onSubmitExcel) {
+        await onSubmitExcel(rows); // 👈 ส่งข้อมูลกลับไป parent
+        onClose();
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Upload failed!");
     }
   };
 
@@ -94,6 +132,7 @@ export default function FormPopup({
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
+          {/* Code, Name EN, Name TH */}
           {[
             { name: "code", placeholder: code },
             { name: "nameEn", placeholder: nameEn },
@@ -104,7 +143,7 @@ export default function FormPopup({
                 type="text"
                 name={name}
                 placeholder={placeholder}
-                value={formData[name as keyof typeof formData]}
+                value={formData[name as keyof FormData]}
                 onChange={handleChange}
                 className={`w-full px-3 py-2 rounded border ${
                   errors[name] ? "border-red-500" : "border"
@@ -116,6 +155,7 @@ export default function FormPopup({
             </div>
           ))}
 
+          {/* Abbreviation */}
           {showAbbreviationInputs && (
             <div className="flex gap-2 mb-4">
               {[
@@ -127,7 +167,7 @@ export default function FormPopup({
                     type="text"
                     name={name}
                     placeholder={placeholder}
-                    value={formData[name as keyof typeof formData]}
+                    value={formData[name as keyof FormData]}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 rounded border ${
                       errors[name] ? "border-red-500" : "border"
@@ -141,6 +181,7 @@ export default function FormPopup({
             </div>
           )}
 
+          {/* Year */}
           {showYearInput && (
             <div className="mb-4">
               <input
@@ -162,16 +203,20 @@ export default function FormPopup({
           <div className="flex justify-between gap-2">
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-blue-400 text-white rounded hover:bg-blue-700"
+              disabled={loading}
+              className="w-full px-4 py-2 bg-blue-400 text-white rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              {insert}
+              {loading ? "Submitting..." : insert}
             </button>
-            <button
-              type="button"
-              className="w-full px-4 py-2 bg-blue-400 text-white rounded hover:bg-blue-700"
-            >
+            <label className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-700 text-center cursor-pointer">
               {upload}
-            </button>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
           </div>
         </form>
       </div>

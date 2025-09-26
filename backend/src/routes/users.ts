@@ -40,7 +40,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "1h" }
     );
 
     // ✅ ส่งทั้ง token และ user ข้อมูลหลัก

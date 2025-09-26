@@ -17,7 +17,8 @@ export default function ProtectedRoute({
   useEffect(() => {
     if (initialized) {
       if (!isLoggedIn) {
-        router.replace("/login");
+        router.replace("/");
+        router.refresh();
       } else if (roles && !roles.includes(user?.role ?? "")) {
         router.replace("/403"); // หน้า forbidden
       }

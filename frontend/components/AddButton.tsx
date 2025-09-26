@@ -17,6 +17,8 @@ interface AddButtonProp {
     insert?: string;
     upload?: string;
   };
+  onSubmit: (data: any) => void;
+  onSubmitExcel: (data: any) => void;
 
   showAbbreviationInputs?: boolean;
   showYearInput?: boolean;
@@ -28,6 +30,8 @@ export default function AddButton({
   submitButtonText = {},
   showAbbreviationInputs = true,
   showYearInput = true,
+  onSubmit,
+  onSubmitExcel,
 }: AddButtonProp) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -42,7 +46,9 @@ export default function AddButton({
 
       {isOpen && (
         <FormPopup
-          onClose={() => setIsOpen(false)}
+          onClose={() => setIsOpen(false)} // ปิด popup
+          onSubmit={onSubmit}
+          onSubmitExcel={onSubmitExcel}
           placeholderText={placeholderText}
           submitButtonText={submitButtonText}
           showAbbreviationInputs={showAbbreviationInputs}

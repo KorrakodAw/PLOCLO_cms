@@ -6,8 +6,10 @@ import { apiClient } from "../../utils/apiClient";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import AddButton from "../../components/AddButton";
 import { useTranslation } from "next-i18next";
+import * as XLSX from "xlsx";
 
 interface Program {
+  id: number;
   program_code: number;
   program_name_en: string;
   program_name_th: string;
@@ -54,6 +56,78 @@ export default function ProgramManagement() {
   if (!isLoggedIn) return <p>Please login first.</p>;
   if (loading) return <p>Loading programs...</p>;
 
+  const handleAddProgram = async (data: any) => {
+    try {
+      const res = await apiClient("/api/program", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          program_code: data.code,
+          program_name_en: data.nameEn,
+          program_name_th: data.nameTh,
+          program_shortname_en: data.abbrEn,
+          program_shortname_th: data.abbrTh,
+          program_year: parseInt(data.year),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || "Failed to add program");
+        return;
+      }
+
+      const newProgram = await res.json();
+      setPrograms((prev) => [...prev, newProgram]); // อัปเดต state
+    } catch (error) {
+      console.error(error);
+      alert("Error adding program");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+
+      try {
+        const res = await apiClient("/api/program/bulk", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(rows),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error || "Failed to upload");
+          return;
+        }
+        alert("Programs uploaded successfully!");
+      } catch (err) {
+        console.error(err);
+        alert("Upload failed. Check backend.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
       <div className="mt-5 p-5">
@@ -64,7 +138,7 @@ export default function ProgramManagement() {
           <AddButton
             buttonText={t("create new program")}
             placeholderText={{
-              code: t("Program Id"),
+              code: t("Program Code"),
               nameEn: "Program Name (EN)",
               nameTh: "Program Name (TH)",
               abbrEn: "Program abbreviation (EN)",
@@ -75,6 +149,8 @@ export default function ProgramManagement() {
               insert: "Insert Program",
               upload: "Upload Program (Excel)",
             }}
+            onSubmit={handleAddProgram}
+            onSubmitExcel={handleFileUpload}
           />
         </div>
 
@@ -83,7 +159,7 @@ export default function ProgramManagement() {
         <table className="min-w-full border border-gray-200">
           <thead>
             <tr className="bg-gray-100">
-              <th className="px-4 py-2 border">{t("program id")}</th>
+              <th className="px-4 py-2 border">{t("Code")}</th>
               <th className="px-4 py-2 border">
                 {lang === "en" ? "Name" : "ชื่อแผนการเรียน"}
               </th>
@@ -95,7 +171,7 @@ export default function ProgramManagement() {
           </thead>
           <tbody>
             {programs.map((p) => (
-              <tr key={p.program_code} className="hover:bg-gray-50">
+              <tr key={p.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2 border">{p.program_code}</td>
                 <td className="px-4 py-2 border">
                   {lang === "en" ? p.program_name_en : p.program_name_th}
@@ -105,7 +181,10 @@ export default function ProgramManagement() {
                     ? p.program_shortname_en
                     : p.program_shortname_th}
                 </td>
-                <td className="px-4 py-2 border">{p.program_year}</td>
+                <td className="px-4 py-2 border">
+                  {" "}
+                  {lang === "en" ? p.program_year - 543 : p.program_year}
+                </td>
               </tr>
             ))}
           </tbody>
