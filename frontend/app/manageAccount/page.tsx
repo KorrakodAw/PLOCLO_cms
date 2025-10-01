@@ -59,7 +59,6 @@ export default function ManageAccount() {
               <th className="px-4 py-2 border">Username</th>
               <th className="px-4 py-2 border">Email</th>
               <th className="px-4 py-2 border">Role</th>
-              <th className="px-4 py-2 border">Created At</th>
             </tr>
           </thead>
           <tbody>
@@ -69,9 +68,6 @@ export default function ManageAccount() {
                 <td className="px-4 py-2 border">{u.username}</td>
                 <td className="px-4 py-2 border">{u.email}</td>
                 <td className="px-4 py-2 border">{u.role}</td>
-                <td className="px-4 py-2 border">
-                  {new Date(u.created_at).toLocaleString()}
-                </td>
               </tr>
             ))}
           </tbody>

@@ -5,7 +5,7 @@
   "please input email": "กรุณากรอกอีเมล",
   "please input password": "กรุณากรอกรหัสผ่าน",
   "please login first": "กรุณาเข้าสู่ระบบก่อน",
-  "sign in": "ลงชื่อเข้าใช้",
+  "sign_in": "ลงชื่อเข้าใช้",
   "edit program": "แก้ไขแผนการเรียน",
   "edit course": "แก้ไขหลักสูตร",
   "view chart": "ดูแผนภูมิ",
@@ -38,5 +38,8 @@
   "welcome": "ยินดีตอนรับ",
   "you are logged in": "คุณเข้าสู่ระบบแล้ว",
   "logout": "ออกจากระบบ",
-  "clear":"CLEAR"
+  "clear": "CLEAR",
+  "enter_password": "กรอกรหัสผ่าน",
+  "enter_email": "กรอกอีเมล",
+  "please select a faculty": "กรุณาเลือกคณะ"
 }

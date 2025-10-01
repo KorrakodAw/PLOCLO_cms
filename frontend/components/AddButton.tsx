@@ -4,6 +4,12 @@ import { useState } from "react";
 import FormPopup from "./FormPopup";
 
 interface AddButtonProp {
+  facultyOptions?: { label: string; value: string }[];
+  programOptions?: { label: string; value: string }[];
+  selectedFaculty?: string;
+  selectedProgram?: string;
+  onFacultyChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onProgramChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   buttonText?: string;
   placeholderText?: {
     code?: string;
@@ -18,7 +24,7 @@ interface AddButtonProp {
     upload?: string;
   };
   onSubmit: (data: any) => void;
-  onSubmitExcel: (data: any) => void;
+  onSubmitExcel?: (data: unknown[]) => void;
 
   showAbbreviationInputs?: boolean;
   showYearInput?: boolean;
@@ -32,6 +38,12 @@ export default function AddButton({
   showYearInput = true,
   onSubmit,
   onSubmitExcel,
+  facultyOptions = [],
+  programOptions = [],
+  selectedFaculty = "",
+  selectedProgram = "",
+  onFacultyChange,
+  onProgramChange,
 }: AddButtonProp) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -53,6 +65,12 @@ export default function AddButton({
           submitButtonText={submitButtonText}
           showAbbreviationInputs={showAbbreviationInputs}
           showYearInput={showYearInput}
+          facultyOptions={facultyOptions}
+          programOptions={programOptions}
+          selectedFaculty={selectedFaculty}
+          selectedProgram={selectedProgram}
+          onFacultyChange={onFacultyChange}
+          onProgramChange={onProgramChange}
         />
       )}
     </>

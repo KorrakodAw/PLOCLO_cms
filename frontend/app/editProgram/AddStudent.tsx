@@ -20,6 +20,18 @@ export default function AddStudent() {
           }}
           showAbbreviationInputs={false}
           showYearInput={false}
+          onSubmit={(data) => {
+            // ฟังก์ชันสำหรับเพิ่ม Student
+            console.log("Add student:", data);
+            alert("Function to add student is not implemented yet.");
+          }}
+          onSubmitExcel={(rows) => {
+            // ฟังก์ชันสำหรับเพิ่ม Student จาก Excel
+            console.log("Upload students from Excel:", rows);
+            alert(
+              "Function to upload students from Excel is not implemented yet."
+            );
+          }}
         />
       </div>
 

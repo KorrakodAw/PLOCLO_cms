@@ -5,7 +5,7 @@
   "please input email": "Please Input Email",
   "please input password": "Please Input Password",
   "please login first": "Please Login First",
-  "sign in": "Sign In",
+  "sign_in": "Sign In",
   "edit program": "Edit Program",
   "edit course": "Edit Course",
   "view chart": "View Chart",
@@ -37,6 +37,9 @@
   "program id": "Program ID",
   "welcome": "Welcome",
   "you are logged in": "You are logged in",
-  "logout":"Logout",
-  "clear":"CLEAR"
+  "logout": "Logout",
+  "clear": "CLEAR",
+  "enter_password": "Enter password",
+  "enter_email": "Enter email",
+  "please select a faculty": "Please select a faculty"
 }

@@ -18,7 +18,7 @@ export default function ProtectedRoute({
     if (initialized) {
       if (!isLoggedIn) {
         router.replace("/");
-        router.refresh();
+        window.location.reload(); // reload to reset state
       } else if (roles && !roles.includes(user?.role ?? "")) {
         router.replace("/403"); // หน้า forbidden
       }

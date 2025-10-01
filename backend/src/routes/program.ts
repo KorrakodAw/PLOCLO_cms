@@ -2,17 +2,28 @@ import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { authorizeRoles } from "../middleware/roleMiddleware";
-
 const router = Router();
 
-// GET all programs
+// GET all programs (with faculty & university names)
 router.get("/", authenticateToken, async (_req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, program_code, program_name_en, program_name_th, 
-              program_shortname_en, program_shortname_th, program_year 
-       FROM program 
-       ORDER BY program_year DESC`
+      `SELECT 
+         p.id,
+         p.program_code,
+         p.program_name_en,
+         p.program_name_th,
+         p.program_shortname_en,
+         p.program_shortname_th,
+         p.program_year,
+         f.id AS faculty_id,
+         f.name AS faculty_name,
+         u.id AS university_id,
+         u.name AS university_name
+       FROM program p
+       JOIN faculty f ON p.faculty_id = f.id
+       JOIN university u ON f.university_id = u.id
+       ORDER BY p.id DESC`
     );
     res.json(result.rows);
   } catch (err: any) {
@@ -28,6 +39,7 @@ router.post(
   authorizeRoles("admin", "instructor"),
   async (req, res) => {
     const {
+      faculty_id,
       program_code,
       program_name_en,
       program_name_th,
@@ -37,6 +49,7 @@ router.post(
     } = req.body;
 
     if (
+      !faculty_id ||
       !program_code ||
       !program_name_en ||
       !program_name_th ||
@@ -44,17 +57,18 @@ router.post(
     ) {
       return res.status(400).json({
         error:
-          "program_code, program_name_en, program_name_th, and program_year are required",
+          "faculty_id, program_code, program_name_en, program_name_th, and program_year are required",
       });
     }
 
     try {
       const result = await pool.query(
         `INSERT INTO program 
-         (program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
-         VALUES ($1,$2,$3,$4,$5,$6)
-         RETURNING id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year`,
+         (faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         RETURNING id, faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year`,
         [
+          faculty_id,
           program_code,
           program_name_en,
           program_name_th,
@@ -68,7 +82,7 @@ router.post(
       console.error(err);
       if (err.code === "23505") {
         return res.status(409).json({
-          error: "Program with the same code and year already exists",
+          error: "Program with the same code already exists",
         });
       }
       res.status(500).json({ error: "Failed to create program" });
@@ -97,6 +111,7 @@ router.post(
 
       for (const p of programs) {
         const {
+          faculty_id,
           program_code,
           program_name_en,
           program_name_th,
@@ -106,6 +121,7 @@ router.post(
         } = p;
 
         if (
+          !faculty_id ||
           !program_code ||
           !program_name_en ||
           !program_name_th ||
@@ -114,16 +130,17 @@ router.post(
           await client.query("ROLLBACK");
           return res.status(400).json({
             error:
-              "Each program must include program_code, program_name_en, program_name_th, and program_year",
+              "Each program must include faculty_id, program_code, program_name_en, program_name_th, and program_year",
           });
         }
 
         const result = await client.query(
           `INSERT INTO program
-           (program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
-           VALUES ($1,$2,$3,$4,$5,$6)
-           RETURNING id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year`,
+           (faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)
+           RETURNING id, faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year`,
           [
+            faculty_id,
             program_code,
             program_name_en,
             program_name_th,
@@ -150,5 +167,52 @@ router.post(
     }
   }
 );
+
+// GET paginated programs
+// GET /api/program/paginate?page=1&limit=10
+router.get("/paginate", authenticateToken, async (req, res) => {
+  let page = parseInt(req.query.page as string) || 1;
+  let limit = parseInt(req.query.limit as string) || 10;
+  if (page < 1) page = 1;
+  if (limit < 1) limit = 10;
+  const offset = (page - 1) * limit;
+  try {
+    // Get total count
+    const countResult = await pool.query("SELECT COUNT(*) FROM program");
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    // Get paginated data
+    const dataResult = await pool.query(
+      `SELECT 
+         p.id,
+         p.program_code,
+         p.program_name_en,
+         p.program_name_th,
+         p.program_shortname_en,
+         p.program_shortname_th,
+         p.program_year,
+         f.id AS faculty_id,
+         f.name AS faculty_name,
+         u.id AS university_id,
+         u.name AS university_name
+       FROM program p
+       JOIN faculty f ON p.faculty_id = f.id
+       JOIN university u ON f.university_id = u.id
+       ORDER BY p.id DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    res.json({
+      data: dataResult.rows,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch paginated programs" });
+  }
+});
 
 export default router;

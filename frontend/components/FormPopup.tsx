@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import * as XLSX from "xlsx";
+import DropdownSelect from "./DropdownSelect";
 
 interface FormData {
   code: string;
@@ -14,9 +15,17 @@ interface FormData {
 }
 
 interface FormPopupProps {
+  requiredFields?: string[];
+  fieldMap?: Record<string, string>; // { internalName: externalName }
+  facultyOptions?: { label: string; value: string }[];
+  programOptions?: { label: string; value: string }[];
+  selectedFaculty?: string;
+  selectedProgram?: string;
+  onFacultyChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onProgramChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   onClose: () => void;
   onSubmit: (data: FormData) => Promise<void> | void;
-  onSubmitExcel?: (rows: any[]) => Promise<void> | void;
+  onSubmitExcel?: (rows: unknown[]) => Promise<void> | void;
   placeholderText: Partial<FormData>;
   submitButtonText?: {
     insert?: string;
@@ -34,6 +43,14 @@ export default function FormPopup({
   submitButtonText = {},
   showAbbreviationInputs = false,
   showYearInput = false,
+  facultyOptions = [],
+  programOptions = [],
+  selectedFaculty = "",
+  selectedProgram = "",
+  onFacultyChange,
+  onProgramChange,
+  requiredFields = ["code", "nameEn", "nameTh"],
+  fieldMap = {},
 }: FormPopupProps) {
   const {
     code = "",
@@ -66,8 +83,13 @@ export default function FormPopup({
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    Object.entries(formData).forEach(([key, value]) => {
-      if (!value.trim()) newErrors[key] = "This field is required.";
+    requiredFields.forEach((internalKey) => {
+      // Use fieldMap if provided, otherwise use internalKey
+      const propKey = fieldMap[internalKey] || internalKey;
+      const value = formData[propKey as keyof typeof formData];
+      if (!value || String(value).trim() === "") {
+        newErrors[propKey] = "This field is required.";
+      }
     });
     return newErrors;
   };
@@ -82,6 +104,7 @@ export default function FormPopup({
     try {
       setLoading(true);
       await onSubmit(formData); // 👈 delegate to parent
+      window.location.reload();
       onClose();
     } catch (err) {
       console.error(err);
@@ -100,7 +123,7 @@ export default function FormPopup({
       const workbook = XLSX.read(data, { type: "array" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
+      const rows: unknown[] = XLSX.utils.sheet_to_json(worksheet);
 
       console.log("Excel Data:", rows);
 
@@ -132,6 +155,29 @@ export default function FormPopup({
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
+          {/* Faculty Dropdown */}
+          {facultyOptions.length > 0 && onFacultyChange && (
+            <div className="mb-4">
+              <DropdownSelect
+                label="Faculty"
+                value={selectedFaculty}
+                onChange={onFacultyChange}
+                options={facultyOptions}
+              />
+            </div>
+          )}
+          {/* Program Dropdown */}
+          {programOptions.length > 0 && onProgramChange && (
+            <div className="mb-4">
+              <DropdownSelect
+                label="Program"
+                value={selectedProgram}
+                onChange={onProgramChange}
+                options={programOptions}
+              />
+            </div>
+          )}
+
           {/* Code, Name EN, Name TH */}
           {[
             { name: "code", placeholder: code },
