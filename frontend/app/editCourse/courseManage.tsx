@@ -40,7 +40,7 @@ export default function CourseManagement() {
   const fetchPrograms = async () => {
     if (!token) return;
     try {
-      const res = await getProgramsPaginated(token, 1, 100);
+      const res = await getProgramsPaginated(token, 1, 10);
       setProgramOptions([
         { label: "กรุณาเลือกโปรแกรม", value: "" },
         ...res.data.map((p: any) => ({
@@ -109,14 +109,14 @@ export default function CourseManagement() {
     }
   };
 
-  const programIdToShortName = (id: string | number) => {
-    const found = programOptions.find((p) => p.value === String(id));
-    return found && found.program_shortname_en
-      ? found.program_shortname_en
-      : found
-      ? found.label
-      : id;
-  };
+  // const programIdToShortName = (id: string | number) => {
+  //   const found = programOptions.find((p) => p.value === String(id));
+  //   return found && found.program_shortname_en
+  //     ? found.program_shortname_en
+  //     : found
+  //     ? found.label
+  //     : id;
+  // };
 
   const courseColumns: Column<Course>[] = [
     { header: t("course id"), accessor: "code" },

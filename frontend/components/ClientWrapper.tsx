@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import LoadingOverlay from "./LoadingOverlay";
 import Navbar from "./Navbar";
 import { useAuth } from "../app/context/AuthContext";
