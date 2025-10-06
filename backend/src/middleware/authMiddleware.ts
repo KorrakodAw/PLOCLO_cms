@@ -17,11 +17,23 @@ export function authenticateToken(
   const authHeader = req.headers["authorization"];
   const token = authHeader?.split(" ")[1];
 
-  if (!token) return res.status(401).json({ error: "Access denied" });
+  if (!token) {
+    // If request is from browser, redirect to main page
+    if (req.accepts("html")) {
+      return res.redirect("/");
+    }
+    return res.status(401).json({ error: "Access denied" });
+  }
 
   // token แน่ใจแล้วว่าไม่ undefined
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Invalid token" });
+    if (err) {
+      // If request is from browser, redirect to main page
+      if (req.accepts("html")) {
+        return res.redirect("/");
+      }
+      return res.status(403).json({ error: "Invalid token" });
+    }
     req.user = user;
     next();
   });

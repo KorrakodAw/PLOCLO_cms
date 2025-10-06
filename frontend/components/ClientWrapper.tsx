@@ -14,7 +14,6 @@ export default function ClientWrapper({
   const pathname = usePathname();
   const [loading, setLoading] = useState(false);
   const { isLoggedIn, initialized } = useAuth();
-  const router = useRouter();
 
   useEffect(() => {
     setLoading(true);
@@ -32,9 +31,13 @@ export default function ClientWrapper({
 
   useEffect(() => {
     if (initialized && !isLoggedIn && protectedRoutes.includes(pathname)) {
-      router.push("/");
+      // Prevent infinite reloads by checking if already on /
+      if (pathname !== "/") {
+        // Reload the page and redirect to login
+        window.location.replace("/");
+      }
     }
-  }, [initialized, isLoggedIn, pathname, router]);
+  }, [initialized, isLoggedIn, pathname]);
 
   if (!initialized) return null;
 

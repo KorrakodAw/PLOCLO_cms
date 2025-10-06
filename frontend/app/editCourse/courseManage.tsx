@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import AddButton from "../../components/AddButton";
 import { Table, Column } from "../../components/Table";
 import { useTranslation } from "react-i18next";
@@ -12,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 interface ProgramOption {
   label: string;
   value: string;
+  program_shortname_en?: string;
 }
 
 interface Course {
@@ -107,18 +109,30 @@ export default function CourseManagement() {
     }
   };
 
+  const programIdToShortName = (id: string | number) => {
+    const found = programOptions.find((p) => p.value === String(id));
+    return found && found.program_shortname_en
+      ? found.program_shortname_en
+      : found
+      ? found.label
+      : id;
+  };
+
   const courseColumns: Column<Course>[] = [
     { header: t("course id"), accessor: "code" },
     lang === "en"
       ? { header: "Name", accessor: "name" }
       : { header: "ชื่อหลักสูตร", accessor: "name_th" },
-
-    { header: t("program id"), accessor: "program_id" },
+    // {
+    //   header: t("program"),
+    //   accessor: "program_id",
+    //   render: (value) => programIdToShortName(value),
+    // },
   ];
 
   return (
-    <div className="mt-5">
-      <div className=" flex justify-between">
+    <div className="mt-5 p-5">
+      <div className=" flex justify-between items-center">
         <h1 className="text-2xl font-extralight">{t("course management")}</h1>
         <AddButton
           buttonText={t("create new course")}
@@ -173,7 +187,7 @@ export default function CourseManagement() {
         />
       </div>
       <hr className="my-3" />
-      <p className="text-xl font-extralight">{t("course")}</p>
+      {/* <p className="text-xl font-extralight">{t("course")}</p> */}
       {/* Table */}
       {loading ? (
         <div>{t("loading")}</div>

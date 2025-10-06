@@ -1,5 +1,5 @@
 // utils/apiClient.ts
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export const apiClient = (path: string, options: RequestInit = {}) => {
   const token =

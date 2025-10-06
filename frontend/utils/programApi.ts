@@ -19,7 +19,17 @@ export async function getProgramsPaginated(
 // utils/programApi.ts
 import { apiClient } from "../utils/apiClient";
 
-export async function addProgram(data: never, token: string) {
+export interface ProgramInput {
+  program_code: string | number;
+  faculty_id: string | number;
+  program_name_en: string;
+  program_name_th: string;
+  program_shortname_en: string;
+  program_shortname_th: string;
+  program_year: number;
+}
+
+export async function addProgram(data: ProgramInput, token: string) {
   const res = await apiClient("/api/program", {
     method: "POST",
     headers: {
@@ -37,7 +47,7 @@ export async function addProgram(data: never, token: string) {
   return res.json();
 }
 
-export async function bulkUploadPrograms(rows: never[], token: string) {
+export async function bulkUploadPrograms(rows: ProgramInput[], token: string) {
   const res = await apiClient("/api/program/bulk", {
     method: "POST",
     headers: {

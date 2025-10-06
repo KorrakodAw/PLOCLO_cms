@@ -7,6 +7,8 @@ import programRoutes from "./routes/program";
 import facultyRoutes from "./routes/faculty";
 import ploRoutes from "./routes/plo";
 import courseRoutes from "./routes/course";
+import univisityRoutes from "./routes/university";
+import cloRoutes from "./routes/clo";
 
 const app = express();
 app.use(morgan("dev"));
@@ -25,4 +27,7 @@ app.use("/api/program", programRoutes);
 app.use("/api/faculty", facultyRoutes); // เพิ่ม route สำหรับดึงข้อมูลคณะ
 app.use("/api/plo", ploRoutes); // เพิ่ม route สำหรับ PLO
 app.use("/api/course", courseRoutes); // เพิ่ม route สำหรับ Course
-app.listen(5000, () => console.log("API on http://localhost:5000"));
+app.use("/api/university", univisityRoutes); // เพิ่ม route สำหรับข้อมูลมหาวิทยาลัย
+app.use("/api/clo", cloRoutes); // เพิ่ม route สำหรับข้อมูล CLO
+
+app.listen(3001, () => console.log("API on http://localhost:3001"));

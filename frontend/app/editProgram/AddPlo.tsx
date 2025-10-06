@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import AddButton from "../../components/AddButton";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import { Table } from "../../components/Table";
 import { useEffect, useState } from "react";
 import { addPlo, getPlosPaginated } from "../../utils/ploApi";
 import { apiClient } from "../../utils/apiClient";
@@ -24,7 +26,8 @@ export default function AddPlo() {
     }
     let successCount = 0;
     let failCount = 0;
-    let errorDetails = [];
+    const errorDetails = [];
+    // Process each row from Excel
     for (const [i, row] of rows.entries()) {
       const missingFields = [];
       // Accept both camelCase, snake_case, and Excel header keys for import
@@ -99,7 +102,7 @@ export default function AddPlo() {
         const result = await getPlosPaginated(token, page, limit);
         setPlos(result.data);
         setTotalPages(result.totalPages);
-      } catch (err) {
+      } catch {
         setPlos([]);
         setTotalPages(1);
       } finally {
@@ -176,8 +179,8 @@ export default function AddPlo() {
   };
 
   return (
-    <div className="mt-5">
-      <div className="flex justify-between">
+    <div className="mt-5 p-5">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-extralight">{t("plo management")}</h1>
         <AddButton
           buttonText={t("create new plo")}
@@ -208,38 +211,32 @@ export default function AddPlo() {
         ) : plos.length === 0 ? (
           <div>No PLO data found.</div>
         ) : (
-          <table className="min-w-full border border-gray-300">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="px-4 py-2 border w-[100px]">{t("Code")}</th>
-                <th className="px-4 py-2 border">
-                  {lang === "en" ? "Name" : "ชื่อแผนการเรียน"}
-                </th>
-                <th className="px-4 py-2 border">
-                  {lang === "en" ? "Name " : "ชื่อโปรแกรม"}
-                </th>
-                <th className="px-4 py-2 border">{t("year")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plos.map((plo) => (
-                <tr key={plo.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 border">{plo.code}</td>
-                  <td className="px-4 py-2 border">
-                    {lang === "en" ? plo.engname : plo.name}
-                  </td>
-                  <td className="px-4 py-2 border">
-                    {lang === "en"
-                      ? plo.program_shortname_en || "-"
-                      : plo.program_shortname_th || "-"}
-                  </td>
-                  <td className="px-4 py-2 border">
-                    {lang === "en" ? plo.program_year - 543 : plo.program_year}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table<any>
+            columns={[
+              { header: t("code"), accessor: "code" },
+              lang === "en"
+                ? { header: "Name", accessor: "engname" }
+                : { header: "ชื่อแผนการเรียน", accessor: "name" },
+              lang === "en"
+                ? {
+                    header: "Program",
+                    accessor: "program_shortname_en",
+                    render: (v) => v || "-",
+                  }
+                : {
+                    header: "ชื่อโปรแกรม",
+                    accessor: "program_shortname_th",
+                    render: (v) => v || "-",
+                  },
+              {
+                header: t("year"),
+                accessor: "program_year",
+                render: (value) =>
+                  lang === "en" ? Number(value) - 543 : value,
+              },
+            ]}
+            data={plos}
+          />
         )}
         <div className="flex justify-center items-center mt-4 gap-2">
           <button
