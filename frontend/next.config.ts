@@ -1,4 +1,4 @@
-import type { NextConfig } from "./frontend/node_modules/next";
+import type { NextConfig } from "next";
 
 /** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {};

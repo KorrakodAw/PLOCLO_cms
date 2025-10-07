@@ -100,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchUser();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // save token in localStorage whenever it changes

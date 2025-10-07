@@ -1,0 +1,108 @@
+datasource postgres {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model users {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @postgres.VarChar(50)
+  email        String   @unique @postgres.VarChar(100)
+  password_hash String   @postgres.Text
+  role         String?  @postgres.VarChar(20) @default("user")
+  created_at   DateTime @default(now()) @postgres.Timestamp(0)
+}
+
+model university {
+  id               Int       @id @default(autoincrement())
+  name             String?   @postgres.VarChar(100)
+  name_th          String?   @postgres.VarChar(100)
+  abbreviation     String?   @postgres.VarChar(50)
+  abbreviation_th  String?   @postgres.VarChar(50)
+
+  // Relation: หนึ่ง university มีหลาย faculty
+  faculties        faculty[]
+
+  @@map("university")
+}
+
+model program {
+  id                   Int       @id @default(autoincrement())
+  faculty_id           Int
+  program_code         String    @postgres.VarChar(50)
+  program_name_en      String    @postgres.VarChar(255)
+  program_name_th      String?   @postgres.VarChar(255)
+  program_shortname_en String?   @postgres.VarChar(100)
+  program_shortname_th String?   @postgres.VarChar(100)
+  program_year         Int
+
+  // Relations
+  faculty  faculty    @relation(fields: [faculty_id], references: [id])
+  plos     plo[]
+  courses  course[]
+
+  @@unique([program_code, program_year])
+  @@map("program")
+}
+
+model plo {
+  id         Int     @id @default(autoincrement())
+  code       String  @postgres.VarChar(50)
+  program_id Int
+  name       String  @postgres.Text
+  engname    String  @postgres.Text
+
+  // Relation
+  program program @relation(fields: [program_id], references: [id])
+
+  @@map("plo")
+}
+
+model faculty {
+  id              Int       @id @default(autoincrement())
+  university_id   Int
+  name            String    @postgres.VarChar(100)
+  name_th         String    @postgres.VarChar(100)
+  abbreviation    String?   @postgres.VarChar(50)
+  abbreviation_th String?   @postgres.VarChar(50)
+
+  // Relations
+  university university @relation(fields: [university_id], references: [id])
+  programs   program[]
+
+  @@map("faculty")
+}
+
+
+model course {
+  id         Int      @id @default(autoincrement())
+  code       Int
+  name       String   @postgres.VarChar(255)
+  name_th    String   @postgres.VarChar(255)
+  program_id Int
+
+  // Relations
+  program program @relation(fields: [program_id], references: [id])
+  clos    clo[]
+
+  @@map("course")
+}
+
+
+model clo {
+  id        Int     @id @default(autoincrement())
+  code      Int
+  course_id Int
+  name      String  @postgres.Text
+  name_th   String  @postgres.Text
+
+  // Relation
+  course course @relation(fields: [course_id], references: [id])
+
+  @@map("clo")
+}
+
+

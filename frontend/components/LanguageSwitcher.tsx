@@ -8,7 +8,7 @@ const LANGUAGES = [
 ];
 
 export default function LanguageSwitcher() {
-  const { t, i18n } = useTranslation();
+  const {  i18n } = useTranslation();
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     i18n.changeLanguage(e.target.value);
