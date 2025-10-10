@@ -1,17 +1,11 @@
 #!/bin/sh
-# wait-for-db.sh
-# ใช้รอให้ database พร้อมก่อนเริ่ม backend
-
 set -e
 
-host="$1"
-shift
-cmd="$@"
-
-until nc -z "$host" 5432; do
-  echo "Waiting for database at $host:5432..."
+until pg_isready -h postgres -p 5432 -U postgres; do
+  echo "⏳ Waiting for Postgres..."
   sleep 2
 done
 
-echo "Database is up. Starting command..."
-exec $cmd
+echo "✅ Postgres is ready!"
+npx prisma db push
+npm run dev

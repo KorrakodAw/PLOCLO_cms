@@ -7,6 +7,16 @@ import { useEffect, useState } from "react";
 import { addPlo, getPlosPaginated } from "../../utils/ploApi";
 import { apiClient } from "../../utils/apiClient";
 
+interface Plo {
+  id: number;
+  code: string;
+  name: string; // Thai name
+  engname: string; // English name
+  program_shortname_en: string | null;
+  program_shortname_th: string | null;
+  program_year: number | null;
+}
+
 export default function AddPlo() {
   // ฟังก์ชันสำหรับเพิ่ม PLO จาก Excel
   const handleAddPloExcel = async (rows: any[]) => {
@@ -75,7 +85,6 @@ export default function AddPlo() {
     try {
       const result = await getPlosPaginated(token, page, limit);
       setPlos(result.data);
-      setTotalPages(result.totalPages);
     } catch (e) {
       console.error("Error refreshing PLOs after Excel import", e);
     }
@@ -88,8 +97,8 @@ export default function AddPlo() {
     { label: string; value: string }[]
   >([]);
   const [selectedProgram, setSelectedProgram] = useState("");
-  const [plos, setPlos] = useState<any[]>([]);
-  const [loadingPlos, setLoadingPlos] = useState(false);
+  const [plos, setPlos] = useState<Plo[]>([]);
+  const [, setLoadingPlos] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10); // You can make this configurable if needed
@@ -101,12 +110,10 @@ export default function AddPlo() {
       try {
         const result = await getPlosPaginated(token, page, limit);
         setPlos(result.data);
-        setTotalPages(result.totalPages);
       } catch {
         setPlos([]);
         setTotalPages(1);
       } finally {
-        setLoadingPlos(false);
       }
     };
     fetchPlos();
@@ -206,55 +213,46 @@ export default function AddPlo() {
       {/* Pagination Controls */}
 
       <div className="mt-4">
-        {loadingPlos ? (
-          <div>Loading...</div>
-        ) : plos.length === 0 ? (
-          <div>No PLO data found.</div>
-        ) : (
-          <Table<any>
-            columns={[
-              { header: t("code"), accessor: "code" },
-              lang === "en"
-                ? { header: "Name", accessor: "engname" }
-                : { header: "ชื่อแผนการเรียน", accessor: "name" },
-              lang === "en"
-                ? {
-                    header: "Program",
-                    accessor: "program_shortname_en",
-                    render: (v) => v || "-",
-                  }
-                : {
-                    header: "ชื่อโปรแกรม",
-                    accessor: "program_shortname_th",
-                    render: (v) => v || "-",
-                  },
-              {
-                header: t("year"),
-                accessor: "program_year",
-                render: (value) =>
-                  lang === "en" ? Number(value) - 543 : value,
-              },
-            ]}
-            data={plos}
-          />
-        )}
+        <Table<Plo>
+          columns={[
+            { header: t("code"), accessor: "code" },
+            lang === "en"
+              ? { header: "Name", accessor: "engname" }
+              : { header: "ชื่อแผนการเรียน", accessor: "name" },
+            lang === "en"
+              ? {
+                  header: "Program",
+                  accessor: "program_shortname_en",
+                }
+              : {
+                  header: "ชื่อโปรแกรม",
+                  accessor: "program_shortname_th",
+                },
+            {
+              header: t("year"),
+              accessor: "program_year",
+              render: (value) => (lang === "en" ? Number(value) - 543 : value),
+            },
+          ]}
+          data={plos}
+        />
         <div className="flex justify-center items-center mt-4 gap-2">
           <button
-            className="px-3 py-1 border rounded disabled:opacity-50"
+            className="px-3 py-1 border rounded bg-gray-100 disabled:opacity-50"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
           >
-            {t("Previous")}
+            {t("previous")}
           </button>
           <span>
-            {t("Page")} {page} of {totalPages}
+            {t("page")} {page} {t("of")} {totalPages}
           </span>
           <button
-            className="px-3 py-1 border rounded disabled:opacity-50"
+            className="px-3 py-1 border rounded bg-gray-100 disabled:opacity-50"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
           >
-            {t("Next")}
+            {t("next")}
           </button>
         </div>
       </div>

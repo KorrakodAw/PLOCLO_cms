@@ -62,6 +62,7 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
                   : ""
               }`}
             >
+              Heloo
               {t("logout")}
             </button>
           )}

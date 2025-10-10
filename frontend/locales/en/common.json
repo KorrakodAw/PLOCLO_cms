@@ -41,5 +41,9 @@
   "view chart": "View Chart",
   "welcome": "Welcome",
   "year": "Year",
-  "you are logged in": "You are logged in"
+  "you are logged in": "You are logged in",
+  "next": "Next",
+  "previous": "Previous",
+  "page": "Page",
+  "of": "Of"
 }

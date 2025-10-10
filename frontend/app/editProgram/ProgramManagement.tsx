@@ -133,71 +133,69 @@ export default function ProgramManagement() {
   };
 
   return (
-      <div className="mt-5 p-5">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-extralight">
-            {t("program management")}
-          </h1>
-          <AddButton
-            buttonText={t("create new program")}
-            placeholderText={{
-              code: t("Program Code"),
-              nameEn: "Program Name (EN)",
-              nameTh: "Program Name (TH)",
-              abbrEn: "Program abbreviation (EN)",
-              abbrTh: "Program abbreviation (TH)",
-              year: "Year",
-            }}
-            submitButtonText={{
-              insert: "Insert Program",
-              upload: "Upload Program (Excel)",
-            }}
-            onSubmit={handleAddProgram}
-            onSubmitExcel={handleFileUpload}
-            facultyOptions={facultyOptions}
-            programOptions={programOptions}
-            selectedFaculty={selectedFaculty}
-            onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
-          />
-        </div>
-        <hr className="my-3" />
-        {/* Table Component for Programs */}
-        <Table<Program>
-          columns={[
-            { header: t("code"), accessor: "program_code" },
-            lang === "en"
-              ? { header: "Name", accessor: "program_name_en" }
-              : { header: "ชื่อแผนการเรียน", accessor: "program_name_th" },
-            lang === "en"
-              ? { header: "Abbrev.", accessor: "program_shortname_en" }
-              : { header: "ชื่อย่อ", accessor: "program_shortname_th" },
-            {
-              header: t("year"),
-              accessor: "program_year",
-              render: (value) => (lang === "en" ? Number(value) - 543 : value),
-            },
-          ]}
-          data={programs}
+    <div className="mt-5 p-5">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-extralight">{t("program management")}</h1>
+        <AddButton
+          buttonText={t("create new program")}
+          placeholderText={{
+            code: t("Program Code"),
+            nameEn: "Program Name (EN)",
+            nameTh: "Program Name (TH)",
+            abbrEn: "Program abbreviation (EN)",
+            abbrTh: "Program abbreviation (TH)",
+            year: "Year",
+          }}
+          submitButtonText={{
+            insert: "Insert Program",
+            upload: "Upload Program (Excel)",
+          }}
+          onSubmit={handleAddProgram}
+          onSubmitExcel={handleFileUpload}
+          facultyOptions={facultyOptions}
+          programOptions={programOptions}
+          selectedFaculty={selectedFaculty}
+          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
         />
-        <div className="flex justify-center items-center gap-2 mt-4 mb-4">
-          <button
-            className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            Previous
-          </button>
-          <span>
-            Page {page} of {totalPages}
-          </span>
-          <button
-            className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-          >
-            Next
-          </button>
-        </div>
       </div>
+      <hr className="my-3" />
+      {/* Table Component for Programs */}
+      <Table<Program>
+        columns={[
+          { header: t("code"), accessor: "program_code" },
+          lang === "en"
+            ? { header: "Name", accessor: "program_name_en" }
+            : { header: "ชื่อแผนการเรียน", accessor: "program_name_th" },
+          lang === "en"
+            ? { header: "Abbrev.", accessor: "program_shortname_en" }
+            : { header: "ชื่อย่อ", accessor: "program_shortname_th" },
+          {
+            header: t("year"),
+            accessor: "program_year",
+            render: (value) => (lang === "en" ? Number(value) - 543 : value),
+          },
+        ]}
+        data={programs}
+      />
+      <div className="flex justify-center items-center gap-2 mt-4 mb-4">
+        <button
+          className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1}
+        >
+          {t("previous")}
+        </button>
+        <span>
+          {t("page")} {page} {t("of")} {totalPages}
+        </span>
+        <button
+          className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          disabled={page === totalPages}
+        >
+          {t("next")}
+        </button>
+      </div>
+    </div>
   );
 }

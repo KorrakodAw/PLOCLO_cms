@@ -204,7 +204,7 @@ export default function CourseManagement() {
               {t("previous")}
             </button>
             <span>
-              {t("page")} {page} / {Math.ceil(total / limit) || 1}
+              {t("page")} {page} {t("of")} {Math.ceil(total / limit) || 1}
             </span>
             <button
               className="px-3 py-1 border rounded disabled:opacity-50"

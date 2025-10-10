@@ -18,4 +18,42 @@ router.get("/", authenticateToken, async (_req, res) => {
   }
 });
 
+router.post("/", authenticateToken, async (req, res) => {
+  const { university_id, name, name_th, abbreviation, abbreviation_th } = req.body;
+
+  if (!university_id || !name || !name_th) {
+    return res
+      .status(400)
+      .json({ error: "university_id, name, and name_th are required" });
+  }
+
+  try {
+    // 1️⃣ Check if the faculty already exists for this university
+    const duplicateCheck = await pool.query(
+      `SELECT id FROM faculty 
+       WHERE university_id = $1 AND name = $2`,
+      [university_id, name]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      return res.status(409).json({ error: "Faculty with this name already exists for the university" });
+    }
+
+    // 2️⃣ Insert if not duplicate
+    const result = await pool.query(
+      `INSERT INTO faculty (university_id, name, name_th, abbreviation, abbreviation_th)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, university_id, name, name_th, abbreviation, abbreviation_th`,
+      [university_id, name, name_th, abbreviation, abbreviation_th]
+    );
+
+    res.status(201).json(result.rows[0]);
+
+  } catch (err: any) {
+    console.error("Database error details:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 export default router;

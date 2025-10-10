@@ -72,6 +72,7 @@ export default function LoginForm() {
           required
           className="w-full px-4 py-2 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
+
         <button
           type="button"
           className="absolute right-3 top-[38px]"

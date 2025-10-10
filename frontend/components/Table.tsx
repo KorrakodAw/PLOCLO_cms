@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 export interface Column<T> {
   header: string;
@@ -20,9 +20,24 @@ export function Table<T>({
   className = "",
   emptyText = "No data found",
 }: TableProps<T>) {
+  const [fontSize, setFontSize] = useState("text-sm");
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width < 640) setFontSize("text-xs"); // mobile
+      else if (width < 1024) setFontSize("text-sm"); // tablet
+      else setFontSize("text-base"); // desktop
+    };
+
+    handleResize(); // initialize
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div className={`overflow-x-auto mt-5 ${className}`}>
-      <table className="border border-gray-300 text-sm w-full">
+      <table className={`border border-gray-300 w-full ${fontSize}`}>
         <thead className="bg-gray-100 border-b border-gray-300">
           <tr>
             {columns.map((col, i) => (
