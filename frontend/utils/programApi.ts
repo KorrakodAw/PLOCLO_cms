@@ -1,3 +1,15 @@
+import { apiClient } from "../utils/apiClient";
+
+export interface ProgramInput {
+  program_code: string | number;
+  faculty_id: string | number;
+  program_name_en: string;
+  program_name_th: string;
+  program_shortname_en: string;
+  program_shortname_th: string;
+  program_year: number;
+}
+
 // Get paginated programs from backend
 export async function getProgramsPaginated(
   token: string,
@@ -17,17 +29,7 @@ export async function getProgramsPaginated(
   return await res.json();
 }
 // utils/programApi.ts
-import { apiClient } from "../utils/apiClient";
 
-export interface ProgramInput {
-  program_code: string | number;
-  faculty_id: string | number;
-  program_name_en: string;
-  program_name_th: string;
-  program_shortname_en: string;
-  program_shortname_th: string;
-  program_year: number;
-}
 
 export async function addProgram(data: ProgramInput, token: string) {
   const res = await apiClient("/api/program", {

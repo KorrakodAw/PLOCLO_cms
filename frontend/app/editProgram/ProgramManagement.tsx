@@ -39,6 +39,7 @@ export default function ProgramManagement() {
   const [, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [limit] = useState(10); // You can make this configurable if needed
 
   // Fetch faculties
   useEffect(() => {
@@ -62,16 +63,16 @@ export default function ProgramManagement() {
   useEffect(() => {
     if (!isLoggedIn || !token) return;
     setLoading(true);
-    getProgramsPaginated(token, page, 10)
+    getProgramsPaginated(token, page, limit)
       .then((res) => {
         setPrograms(res.data);
-        setTotalPages(Math.ceil((res.total || 1) / 10));
+        setTotalPages(Math.ceil((res.total || 1) / limit));
       })
       .catch((err) => {
         alert(err.message || "Failed to fetch programs");
       })
       .finally(() => setLoading(false));
-  }, [isLoggedIn, token, page]);
+  }, [isLoggedIn, token, page, limit]);
 
   // Prepare programOptions for dropdowns
   useEffect(() => {
@@ -125,6 +126,7 @@ export default function ProgramManagement() {
       await bulkUploadPrograms(rowsWithFaculty, token!);
       alert("Programs uploaded successfully!");
       setPage(1);
+      window.location.reload();
     } catch (err: any) {
       alert("Upload failed: " + (err.message || err));
     } finally {
@@ -179,7 +181,8 @@ export default function ProgramManagement() {
       />
       <div className="flex justify-center items-center gap-2 mt-4 mb-4">
         <button
-          className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+          className={`px-3 py-1 border rounded disabled:opacity-50 
+    ${page !== 1 ? "hover:text-white hover:bg-orange-500" : ""}`}
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
         >
@@ -189,7 +192,8 @@ export default function ProgramManagement() {
           {t("page")} {page} {t("of")} {totalPages}
         </span>
         <button
-          className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+          className={`px-3 py-1 rounded border bg-gray-100 disabled:opacity-50 
+    ${page !== totalPages ? "hover:text-white hover:bg-orange-500" : ""}`}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page === totalPages}
         >

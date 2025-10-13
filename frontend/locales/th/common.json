@@ -45,5 +45,10 @@
   "next": "ถัดไป",
   "previous": "ก่อนหน้า",
   "page": "หน้า",
-  "of": "จาก"
+  "of": "จาก",
+  "create new student": "เพิ่มนักศึกษาใหม่",
+  "student id": "รหัสนักศึกษา",
+  "first name": "ชื่อ",
+  "last name": "นามสกุล",
+  "year of admission": "ปีที่เข้าศึกษา"
 }

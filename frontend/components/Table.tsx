@@ -64,7 +64,7 @@ export function Table<T>({
             </tr>
           ) : (
             data.map((row, rowIndex) => (
-              <tr key={rowIndex} className="hover:bg-gray-50">
+              <tr key={rowIndex} className="hover:bg-orange-50">
                 {columns.map((col, colIndex) => {
                   const value = row[col.accessor];
                   return (

@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import AddButton from "../../components/AddButton";
-import { Table, Column } from "../../components/Table";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
+import AddButton from "../../components/AddButton";
+import { Table, Column } from "../../components/Table";
+import PaginationControlButton from "../../components/PaignateControlButton";
+
 import {
   getCourses,
   addCourse,
@@ -10,6 +12,7 @@ import {
 } from "../../utils/courseApi";
 import { getProgramsPaginated } from "../../utils/programApi";
 import { useAuth } from "../context/AuthContext";
+
 interface ProgramOption {
   label: string;
   value: string;
@@ -28,15 +31,18 @@ export default function CourseManagement() {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn, initialized } = useAuth();
+
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 10;
+  const totalPages = Math.max(1, Math.ceil(total / limit)); // ✅ FIXED
 
   const [programOptions, setProgramOptions] = useState<ProgramOption[]>([]);
   const [selectedProgram, setSelectedProgram] = useState("");
-  // Fetch program options for dropdown
+
+  // Fetch program options
   const fetchPrograms = async () => {
     if (!token) return;
     try {
@@ -55,6 +61,7 @@ export default function CourseManagement() {
     }
   };
 
+  // Fetch courses
   const fetchCourses = async (pageNum = page) => {
     if (!token) return;
     setLoading(true);
@@ -78,7 +85,6 @@ export default function CourseManagement() {
     // eslint-disable-next-line
   }, [isLoggedIn, initialized, token]);
 
-  // Refetch when page changes
   useEffect(() => {
     if (isLoggedIn && initialized) {
       fetchCourses(page);
@@ -109,13 +115,10 @@ export default function CourseManagement() {
     }
   };
 
+  // Optional: render program name instead of ID
   // const programIdToShortName = (id: string | number) => {
   //   const found = programOptions.find((p) => p.value === String(id));
-  //   return found && found.program_shortname_en
-  //     ? found.program_shortname_en
-  //     : found
-  //     ? found.label
-  //     : id;
+  //   return found?.label || id;
   // };
 
   const courseColumns: Column<Course>[] = [
@@ -132,7 +135,7 @@ export default function CourseManagement() {
 
   return (
     <div className="mt-5 p-5">
-      <div className=" flex justify-between items-center">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-extralight">{t("course management")}</h1>
         <AddButton
           buttonText={t("create new course")}
@@ -186,36 +189,20 @@ export default function CourseManagement() {
           }}
         />
       </div>
+
       <hr className="my-3" />
-      {/* <p className="text-xl font-extralight">{t("course")}</p> */}
-      {/* Table */}
+
       {loading ? (
         <div>{t("loading")}</div>
       ) : (
         <>
           <Table<Course> columns={courseColumns} data={courses} />
-          {/* Pagination Controls */}
-          <div className="flex justify-center items-center gap-4 mt-4">
-            <button
-              className="px-3 py-1 border rounded disabled:opacity-50"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              {t("previous")}
-            </button>
-            <span>
-              {t("page")} {page} {t("of")} {Math.ceil(total / limit) || 1}
-            </span>
-            <button
-              className="px-3 py-1 border rounded disabled:opacity-50"
-              onClick={() =>
-                setPage((p) => (p < Math.ceil(total / limit) ? p + 1 : p))
-              }
-              disabled={page >= Math.ceil(total / limit)}
-            >
-              {t("next")}
-            </button>
-          </div>
+          <PaginationControlButton
+            page={page}
+            totalPages={totalPages} // ✅ FIXED
+            onPageChange={setPage}
+            t={t}
+          />
         </>
       )}
     </div>

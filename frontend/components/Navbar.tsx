@@ -58,11 +58,10 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
               className={`p-3 block font-normal mt-20 transition-all duration-200 transform hover:translate-x-2
               ${
                 isActive
-                  ? "text-black hover:text-red-500 hover:shadow-2xl hover:rounded-b-md"
-                  : ""
+                  ? ""
+                  : "text-black hover:text-red-500 hover:shadow-2xl hover:rounded-b-md"
               }`}
             >
-              Heloo
               {t("logout")}
             </button>
           )}

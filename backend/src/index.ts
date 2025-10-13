@@ -9,6 +9,7 @@ import ploRoutes from "./routes/plo";
 import courseRoutes from "./routes/course";
 import univisityRoutes from "./routes/university";
 import cloRoutes from "./routes/clo";
+import studentRoutes from "./routes/student";
 
 const app = express();
 app.use(morgan("dev"));
@@ -25,9 +26,10 @@ app.use(
 app.use("/api/users", usersRouter);
 app.use("/api/program", programRoutes);
 app.use("/api/faculty", facultyRoutes);
-app.use("/api/plo", ploRoutes); 
+app.use("/api/plo", ploRoutes);
 app.use("/api/course", courseRoutes);
 app.use("/api/university", univisityRoutes);
 app.use("/api/clo", cloRoutes);
+app.use("/api/student", studentRoutes);
 
 app.listen(3001, () => console.log("API on http://localhost:3001"));

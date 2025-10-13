@@ -6,18 +6,22 @@ import { Table } from "../../components/Table";
 import { useEffect, useState } from "react";
 import { addPlo, getPlosPaginated } from "../../utils/ploApi";
 import { apiClient } from "../../utils/apiClient";
-
-interface Plo {
-  id: number;
-  code: string;
-  name: string; // Thai name
-  engname: string; // English name
-  program_shortname_en: string | null;
-  program_shortname_th: string | null;
-  program_year: number | null;
-}
+import PaginationControlButton from "../../components/PaignateControlButton";
 
 export default function AddPlo() {
+  const { t, i18n } = useTranslation("common");
+  const lang = i18n.language;
+  const { token, isLoggedIn, initialized } = useAuth();
+  const [programOptions, setProgramOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [selectedProgram, setSelectedProgram] = useState("");
+  const [plos, setPlos] = useState<any[]>([]);
+  const [, setLoadingPlos] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [limit] = useState(10); // You can make this configurable if needed
+  // ดึงรายการ PLO จาก backend
   // ฟังก์ชันสำหรับเพิ่ม PLO จาก Excel
   const handleAddPloExcel = async (rows: any[]) => {
     if (!initialized) {
@@ -85,38 +89,24 @@ export default function AddPlo() {
     try {
       const result = await getPlosPaginated(token, page, limit);
       setPlos(result.data);
+      setTotalPages(result.totalPages);
     } catch (e) {
       console.error("Error refreshing PLOs after Excel import", e);
     }
   };
 
-  const { t, i18n } = useTranslation("common");
-  const lang = i18n.language;
-  const { token, isLoggedIn, initialized } = useAuth();
-  const [programOptions, setProgramOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [plos, setPlos] = useState<Plo[]>([]);
-  const [, setLoadingPlos] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [limit] = useState(10); // You can make this configurable if needed
-  // ดึงรายการ PLO จาก backend
   useEffect(() => {
     if (!isLoggedIn || !token) return;
-    const fetchPlos = async () => {
-      setLoadingPlos(true);
-      try {
-        const result = await getPlosPaginated(token, page, limit);
-        setPlos(result.data);
-      } catch {
-        setPlos([]);
-        setTotalPages(1);
-      } finally {
-      }
-    };
-    fetchPlos();
+    setLoadingPlos(true);
+    getPlosPaginated(token, page, 10)
+      .then((res) => {
+        setPlos(res.data);
+        setTotalPages(Math.ceil((res.total || 1) / limit));
+      })
+      .catch((err) => {
+        alert(err.message || "Failed to fetch programs");
+      })
+      .finally(() => setLoadingPlos(false));
   }, [isLoggedIn, token, page, limit]);
 
   // ดึงรายการโปรแกรมจาก backend
@@ -213,7 +203,7 @@ export default function AddPlo() {
       {/* Pagination Controls */}
 
       <div className="mt-4">
-        <Table<Plo>
+        <Table<any>
           columns={[
             { header: t("code"), accessor: "code" },
             lang === "en"
@@ -223,10 +213,12 @@ export default function AddPlo() {
               ? {
                   header: "Program",
                   accessor: "program_shortname_en",
+                  render: (v) => v || "-",
                 }
               : {
                   header: "ชื่อโปรแกรม",
                   accessor: "program_shortname_th",
+                  render: (v) => v || "-",
                 },
             {
               header: t("year"),
@@ -236,25 +228,13 @@ export default function AddPlo() {
           ]}
           data={plos}
         />
-        <div className="flex justify-center items-center mt-4 gap-2">
-          <button
-            className="px-3 py-1 border rounded bg-gray-100 disabled:opacity-50"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            {t("previous")}
-          </button>
-          <span>
-            {t("page")} {page} {t("of")} {totalPages}
-          </span>
-          <button
-            className="px-3 py-1 border rounded bg-gray-100 disabled:opacity-50"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-          >
-            {t("next")}
-          </button>
-        </div>
+
+        <PaginationControlButton
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          t={t}
+        />
       </div>
     </div>
   );
