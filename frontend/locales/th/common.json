@@ -50,5 +50,6 @@
   "student id": "รหัสนักศึกษา",
   "first name": "ชื่อ",
   "last name": "นามสกุล",
-  "year of admission": "ปีที่เข้าศึกษา"
+  "year of admission": "ปีที่เข้าศึกษา",
+  "please select a university": "กรุณาเลือกมหาวิทยาลัย"
 }

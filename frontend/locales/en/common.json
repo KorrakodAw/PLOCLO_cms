@@ -50,5 +50,6 @@
   "student id": "Student ID",
   "first name": "First Name",
   "last name": "Last Name",
-  "year of admission": "Year of Admission"
+  "year of admission": "Year of Admission",
+  "please select a university": "Please select a university"
 }

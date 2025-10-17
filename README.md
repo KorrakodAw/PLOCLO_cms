@@ -90,6 +90,7 @@ PostgreSQL → localhost:5432
 🛠 Prisma Commands
 Sync Prisma schema with the database:
 
+⚠️ Notes
 bash
 docker exec -it backend npx prisma db push
 Reset the database (⚠️ deletes all data):
@@ -108,12 +109,3 @@ Start Docker:
 bash
 docker-compose up -d --build
 The backend will automatically push the Prisma schema to the database.
-
-⚠️ Notes
-The backend container uses postgres as the database host — make sure .env matches it.
-For development, npx prisma db push is simpler than running full migrations.
-After modifying your Prisma schema, update it with:
-
-bash
-docker exec -it backend npx prisma db push
-```

@@ -46,7 +46,7 @@ export default function CourseManagement() {
   const fetchPrograms = async () => {
     if (!token) return;
     try {
-      const res = await getProgramsPaginated(token, 1, 100);
+      const res = await getProgramsPaginated(token, 1, 10);
       setProgramOptions([
         { label: "กรุณาเลือกโปรแกรม", value: "" },
         ...res.data.map((p: any) => ({
@@ -78,7 +78,6 @@ export default function CourseManagement() {
 
   useEffect(() => {
     if (isLoggedIn && initialized) {
-      fetchCourses(1);
       fetchPrograms();
       setPage(1);
     }

@@ -9,7 +9,7 @@ const router = Router();
 router.get("/", authenticateToken, async (_req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, name FROM faculty ORDER BY id ASC`
+      `SELECT id, name, university_id FROM faculty ORDER BY id ASC`
     );
     res.json(result.rows);
   } catch (err: any) {
@@ -19,12 +19,11 @@ router.get("/", authenticateToken, async (_req, res) => {
 });
 
 router.post("/", authenticateToken, async (req, res) => {
-  const { university_id, name, name_th, abbreviation, abbreviation_th } = req.body;
+  const { university_id, name, name_th, abbreviation, abbreviation_th } =
+    req.body;
 
-  if (!university_id || !name || !name_th) {
-    return res
-      .status(400)
-      .json({ error: "university_id, name, and name_th are required" });
+  if (!name || !name_th || !abbreviation || !abbreviation_th) {
+    return res.status(400).json({ error: "All fields are required" });
   }
 
   try {
@@ -36,7 +35,9 @@ router.post("/", authenticateToken, async (req, res) => {
     );
 
     if (duplicateCheck.rows.length > 0) {
-      return res.status(409).json({ error: "Faculty with this name already exists for the university" });
+      return res.status(409).json({
+        error: "Faculty with this name already exists for the university",
+      });
     }
 
     // 2️⃣ Insert if not duplicate
@@ -48,12 +49,10 @@ router.post("/", authenticateToken, async (req, res) => {
     );
 
     res.status(201).json(result.rows[0]);
-
   } catch (err: any) {
     console.error("Database error details:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
-
 
 export default router;

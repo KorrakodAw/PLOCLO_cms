@@ -11,7 +11,7 @@ router.get("/", authenticateToken, async (_req, res) => {
       `SELECT id, name, name_th, abbreviation, abbreviation_th FROM university ORDER BY id ASC`
     );
     res.json(result.rows);
-  } catch (err: any) {
+  } catch (err) {
     console.error(err);
     res
       .status(500)
@@ -34,11 +34,9 @@ router.post("/", authenticateToken, async (req, res) => {
     );
 
     if (duplicateCheck.rows.length > 0) {
-      return res
-        .status(409)
-        .json({
-          error: "University with this name or abbreviation already exists",
-        });
+      return res.status(409).json({
+        error: "University with this name or abbreviation already exists",
+      });
     }
 
     // Insert new university

@@ -5,6 +5,9 @@ import { useState } from "react";
 import FormPopup from "./FormPopup";
 
 interface AddButtonProp {
+  universityOptions?: { label: string; value: string }[];
+  selectedUniversity?: string;
+  onUniversityChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   facultyOptions?: { label: string; value: string }[];
   programOptions?: { label: string; value: string }[];
   selectedFaculty?: string;
@@ -39,6 +42,9 @@ export default function AddButton({
   showYearInput = true,
   onSubmit,
   onSubmitExcel,
+  universityOptions = [],
+  selectedUniversity = "",
+  onUniversityChange,
   facultyOptions = [],
   programOptions = [],
   selectedFaculty = "",
@@ -66,10 +72,13 @@ export default function AddButton({
           submitButtonText={submitButtonText}
           showAbbreviationInputs={showAbbreviationInputs}
           showYearInput={showYearInput}
-          facultyOptions={facultyOptions}
-          programOptions={programOptions}
+          selectedUniversity={selectedUniversity}
           selectedFaculty={selectedFaculty}
           selectedProgram={selectedProgram}
+          facultyOptions={facultyOptions}
+          programOptions={programOptions}
+          universityOptions={universityOptions}
+          onUniversityChange={onUniversityChange}
           onFacultyChange={onFacultyChange}
           onProgramChange={onProgramChange}
         />

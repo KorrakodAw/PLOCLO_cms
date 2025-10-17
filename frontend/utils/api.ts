@@ -1,4 +1,4 @@
-export const API_URL = "http://localhost:5000"; // backend URL
+export const API_URL = "http://localhost:3001"; // backend URL
 
 // Register
 export async function register(

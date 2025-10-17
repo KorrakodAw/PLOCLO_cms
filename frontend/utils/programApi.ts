@@ -10,6 +10,15 @@ export interface ProgramInput {
   program_year: number;
 }
 
+// Get all programs (for dropdowns, not paginated)
+export async function getPrograms(token: string) {
+  const res = await apiClient("/api/program", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // Get paginated programs from backend
 export async function getProgramsPaginated(
   token: string,
@@ -29,7 +38,6 @@ export async function getProgramsPaginated(
   return await res.json();
 }
 // utils/programApi.ts
-
 
 export async function addProgram(data: ProgramInput, token: string) {
   const res = await apiClient("/api/program", {

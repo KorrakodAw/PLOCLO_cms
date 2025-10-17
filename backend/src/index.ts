@@ -11,6 +11,7 @@ import univisityRoutes from "./routes/university";
 import cloRoutes from "./routes/clo";
 import studentRoutes from "./routes/student";
 
+
 const app = express();
 app.use(morgan("dev"));
 app.use(express.json());
@@ -31,5 +32,6 @@ app.use("/api/course", courseRoutes);
 app.use("/api/university", univisityRoutes);
 app.use("/api/clo", cloRoutes);
 app.use("/api/student", studentRoutes);
+
 
 app.listen(3001, () => console.log("API on http://localhost:3001"));

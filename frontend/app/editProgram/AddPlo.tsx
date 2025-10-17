@@ -7,20 +7,76 @@ import { useEffect, useState } from "react";
 import { addPlo, getPlosPaginated } from "../../utils/ploApi";
 import { apiClient } from "../../utils/apiClient";
 import PaginationControlButton from "../../components/PaignateControlButton";
+import { getFaculties } from "../../utils/facultyApi";
+import { getUniversities } from "../../utils/universityApi";
 
 export default function AddPlo() {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn, initialized } = useAuth();
-  const [programOptions, setProgramOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
+
   const [selectedProgram, setSelectedProgram] = useState("");
+  const [selectedFaculty, setSelectedFaculty] = useState("");
+  const [selectedUniversity, setSelectedUniversity] = useState("");
   const [plos, setPlos] = useState<any[]>([]);
   const [, setLoadingPlos] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10); // You can make this configurable if needed
+
+  const [universityOptions, setUniversityOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [facultyOptions, setFacultyOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [programOptions, setProgramOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [yearOptions, setYearOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+
+  // Fetch universities
+  useEffect(() => {
+    if (!isLoggedIn || !token) return;
+    const fetchUniversities = async () => {
+      try {
+        const data = await getUniversities(token);
+        setUniversityOptions([
+          { label: t("please select a university"), value: "" },
+          ...data.map((u: any) => ({ label: u.name, value: String(u.id) })),
+        ]);
+      } catch (err) {
+        console.error(err);
+        alert("API university error");
+      }
+    };
+    fetchUniversities();
+  }, [isLoggedIn, token, t]);
+
+  // Fetch faculties for selected university
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedUniversity) {
+      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
+      return;
+    }
+    const fetchFaculties = async () => {
+      try {
+        const data = await getFaculties(token);
+        setFacultyOptions([
+          { label: t("please select a faculty"), value: "" },
+          ...data
+            .filter((f: any) => String(f.university_id) === selectedUniversity)
+            .map((f: any) => ({ label: f.name, value: String(f.id) })),
+        ]);
+      } catch (err) {
+        console.error(err);
+        alert("API faculty error");
+      }
+    };
+    fetchFaculties();
+  }, [isLoggedIn, token, t, selectedUniversity]);
   // ดึงรายการ PLO จาก backend
   // ฟังก์ชันสำหรับเพิ่ม PLO จาก Excel
   const handleAddPloExcel = async (rows: any[]) => {
@@ -192,8 +248,14 @@ export default function AddPlo() {
             insert: "Insert PLO",
           }}
           programOptions={programOptions}
+          facultyOptions={facultyOptions}
+          universityOptions={universityOptions}
           selectedProgram={selectedProgram}
+          selectedFaculty={selectedFaculty}
+          selectedUniversity={selectedUniversity}
           onProgramChange={(e) => setSelectedProgram(e.target.value)}
+          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
+          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
           onSubmit={handleAddPlo}
           onSubmitExcel={handleAddPloExcel}
         />

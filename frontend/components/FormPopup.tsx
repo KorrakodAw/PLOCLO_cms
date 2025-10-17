@@ -19,6 +19,9 @@ interface FormPopupProps {
   fieldMap?: Record<string, string>; // { internalName: externalName }
   facultyOptions?: { label: string; value: string }[];
   programOptions?: { label: string; value: string }[];
+  universityOptions?: { label: string; value: string }[];
+  selectedUniversity?: string;
+  onUniversityChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   selectedFaculty?: string;
   selectedProgram?: string;
   onFacultyChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -45,10 +48,13 @@ export default function FormPopup({
   showYearInput = false,
   facultyOptions = [],
   programOptions = [],
+  universityOptions = [],
   selectedFaculty = "",
   selectedProgram = "",
+  selectedUniversity = "",
   onFacultyChange,
   onProgramChange,
+  onUniversityChange,
   requiredFields = ["code", "nameEn", "nameTh"],
   fieldMap = {},
 }: FormPopupProps) {
@@ -141,83 +147,98 @@ export default function FormPopup({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black opacity-50"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       ></div>
 
       {/* Modal */}
-      <div className="relative z-10 bg-white p-6 rounded shadow-lg w-2/3 max-w-3xl">
-        <div className="flex justify-end items-center mb-5">
+      <div className="relative z-10 bg-white p-8 rounded-2xl shadow-2xl w-[90%] max-w-3xl transition-all">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6 border-b pb-3">
+          <h2 className="text-xl font-semibold text-gray-800">
+            Program Management
+          </h2>
           <X
             onClick={onClose}
-            className="text-gray-600 hover:text-black cursor-pointer"
+            className="text-gray-500 hover:text-gray-800 cursor-pointer transition-colors"
           />
         </div>
 
-        <form onSubmit={handleSubmit} noValidate>
-          {/* Faculty Dropdown */}
-          {facultyOptions.length > 0 && onFacultyChange && (
-            <div className="mb-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {/* Dropdown Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {universityOptions.length > 0 && onUniversityChange && (
+              <DropdownSelect
+                label="University"
+                value={selectedUniversity}
+                onChange={onUniversityChange}
+                options={universityOptions}
+              />
+            )}
+
+            {facultyOptions.length > 0 && onFacultyChange && (
               <DropdownSelect
                 label="Faculty"
                 value={selectedFaculty}
                 onChange={onFacultyChange}
                 options={facultyOptions}
+                disabled={!selectedUniversity}
               />
-            </div>
-          )}
-          {/* Program Dropdown */}
-          {programOptions.length > 0 && onProgramChange && (
-            <div className="mb-4">
+            )}
+
+            {programOptions.length > 0 && onProgramChange && (
               <DropdownSelect
                 label="Program"
                 value={selectedProgram}
                 onChange={onProgramChange}
                 options={programOptions}
+                disabled={!selectedFaculty}
               />
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Code, Name EN, Name TH */}
-          {[
-            { name: "code", placeholder: code },
-            { name: "nameEn", placeholder: nameEn },
-            { name: "nameTh", placeholder: nameTh },
-          ].map(({ name, placeholder }) => (
-            <div key={name} className="mb-4">
-              <input
-                type="text"
-                name={name}
-                placeholder={placeholder}
-                value={formData[name as keyof FormData]}
-                onChange={handleChange}
-                className={`w-full px-3 py-2 rounded border ${
-                  errors[name] ? "border-red-500" : "border"
-                }`}
-              />
-              {errors[name] && (
-                <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
-              )}
-            </div>
-          ))}
+          {/* Input Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            {[
+              { name: "code", placeholder: code },
+              { name: "nameEn", placeholder: nameEn },
+              { name: "nameTh", placeholder: nameTh },
+            ].map(({ name, placeholder }) => (
+              <div key={name}>
+                <input
+                  type="text"
+                  name={name}
+                  placeholder={placeholder}
+                  value={formData[name as keyof FormData]}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2.5 rounded-lg border ${
+                    errors[name] ? "border-red-500" : "border-gray-300"
+                  } focus:outline-none focus:ring-2 focus:ring-blue-400`}
+                />
+                {errors[name] && (
+                  <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
+                )}
+              </div>
+            ))}
+          </div>
 
-          {/* Abbreviation */}
+          {/* Abbreviation Fields */}
           {showAbbreviationInputs && (
-            <div className="flex gap-2 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 { name: "abbrEn", placeholder: abbrEn },
                 { name: "abbrTh", placeholder: abbrTh },
               ].map(({ name, placeholder }) => (
-                <div key={name} className="w-full">
+                <div key={name}>
                   <input
                     type="text"
                     name={name}
                     placeholder={placeholder}
                     value={formData[name as keyof FormData]}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 rounded border ${
-                      errors[name] ? "border-red-500" : "border"
-                    }`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      errors[name] ? "border-red-500" : "border-gray-300"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   />
                   {errors[name] && (
                     <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
@@ -227,18 +248,18 @@ export default function FormPopup({
             </div>
           )}
 
-          {/* Year */}
+          {/* Year Input */}
           {showYearInput && (
-            <div className="mb-4">
+            <div>
               <input
                 type="text"
                 name="year"
                 placeholder={year}
                 value={formData.year}
                 onChange={handleChange}
-                className={`w-full px-3 py-2 rounded border ${
-                  errors.year ? "border-red-500" : "border"
-                }`}
+                className={`w-full px-4 py-2.5 rounded-lg border ${
+                  errors.year ? "border-red-500" : "border-gray-300"
+                } focus:outline-none focus:ring-2 focus:ring-blue-400`}
               />
               {errors.year && (
                 <p className="text-red-500 text-sm mt-1">{errors.year}</p>
@@ -246,15 +267,17 @@ export default function FormPopup({
             </div>
           )}
 
-          <div className="flex justify-between gap-2">
+          {/* Buttons */}
+          <div className="flex flex-col md:flex-row justify-end gap-3 mt-6">
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 bg-blue-400 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="w-full md:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition disabled:opacity-50"
             >
               {loading ? "Submitting..." : insert}
             </button>
-            <label className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-700 text-center cursor-pointer">
+
+            <label className="w-full md:w-auto px-5 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 cursor-pointer text-center transition">
               {upload}
               <input
                 type="file"

@@ -76,12 +76,20 @@ export default function AddStudent() {
     let failCount = 0;
     const errorDetails: string[] = [];
 
-    for (const [i, row] of rows.entries()) {
-      const student_id = row.code || row.student_id;
-      const first_name = row.nameEn || row.first_name;
-      const last_name = row.nameTh || row.last_name;
-      const email = row.email || row.abbrTh;
-      const year_of_admission = Number(row.year || row.abbrEn);
+    // Inject selectedProgram as program_id for every row
+    const rowsWithProgram = rows.map((row) => ({
+      ...row,
+      program_id: selectedProgram,
+      year_of_admission: Number(row.year_of_admission ?? row.year),
+    }));
+
+    for (const [i, row] of rowsWithProgram.entries()) {
+      const student_id = row.student_id;
+      const first_name = row.first_name;
+      const last_name = row.last_name;
+      const email = row.email;
+      const year_of_admission = row.year_of_admission;
+      const program_id = row.program_id;
 
       // ✅ Validate
       if (
@@ -89,7 +97,8 @@ export default function AddStudent() {
         !first_name ||
         !last_name ||
         !email ||
-        !year_of_admission
+        !year_of_admission ||
+        !program_id
       ) {
         failCount++;
         errorDetails.push(`Row ${i + 1}: missing required fields`);
@@ -102,12 +111,13 @@ export default function AddStudent() {
         last_name: String(last_name),
         email: String(email),
         year_of_admission,
-        program_id: selectedProgram,
+        program_id,
       };
 
       try {
         await addStudent(payload, token);
         successCount++;
+        window.location.reload();
       } catch (err: any) {
         failCount++;
         errorDetails.push(`Row ${i + 1}: ${err.message}`);
@@ -131,19 +141,20 @@ export default function AddStudent() {
       return alert("You are logged out or token expired. Please log in again.");
     if (!selectedProgram) return alert("Please select a program.");
 
+    // Map form fields to backend payload
     const payload = {
-      student_id: String(data.code),
-      first_name: String(data.nameEn),
-      last_name: String(data.nameTh),
-      email: String(data.abbrTh),
-      year_of_admission: Number(data.abbrEn),
+      student_id: String(data.code), // code → student_id
+      first_name: String(data.nameEn), // nameEn → first_name
+      last_name: String(data.nameTh), // nameTh → last_name
+      email: String(data.abbrTh), // abbrTh → email
+      year_of_admission: Number(data.abbrEn ?? data.year), // abbrEn or year → year_of_admission
       program_id: selectedProgram,
     };
 
     try {
       await addStudent(payload, token);
       alert("✅ Student added successfully.");
-      // Optionally reload students
+      // Update students table
       getStudentsPaginated(token, page, limit).then((res) =>
         setStudents(res.data)
       );
@@ -185,8 +196,11 @@ export default function AddStudent() {
         <Table
           columns={[
             { header: t("student id"), accessor: "student_id" },
-            { header: t("first name"), accessor: "first_name" },
-            { header: t("last name"), accessor: "last_name" },
+            {
+              header: t("full name"),
+              accessor: "name",
+              render: (value, row) => `${row.first_name} ${row.last_name}`,
+            },
             { header: t("email"), accessor: "email" },
             {
               header: t("year of admission"),

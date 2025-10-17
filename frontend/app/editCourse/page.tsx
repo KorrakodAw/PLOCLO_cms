@@ -55,7 +55,7 @@ export default function EditCourse() {
 
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
-      <div className="max-w-[1100px] px-4 h-full">
+      <div className="max-w-[1100px] h-full">
         <p className="font-extralight text-2xl">{t("course information")}</p>
 
         <div className="max-w-200 flex gap-3 mt-5 items-center">

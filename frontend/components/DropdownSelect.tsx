@@ -6,6 +6,7 @@ interface Option {
 }
 
 interface DropdownSelectProps {
+  disabled?: boolean;
   label: string;
   value: string;
   onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -17,6 +18,7 @@ const DropdownSelect: React.FC<DropdownSelectProps> = ({
   value,
   onChange,
   options,
+  disabled = false,
 }) => {
   return (
     <div className="w-full">
@@ -24,7 +26,8 @@ const DropdownSelect: React.FC<DropdownSelectProps> = ({
       <select
         value={value}
         onChange={onChange}
-        className="bg-gray-500 p w-full max-w-md font-extralight text-white rounded text-center cursor-pointer"
+        className={`bg-gray-500 p w-full max-w-md font-extralight text-white rounded text-center cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        disabled={disabled}
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
