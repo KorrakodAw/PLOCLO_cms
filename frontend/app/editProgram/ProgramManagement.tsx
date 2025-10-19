@@ -13,6 +13,7 @@ import AddButton from "../../components/AddButton";
 import { useTranslation } from "next-i18next";
 import { getFaculties } from "../../utils/facultyApi";
 import { getUniversities } from "../../utils/universityApi";
+import PaginationControlButton from "../../components/PaignateControlButton";
 
 interface Program {
   id: number;
@@ -233,27 +234,11 @@ export default function ProgramManagement() {
         ]}
         data={programs}
       />
-      <div className="flex justify-center items-center gap-2 mt-4 mb-4">
-        <button
-          className={`px-3 py-1 border rounded disabled:opacity-50 
-    ${page !== 1 ? "hover:text-white hover:bg-orange-500" : ""}`}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-        >
-          {t("previous")}
-        </button>
-        <span>
-          {t("page")} {page} {t("of")} {totalPages}
-        </span>
-        <button
-          className={`px-3 py-1 rounded border bg-gray-100 disabled:opacity-50 
-    ${page !== totalPages ? "hover:text-white hover:bg-orange-500" : ""}`}
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-        >
-          {t("next")}
-        </button>
-      </div>
+      <PaginationControlButton
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

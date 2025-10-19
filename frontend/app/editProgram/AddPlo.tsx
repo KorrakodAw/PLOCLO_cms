@@ -33,9 +33,6 @@ export default function AddPlo() {
   const [programOptions, setProgramOptions] = useState<
     { label: string; value: string }[]
   >([]);
-  const [yearOptions, setYearOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
 
   // Fetch universities
   useEffect(() => {
@@ -91,7 +88,7 @@ export default function AddPlo() {
       return;
     }
     if (!selectedProgram) {
-      alert("selectedProgram: " + selectedProgram);
+      alert("Please select the program");
       return;
     }
     let successCount = 0;
@@ -295,7 +292,6 @@ export default function AddPlo() {
           page={page}
           totalPages={totalPages}
           onPageChange={setPage}
-          t={t}
         />
       </div>
     </div>

@@ -1,18 +1,19 @@
+import { useTranslation } from "next-i18next";
 import React from "react";
 
 interface PaginationProps {
   page: number;
   totalPages: number;
   onPageChange: (newPage: number) => void;
-  t?: (key: string) => string; // optional translation function
 }
 
 const PaginationControlButton: React.FC<PaginationProps> = ({
   page,
   totalPages,
   onPageChange,
-  t,
 }) => {
+  const { t } = useTranslation("common");
+
   return (
     <div className="flex justify-center mt-4 gap-2">
       <button
@@ -21,11 +22,11 @@ const PaginationControlButton: React.FC<PaginationProps> = ({
         disabled={page === 1}
         onClick={() => onPageChange(Math.max(1, page - 1))}
       >
-        {t ? t("previous") : "Previous"}
+        {t("previous")}
       </button>
 
       <span className="flex items-center">
-        {page} / {totalPages}
+        {t("page")} {page} {t("of")} {totalPages}
       </span>
 
       <button
@@ -34,7 +35,7 @@ const PaginationControlButton: React.FC<PaginationProps> = ({
         disabled={page === totalPages}
         onClick={() => onPageChange(Math.min(totalPages, page + 1))}
       >
-        {t ? t("next") : "Next"}
+        {t("next")}
       </button>
     </div>
   );

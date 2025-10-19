@@ -7,6 +7,8 @@ import { addStudent, getStudentsPaginated } from "../../utils/studentApi";
 import { apiClient } from "../../utils/apiClient";
 import { Table } from "../../components/Table";
 import PaginationControlButton from "../../components/PaignateControlButton";
+import { getFaculties } from "../../utils/facultyApi";
+import { getUniversities } from "../../utils/universityApi";
 
 export default function AddStudent() {
   const { t, i18n } = useTranslation("common");
@@ -14,7 +16,15 @@ export default function AddStudent() {
   const { token, isLoggedIn, initialized } = useAuth();
 
   const [selectedProgram, setSelectedProgram] = useState("");
+  const [selectedUniversity, setSelectedUniversity] = useState("");
+  const [selectedFaculty, setSelectedFaculty] = useState("");
   const [programOptions, setProgramOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [facultyOptions, setFacultyOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [universityOptions, setUniversityOptions] = useState<
     { label: string; value: string }[]
   >([]);
   const [, setLoadingStudent] = useState(false);
@@ -22,6 +32,47 @@ export default function AddStudent() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
+
+  // Fetch universities
+  useEffect(() => {
+    if (!isLoggedIn || !token) return;
+    const fetchUniversities = async () => {
+      try {
+        const data = await getUniversities(token);
+        setUniversityOptions([
+          { label: t("please select a university"), value: "" },
+          ...data.map((u: any) => ({ label: u.name, value: String(u.id) })),
+        ]);
+      } catch (err) {
+        console.error(err);
+        alert("API university error");
+      }
+    };
+    fetchUniversities();
+  }, [isLoggedIn, token, t]);
+
+  // Fetch faculties for selected university
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedUniversity) {
+      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
+      return;
+    }
+    const fetchFaculties = async () => {
+      try {
+        const data = await getFaculties(token);
+        setFacultyOptions([
+          { label: t("please select a faculty"), value: "" },
+          ...data
+            .filter((f: any) => String(f.university_id) === selectedUniversity)
+            .map((f: any) => ({ label: f.name, value: String(f.id) })),
+        ]);
+      } catch (err) {
+        console.error(err);
+        alert("API faculty error");
+      }
+    };
+    fetchFaculties();
+  }, [isLoggedIn, token, t, selectedUniversity]);
 
   // 🧩 Load all programs
   useEffect(() => {
@@ -35,11 +86,9 @@ export default function AddStudent() {
         if (!res.ok) return;
         const data = await res.json();
         setProgramOptions([
-          { label: "กรุณาเลือกโปรแกรม", value: "" },
+          { label: t("Please select a program"), value: "" },
           ...data.map((p: any) => ({
-            label: `${p.program_name_th || p.program_name_en} (${
-              p.program_year
-            })`,
+            label: `${p.program_name_en} (${p.program_year})`,
             value: String(p.id),
           })),
         ]);
@@ -183,7 +232,13 @@ export default function AddStudent() {
           }}
           showYearInput={false}
           programOptions={programOptions}
+          universityOptions={universityOptions}
+          facultyOptions={facultyOptions}
           selectedProgram={selectedProgram}
+          selectedUniversity={selectedUniversity}
+          selectedFaculty={selectedFaculty}
+          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
+          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
           onProgramChange={(e) => setSelectedProgram(e.target.value)}
           onSubmit={handleAddStudent}
           onSubmitExcel={handleAddStudentExcel}
@@ -222,7 +277,6 @@ export default function AddStudent() {
           page={page}
           totalPages={totalPages}
           onPageChange={setPage}
-          t={t}
         />
       </div>
     </div>

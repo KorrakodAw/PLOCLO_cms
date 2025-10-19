@@ -200,7 +200,6 @@ export default function CourseManagement() {
             page={page}
             totalPages={totalPages} // ✅ FIXED
             onPageChange={setPage}
-            t={t}
           />
         </>
       )}

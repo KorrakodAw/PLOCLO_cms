@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import * as XLSX from "xlsx";
 import DropdownSelect from "./DropdownSelect";
@@ -16,7 +16,7 @@ interface FormData {
 
 interface FormPopupProps {
   requiredFields?: string[];
-  fieldMap?: Record<string, string>; // { internalName: externalName }
+  fieldMap?: Record<string, string>;
   facultyOptions?: { label: string; value: string }[];
   programOptions?: { label: string; value: string }[];
   universityOptions?: { label: string; value: string }[];
@@ -81,6 +81,14 @@ export default function FormPopup({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
+  // 🚫 Disable background scroll while modal is open
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -90,7 +98,6 @@ export default function FormPopup({
   const validate = () => {
     const newErrors: Record<string, string> = {};
     requiredFields.forEach((internalKey) => {
-      // Use fieldMap if provided, otherwise use internalKey
       const propKey = fieldMap[internalKey] || internalKey;
       const value = formData[propKey as keyof typeof formData];
       if (!value || String(value).trim() === "") {
@@ -109,7 +116,7 @@ export default function FormPopup({
     }
     try {
       setLoading(true);
-      await onSubmit(formData); // 👈 delegate to parent
+      await onSubmit(formData);
       window.location.reload();
       onClose();
     } catch (err) {
@@ -134,7 +141,7 @@ export default function FormPopup({
       console.log("Excel Data:", rows);
 
       if (onSubmitExcel) {
-        await onSubmitExcel(rows); // 👈 ส่งข้อมูลกลับไป parent
+        await onSubmitExcel(rows);
         onClose();
       }
     } catch (error) {
@@ -144,20 +151,17 @@ export default function FormPopup({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
         onClick={onClose}
       ></div>
 
       {/* Modal */}
       <div className="relative z-10 bg-white p-8 rounded-2xl shadow-2xl w-[90%] max-w-3xl transition-all">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6 border-b pb-3">
-          <h2 className="text-xl font-semibold text-gray-800">
-            Program Management
-          </h2>
+        <div className="flex justify-end mb-6 border-b pb-3">
           <X
             onClick={onClose}
             className="text-gray-500 hover:text-gray-800 cursor-pointer transition-colors"
