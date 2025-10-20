@@ -43,8 +43,9 @@ export async function uploadCoursesExcel(
         break;
       }
     }
-    // Debug log for developer
+
     console.log("Excel row:", row, "Extracted code:", code);
+
     if (!code) {
       results.push({
         code: "",
@@ -53,10 +54,12 @@ export async function uploadCoursesExcel(
       });
       continue;
     }
+
     if (existingCodes.has(code)) {
       results.push({ code, status: "duplicate" });
       continue;
     }
+
     try {
       const payload = {
         code: Number(code),
@@ -73,7 +76,11 @@ export async function uploadCoursesExcel(
             ""
         ).trim(),
         program_id: Number(programId),
+
+        // ✅ Default section = 1
+        section: 1,
       };
+
       const addRes = await apiClient("/api/course", {
         method: "POST",
         headers: {
@@ -82,6 +89,7 @@ export async function uploadCoursesExcel(
         },
         body: JSON.stringify(payload),
       });
+
       if (addRes.ok) {
         results.push({ code, status: "added" });
         existingCodes.add(code); // Prevent double add in same batch
@@ -99,6 +107,7 @@ export async function uploadCoursesExcel(
       results.push({ code, status: "error", error: errorMsg });
     }
   }
+
   return results;
 }
 
@@ -119,6 +128,7 @@ export async function addCourse(
     name: string;
     name_th: string;
     program_id: number;
+    section: number;
   },
   token: string
 ) {

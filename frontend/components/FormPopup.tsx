@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import * as XLSX from "xlsx";
 import DropdownSelect from "./DropdownSelect";
+import { useTranslation } from "react-i18next";
 
 interface FormData {
   code: string;
@@ -80,6 +81,7 @@ export default function FormPopup({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation("common");
 
   // 🚫 Disable background scroll while modal is open
   useEffect(() => {
@@ -173,7 +175,7 @@ export default function FormPopup({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {universityOptions.length > 0 && onUniversityChange && (
               <DropdownSelect
-                label="University"
+                label={t("University")}
                 value={selectedUniversity}
                 onChange={onUniversityChange}
                 options={universityOptions}

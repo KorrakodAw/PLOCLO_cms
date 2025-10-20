@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import AddButton from "../../components/AddButton";
 import { Table, Column } from "../../components/Table";
 import PaginationControlButton from "../../components/PaignateControlButton";
+import { getFaculties } from "../../utils/facultyApi";
+import { getUniversities } from "../../utils/universityApi";
 
 import {
   getCourses,
@@ -25,6 +27,7 @@ interface Course {
   name: string;
   name_th: string;
   program_id: number;
+  section: number;
 }
 
 export default function CourseManagement() {
@@ -40,7 +43,33 @@ export default function CourseManagement() {
   const totalPages = Math.max(1, Math.ceil(total / limit)); // ✅ FIXED
 
   const [programOptions, setProgramOptions] = useState<ProgramOption[]>([]);
+  const [universityOptions, setUniversityOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [facultyOptions, setFacultyOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+
   const [selectedProgram, setSelectedProgram] = useState("");
+  const [selectedUniversity, setSelectedUniversity] = useState("");
+  const [selectedFaculty, setSelectedFaculty] = useState("");
+
+  // Fetch university options
+  useEffect(() => {
+    const fetchUniversities = async () => {
+      if (!token) return;
+      try {
+        const data = await getUniversities(token);
+        setUniversityOptions([
+          { label: t("please select a university"), value: "" },
+          ...data.map((u: any) => ({ label: u.name, value: String(u.id) })),
+        ]);
+      } catch (err: any) {
+        alert("Failed to fetch universities: " + (err.message || err));
+      }
+    };
+    fetchUniversities();
+  }, [token]);
 
   // Fetch program options
   const fetchPrograms = async () => {
@@ -48,16 +77,58 @@ export default function CourseManagement() {
     try {
       const res = await getProgramsPaginated(token, 1, 10);
       setProgramOptions([
-        { label: "กรุณาเลือกโปรแกรม", value: "" },
+        { label: t("please select a program"), value: "" },
         ...res.data.map((p: any) => ({
-          label: `${p.program_name_th || p.program_name_en} (${
-            p.program_year
-          })`,
+          label: `${p.program_name_en} (${p.program_year})`,
           value: String(p.id),
         })),
       ]);
     } catch (err: any) {
       alert("Failed to fetch programs: " + (err.message || err));
+    }
+  };
+
+  //fetch Faculties
+  useEffect(() => {
+    const fetchFaculties = async () => {
+      if (!token) return;
+      try {
+        const data = await getFaculties(token);
+        setFacultyOptions([
+          { label: t("please select a faculty"), value: "" },
+          ...data.map((f: any) => ({ label: f.name, value: String(f.id) })),
+        ]);
+      } catch (err: any) {
+        alert("Failed to fetch faculties: " + (err.message || err));
+      }
+    };
+    fetchFaculties();
+  }, [token]);
+
+  const handleAddCourseExcel = async (data: unknown[]) => {
+    if (!token || !selectedProgram) {
+      alert(t("Please select a program and ensure you are logged in."));
+      return;
+    }
+    try {
+      const results = await uploadCoursesExcel(
+        data as any[],
+        token,
+        selectedProgram
+      );
+      const added = results.filter((r: any) => r.status === "added").length;
+      const duplicate = results.filter(
+        (r: any) => r.status === "duplicate"
+      ).length;
+      const error = results.filter((r: any) => r.status === "error").length;
+      let msg = `${t("Upload summary")}\n`;
+      msg += `${t("Added")}: ${added}\n`;
+      msg += `${t("Duplicate")}: ${duplicate}\n`;
+      msg += `${t("Error")}: ${error}`;
+      alert(msg);
+      fetchCourses(1);
+    } catch (err: any) {
+      alert(t("Error uploading courses") + ": " + (err.message || err));
     }
   };
 
@@ -104,6 +175,7 @@ export default function CourseManagement() {
           name: String(data.nameEn),
           name_th: String(data.nameTh),
           program_id: Number(selectedProgram),
+          section: Number(data.year),
         },
         token
       );
@@ -125,6 +197,7 @@ export default function CourseManagement() {
     lang === "en"
       ? { header: "Name", accessor: "name" }
       : { header: "ชื่อหลักสูตร", accessor: "name_th" },
+    { header: t("section"), accessor: "section" },
     // {
     //   header: t("program"),
     //   accessor: "program_id",
@@ -144,48 +217,24 @@ export default function CourseManagement() {
             nameTh: "Course Name (TH)",
             abbrEn: "Course abbreviation (EN)",
             abbrTh: "Course abbreviation (TH)",
-            year: "Year",
+            year: "Section",
           }}
           submitButtonText={{
             insert: "Insert Course",
             upload: "Upload Course (Excel)",
           }}
           showAbbreviationInputs={false}
-          showYearInput={false}
           programOptions={programOptions}
+          universityOptions={universityOptions}
+          facultyOptions={facultyOptions}
           selectedProgram={selectedProgram}
+          selectedFaculty={selectedFaculty}
+          selectedUniversity={selectedUniversity}
           onProgramChange={(e) => setSelectedProgram(e.target.value)}
+          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
+          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
           onSubmit={handleAddCourse}
-          onSubmitExcel={async (data: unknown[]) => {
-            if (!token || !selectedProgram) {
-              alert(t("Please select a program and ensure you are logged in."));
-              return;
-            }
-            try {
-              const results = await uploadCoursesExcel(
-                data as any[],
-                token,
-                selectedProgram
-              );
-              const added = results.filter(
-                (r: any) => r.status === "added"
-              ).length;
-              const duplicate = results.filter(
-                (r: any) => r.status === "duplicate"
-              ).length;
-              const error = results.filter(
-                (r: any) => r.status === "error"
-              ).length;
-              let msg = `${t("Upload summary")}\n`;
-              msg += `${t("Added")}: ${added}\n`;
-              msg += `${t("Duplicate")}: ${duplicate}\n`;
-              msg += `${t("Error")}: ${error}`;
-              alert(msg);
-              fetchCourses(1);
-            } catch (err: any) {
-              alert(t("Error uploading courses") + ": " + (err.message || err));
-            }
-          }}
+          onSubmitExcel={handleAddCourseExcel}
         />
       </div>
 

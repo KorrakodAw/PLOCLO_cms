@@ -44,7 +44,7 @@ export function Table<T>({
               <th
                 key={i}
                 className={`text-left px-4 py-2 border-r border-gray-300 ${
-                  col.className ?? ""
+                  col.className ?? "" 
                 }`}
               >
                 {col.header}

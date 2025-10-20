@@ -5,6 +5,7 @@ import DropdownSelect from "../../components/DropdownSelect";
 import CourseManagement from "./courseManage";
 import { useTranslation } from "react-i18next";
 import ProtectedRoute from "../../components/ProtectedRoute";
+import TabButton from "../../components/TabButton";
 
 export default function EditCourse() {
   const { t } = useTranslation("common");
@@ -53,10 +54,41 @@ export default function EditCourse() {
     { label: "3", value: "3" },
   ];
 
+  const tabs = [
+    { id: "general", label: t("general information") },
+    { id: "clo", label: t("course learning outcomes (CLO)") },
+    { id: "clo-plo mapping", label: t("CLO-PLO mapping") },
+    { id: "assignment", label: t("Assignment mapping") },
+    { id: "course-clo mapping", label: t("Course-CLO mapping") },
+  ];
+
+  const [activeTab, setActiveTab] = useState("general");
+
+  const clearFilters = () => {
+    setUniversity("");
+    setFaculty("");
+    setProgram("");
+    setYear("");
+  };
+
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
       <div className="max-w-[1100px] h-full">
         <p className="font-extralight text-2xl">{t("course information")}</p>
+
+        <div className="flex gap-3 mt-5 px-3 py-2 ">
+          {tabs.map((tab) => (
+            <TabButton
+              key={tab.id}
+              label={tab.label}
+              isActive={activeTab === tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                clearFilters();
+              }}
+            />
+          ))}
+        </div>
 
         <div className="max-w-200 flex gap-3 mt-5 items-center">
           <DropdownSelect
@@ -102,7 +134,11 @@ export default function EditCourse() {
             {t("clear")}
           </button>
         </div>
-        <CourseManagement />
+        {activeTab === "general" && <CourseManagement />}
+        {activeTab === "clo" && ""}
+        {activeTab === "clo-plo mapping" && ""}
+        {activeTab === "assignment" && ""}
+        {activeTab === "course-clo mapping" && ""}
       </div>
     </ProtectedRoute>
   );
