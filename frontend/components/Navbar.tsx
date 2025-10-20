@@ -36,13 +36,15 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
         <ul>
           {isLoggedIn && (
             <>
-              {/* ✅ เฉพาะ Admin */}
               {["admin", "instructor"].includes(user?.role || "") && (
                 <>
                   <NavLink href="/editProgram">{t("edit program")}</NavLink>
                   <NavLink href="/editCourse">{t("edit course")}</NavLink>
-                  <NavLink href="/manageAccount">{t("manage account")}</NavLink>
                 </>
+              )}
+              {/* ✅ เฉพาะ Admin */}
+              {["admin"].includes(user?.role || "") && (
+                <NavLink href="/manageAccount">{t("manage account")}</NavLink>
               )}
 
               {/* ✅ ทุก role เข้าได้ */}
