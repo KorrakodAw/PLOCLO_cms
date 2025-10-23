@@ -215,4 +215,32 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/program/:id
+router.delete("/:id", authenticateToken, async(req,res)=>{
+  const { id } = req.params;
+    try {
+        // ลบ courses ที่อยู่ใน program
+    await pool.query(`DELETE FROM course WHERE program_id = $1`, [id]);
+        // ลบ PLO ที่อยู่ใน program นี้
+    await pool.query(`DELETE FROM plo WHERE program_id = $1`, [id]);
+        // ลบ student ที่อยู่ใน program นี้
+    await pool.query(`DELETE FROM student WHERE program_id = $1`, [id]);
+        // ลบ program
+    await pool.query(`DELETE FROM program WHERE id = $1`, [id]);
+    const result = await pool.query(
+      `DELETE FROM program WHERE id = $1 RETURNING id`,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "program not found" });
+    }
+
+    res.json({ message: "program deleted", deletedId: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to delete program" });
+  }
+});
+
 export default router;
