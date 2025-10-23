@@ -90,4 +90,21 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/plo/:id
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `DELETE FROM plo WHERE id = $1 RETURNING id`,
+      [id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "PLO not found" });
+    }
+    res.json({ success: true, id });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to delete PLO" });
+  }
+});
 export default router;

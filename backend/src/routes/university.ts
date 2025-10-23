@@ -54,4 +54,51 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/university/:id
+router.delete(":id", authenticateToken,async(req,res)=>{
+  const {id} = req.params;
+  try{
+    // 1️⃣ หา faculties ที่อยู่ใน university นี้
+    const faculties = await pool.query(`SELECT id FROM faculty WHERE university_id = $1`, [id]);
+
+    for (const f of faculties.rows) {
+      const facultyId = f.id;
+
+      // 2️⃣ หา programs ของ faculty นี้
+      const programs = await pool.query(`SELECT id FROM program WHERE faculty_id = $1`, [facultyId]);
+
+      for (const p of programs.rows) {
+        const programId = p.id;
+
+        // 3️⃣ ลบ students ของ program นี้
+        await pool.query(`DELETE FROM student WHERE program_id = $1`, [programId]);
+
+        // 4️⃣ ลบ courses ของ program นี้
+        await pool.query(`DELETE FROM course WHERE program_id = $1`, [programId]);
+
+        // 5️⃣ ลบ plos ของ program นี้
+        await pool.query(`DELETE FROM plo WHERE program_id = $1`, [programId]);
+
+        // 6️⃣ ลบ program เอง
+        await pool.query(`DELETE FROM program WHERE id = $1`, [programId]);
+      }
+
+      // 7️⃣ ลบ faculty เอง
+      await pool.query(`DELETE FROM faculty WHERE id = $1`, [facultyId]);
+    }
+     //ลบ university
+    const result = await pool.query(
+      'DELETE FROM university WHERE id = $1 RETURNING id',
+      [id]
+    );
+    if (result.rowCount === 0){
+      return res.status(404).json({ error:"university not found"});
+    }
+    res.json({ message: "university deleted", deletedId: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to delete university" });
+  }
+});
+
 export default router;

@@ -55,4 +55,39 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/faculty/:id
+router.delete("/:id", authenticateToken, async(req,res)=>{
+  const { id } = req.params;
+    try {
+     //ลบ progrms
+    const programs = await pool.query(`SELECT id FROM program WHERE faculty_id = $1`, [id]);
+      for (const p of programs.rows) {
+           const programId = p.id;
+     // ลบ course ของ program
+      await pool.query(`DELETE FROM course WHERE program_id = $1`, [programId]);
+     // ลบ PLO ของ program
+      await pool.query(`DELETE FROM plo WHERE program_id = $1`, [programId]);
+
+     // ลบ program
+      await pool.query(`DELETE FROM program WHERE id = $1`, [programId]);
+      }
+
+    //ลบ faculty
+    const result = await pool.query(
+      `DELETE FROM faculty WHERE id = $1 RETURNING id`,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Faculty not found" });
+    }
+
+    res.json({ success: true, id });
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to delete Faculty" });
+
+}
+});
+
 export default router;
