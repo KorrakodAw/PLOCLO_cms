@@ -8,7 +8,7 @@ const router = Router();
 router.get("/all", authenticateToken, async (_req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, code, name, name_th,  program_id
+      `SELECT id, code, name, name_th,  program_id , section
        FROM course
        ORDER BY id ASC`
     );
@@ -27,7 +27,7 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   const offset = (page - 1) * limit;
   try {
     const result = await pool.query(
-      `SELECT id, code, name, name_th,  program_id
+      `SELECT id, code, name, name_th,  program_id , section
        FROM course
        ORDER BY id ASC
        LIMIT $1 OFFSET $2`,
@@ -48,32 +48,33 @@ router.get("/paginate", authenticateToken, async (req, res) => {
 
 // POST /api/course
 router.post("/", authenticateToken, async (req, res) => {
-  const { code, name, name_th,  program_id } = req.body;
-  if (
-    code === undefined ||
-    !name ||
-    !name_th ||
-    !program_id
-  ) {
+  const { code, name, name_th, program_id, section } = req.body;
+
+  if (!code || !name || !name_th || !program_id || !section) {
     return res.status(400).json({ error: "Missing required fields" });
   }
+
   try {
-    // Check for duplicate course code in the same program
+    // ✅ Check for duplicate code *in the same program and section*
     const dup = await pool.query(
-      `SELECT id FROM course WHERE code = $1 AND program_id = $2`,
-      [code, program_id]
+      `SELECT id FROM course WHERE code = $1 AND program_id = $2 AND section = $3`,
+      [code, program_id, section]
     );
+
     if (dup.rows.length > 0) {
       return res
         .status(409)
-        .json({ error: "Duplicate course code in this program" });
+        .json({ error: "Duplicate course code in this program and section" });
     }
+
+    // ✅ Insert course
     const result = await pool.query(
-      `INSERT INTO course (code, name, name_th, program_id)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, code, name, name_th, program_id`,
-      [code, name, name_th, program_id]
+      `INSERT INTO course (code, name, name_th, program_id, section)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, code, name, name_th, program_id, section`,
+      [code, name, name_th, program_id, section]
     );
+
     res.status(201).json(result.rows[0]);
   } catch (err: any) {
     console.error(err);

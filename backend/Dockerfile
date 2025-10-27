@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+RUN npm run build
+
+EXPOSE 3001
+
+# รอ DB ก่อน start backend
+CMD ["sh", "-c", "./wait-for-db.sh postgres && node dist/index.js"]
+
+
+
