@@ -1,14 +1,19 @@
+// backend/src/routes/program.ts
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { authorizeRoles } from "../middleware/roleMiddleware";
+import { parse } from "path";
+import { queryObjects } from "v8";
 const router = Router();
 
 // GET all programs (with faculty & university names)
-router.get("/", authenticateToken, async (_req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT 
+    const facultyId = req.query.facultyId as string | undefined;
+
+    let query = `
+      SELECT 
          p.id,
          p.program_code,
          p.program_name_en,
@@ -23,8 +28,19 @@ router.get("/", authenticateToken, async (_req, res) => {
        FROM program p
        JOIN faculty f ON p.faculty_id = f.id
        JOIN university u ON f.university_id = u.id
-       ORDER BY p.id DESC`
-    );
+    `;
+
+    const params: any[] = [];
+
+    // Add facultyId filter if provided
+    if (facultyId) {
+      query += ` WHERE p.faculty_id = $1`;
+      params.push(facultyId);
+    }
+
+    query += ` ORDER BY p.id DESC`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err: any) {
     console.error(err);
@@ -48,16 +64,17 @@ router.post(
       program_year,
     } = req.body;
 
-    if (
-      !faculty_id ||
-      !program_code ||
-      !program_name_en ||
-      !program_name_th ||
-      !program_year
-    ) {
+    const missingFields = [];
+
+    if (!faculty_id) missingFields.push("faculty_id");
+    if (!program_code) missingFields.push("program_code");
+    if (!program_name_en) missingFields.push("program_name_en");
+    if (!program_name_th) missingFields.push("program_name_th");
+    if (!program_year) missingFields.push("program_year");
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
-        error:
-          "faculty_id, program_code, program_name_en, program_name_th, and program_year are required",
+        error: `Missing required field(s): ${missingFields.join(", ")}`,
       });
     }
 
@@ -161,6 +178,12 @@ router.post(
     } catch (err: any) {
       await client.query("ROLLBACK");
       console.error(err);
+      // Detect unique violation and return 409 so client can show a helpful message
+      if (err && err.code === "23505") {
+        const message =
+          err.detail || "Duplicate program code detected in bulk upload";
+        return res.status(409).json({ error: message });
+      }
       res.status(500).json({ error: "Bulk upload failed" });
     } finally {
       client.release();
@@ -169,77 +192,113 @@ router.post(
 );
 
 // GET paginated programs
-// GET /api/program/paginate?page=1&limit=10
+
 router.get("/paginate", authenticateToken, async (req, res) => {
-  let page = parseInt(req.query.page as string) || 1;
-  let limit = parseInt(req.query.limit as string) || 10;
-  if (page < 1) page = 1;
-  if (limit < 1) limit = 10;
-  const offset = (page - 1) * limit;
   try {
-    // Get total count
-    const countResult = await pool.query("SELECT COUNT(*) FROM program");
+    const universityId = req.query.universityId as string | undefined;
+    const facultyId = req.query.facultyId as string | undefined;
+    const programId = req.query.programId as string | undefined; // This is now program_code
+    const year = req.query.year as string | undefined;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    // 🧩 Start building query with JOIN to support university filter
+    let baseQuery = `
+      SELECT 
+        p.id, 
+        p.program_code, 
+        p.program_name_en, 
+        p.program_name_th, 
+        p.program_shortname_en, 
+        p.program_shortname_th, 
+        p.program_year, 
+        p.faculty_id,
+        f.university_id
+      FROM program p
+      JOIN faculty f ON p.faculty_id = f.id
+    `;
+    const params: any[] = [];
+    const conditions: string[] = [];
+
+    // 🧠 Build WHERE conditions dynamically
+    if (universityId) {
+      conditions.push(`f.university_id = $${params.length + 1}`);
+      params.push(universityId);
+    }
+    if (facultyId) {
+      conditions.push(`p.faculty_id = $${params.length + 1}`);
+      params.push(facultyId);
+    }
+    if (programId) {
+      // Filter by program_code (not id) to get all years of the same program
+      conditions.push(`p.program_code = $${params.length + 1}`);
+      params.push(programId);
+    }
+    if (year) {
+      conditions.push(`p.program_year = $${params.length + 1}`);
+      params.push(year);
+    }
+
+    // Add WHERE clause if conditions exist
+    if (conditions.length > 0) {
+      baseQuery += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    // 🧮 Pagination
+    baseQuery += ` ORDER BY p.id ASC LIMIT $${params.length + 1} OFFSET $${
+      params.length + 2
+    }`;
+    params.push(limit, offset);
+
+    // 📦 Execute main data query
+    const result = await pool.query(baseQuery, params);
+
+    // 📊 Count total records for pagination (use same conditions)
+    let countQuery = `
+      SELECT COUNT(*) 
+      FROM program p
+      JOIN faculty f ON p.faculty_id = f.id
+    `;
+    const countParams: any[] = [];
+    const countConditions: string[] = [];
+
+    if (universityId) {
+      countConditions.push(`f.university_id = $${countParams.length + 1}`);
+      countParams.push(universityId);
+    }
+    if (facultyId) {
+      countConditions.push(`p.faculty_id = $${countParams.length + 1}`);
+      countParams.push(facultyId);
+    }
+    if (programId) {
+      countConditions.push(`p.program_code = $${countParams.length + 1}`);
+      countParams.push(programId);
+    }
+    if (year) {
+      countConditions.push(`p.program_year = $${countParams.length + 1}`);
+      countParams.push(year);
+    }
+
+    if (countConditions.length > 0) {
+      countQuery += ` WHERE ${countConditions.join(" AND ")}`;
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0].count, 10);
 
-    // Get paginated data
-    const dataResult = await pool.query(
-      `SELECT 
-         p.id,
-         p.program_code,
-         p.program_name_en,
-         p.program_name_th,
-         p.program_shortname_en,
-         p.program_shortname_th,
-         p.program_year,
-         f.id AS faculty_id,
-         f.name AS faculty_name,
-         u.id AS university_id,
-         u.name AS university_name
-       FROM program p
-       JOIN faculty f ON p.faculty_id = f.id
-       JOIN university u ON f.university_id = u.id
-       ORDER BY p.id DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
     res.json({
-      data: dataResult.rows,
+      data: result.rows,
+      total,
       page,
       limit,
-      total,
       totalPages: Math.ceil(total / limit),
     });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch paginated programs" });
-  }
-});
-
-// DELETE /api/program/:id
-router.delete("/:id", authenticateToken, async(req,res)=>{
-  const { id } = req.params;
-    try {
-        // ลบ courses ที่อยู่ใน program
-    await pool.query(`DELETE FROM course WHERE program_id = $1`, [id]);
-        // ลบ PLO ที่อยู่ใน program นี้
-    await pool.query(`DELETE FROM plo WHERE program_id = $1`, [id]);
-        // ลบ student ที่อยู่ใน program นี้
-    await pool.query(`DELETE FROM student WHERE program_id = $1`, [id]);
-        // ลบ program
-    await pool.query(`DELETE FROM program WHERE id = $1`, [id]);
-    const result = await pool.query(
-      `DELETE FROM program WHERE id = $1 RETURNING id`,
-      [id]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "program not found" });
-    }
-
-    res.json({ message: "program deleted", deletedId: result.rows[0].id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to delete program" });
+    console.error("❌ Pagination error:", err.message);
+    res.status(500).json({
+      error: "Unable to retrieve paginated program information",
+    });
   }
 });
 

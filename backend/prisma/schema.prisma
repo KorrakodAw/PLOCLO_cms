@@ -88,7 +88,7 @@ model student {
   last_name         String    @postgres.VarChar(100)
   email             String?   @unique @postgres.VarChar(150)
   year_of_admission Int
-  program_id        Int?
+  program_id        Int
   created_at        DateTime? @default(now()) @postgres.Timestamp(6)
   program           program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction)
 }

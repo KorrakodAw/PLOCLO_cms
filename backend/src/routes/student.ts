@@ -125,22 +125,4 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE /api/studer/:id
-router.delete(":id", authenticateToken,async(req,res)=>{
-  const {id} = req.params;
-  try{
-    const result = await pool.query(
-      'DELETE FROM student WHERE id = $1 RETURNING id',
-      [id]
-    );
-    if (result.rowCount === 0){
-      return res.status(404).json({ error:"student not found"});
-    }
-    res.json({ message: "student deleted", deletedId: result.rows[0].id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to delete student" });
-  }
-});
-
 export default router;

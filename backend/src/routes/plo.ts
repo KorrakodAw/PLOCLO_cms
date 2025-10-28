@@ -55,28 +55,49 @@ router.get("/", authenticateToken, async (_req, res) => {
 
 // ดึงข้อมูล PLO แบบแบ่งหน้า
 // GET /api/plo/paginate?page=1&limit=10
+// GET /api/plo/paginate?page=1&limit=10&program_id=2&sort=code&order=asc
 router.get("/paginate", authenticateToken, async (req, res) => {
   let page = parseInt(req.query.page as string) || 1;
   let limit = parseInt(req.query.limit as string) || 10;
+  const program_id = req.query.program_id
+    ? parseInt(req.query.program_id as string)
+    : null;
+  const sort = ["id", "code", "name"].includes(req.query.sort as string)
+    ? req.query.sort
+    : "id";
+  const order = req.query.order === "desc" ? "DESC" : "ASC";
+
   if (page < 1) page = 1;
   if (limit < 1) limit = 10;
   const offset = (page - 1) * limit;
+
   try {
-    // Get total count
-    const countResult = await pool.query("SELECT COUNT(*) FROM plo");
+    let whereClause = "";
+    const params: any[] = [];
+    if (program_id) {
+      params.push(program_id);
+      whereClause = `WHERE plo.program_id = $${params.length}`;
+    }
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM plo ${whereClause}`,
+      params
+    );
     const total = parseInt(countResult.rows[0].count, 10);
 
-    // Get paginated data
+    params.push(limit, offset); // for LIMIT and OFFSET
     const dataResult = await pool.query(
       `SELECT 
          plo.id, plo.code, plo.program_id, plo.name, plo.engname,
          program.program_shortname_th, program.program_shortname_en, program.program_year
        FROM plo
        JOIN program ON plo.program_id = program.id
-       ORDER BY plo.id
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
+       ${whereClause}
+       ORDER BY ${sort} ${order}
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
     );
+
     res.json({
       data: dataResult.rows,
       page,
@@ -90,21 +111,4 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE /api/plo/:id
-router.delete("/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await pool.query(
-      `DELETE FROM plo WHERE id = $1 RETURNING id`,
-      [id]
-    );
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "PLO not found" });
-    }
-    res.json({ success: true, id });
-  } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to delete PLO" });
-  }
-});
 export default router;

@@ -6,17 +6,70 @@ const router = Router();
 
 // ดึงข้อมูลคณะทั้งหมด (faculty) สำหรับ dropdown
 // ใช้ในหน้าเพิ่ม/แก้ไขโปรแกรมหรือคอร์ส
-router.get("/", authenticateToken, async (_req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT id, name, university_id FROM faculty ORDER BY id ASC`
-    );
+    const universityId = req.query.university_id as string | undefined;
+
+    let query = `SELECT id, name, university_id FROM faculty`;
+    const params: any[] = [];
+
+    if (universityId) {
+      query += ` WHERE university_id = $1`;
+      params.push(universityId);
+    }
+
+    query += ` ORDER BY id ASC`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err: any) {
     console.error(err);
     res.status(500).json({ error: "Unable to retrieve faculty information" });
   }
 });
+
+
+router.get("/paginate", authenticateToken, async (req, res) => {
+  try {
+    const universityId = req.query.university_id as string | undefined;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    let query = `SELECT id, name, university_id FROM faculty`;
+    const params: any[] = [];
+
+    if (universityId) {
+      query += ` WHERE university_id = $1`;
+      params.push(universityId);
+    }
+
+    query += ` ORDER BY id ASC LIMIT $${params.length + 1} OFFSET $${
+      params.length + 2
+    }`;
+    params.push(limit, offset);
+
+    const result = await pool.query(query, params);
+
+    // Optionally get total count
+    const countResult = await pool.query(
+      universityId
+        ? `SELECT COUNT(*) FROM faculty WHERE university_id = $1`
+        : `SELECT COUNT(*) FROM faculty`,
+      universityId ? [universityId] : []
+    );
+
+    const total = parseInt(countResult.rows[0].count);
+
+    res.json({ data: result.rows, total });
+  } catch (err: any) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ error: "Unable to retrieve paginated faculty information" });
+  }
+});
+
 
 router.post("/", authenticateToken, async (req, res) => {
   const { university_id, name, name_th, abbreviation, abbreviation_th } =
@@ -53,41 +106,6 @@ router.post("/", authenticateToken, async (req, res) => {
     console.error("Database error details:", err.message);
     res.status(500).json({ error: err.message });
   }
-});
-
-// DELETE /api/faculty/:id
-router.delete("/:id", authenticateToken, async(req,res)=>{
-  const { id } = req.params;
-    try {
-     //ลบ progrms
-    const programs = await pool.query(`SELECT id FROM program WHERE faculty_id = $1`, [id]);
-      for (const p of programs.rows) {
-           const programId = p.id;
-     // ลบ course ของ program
-      await pool.query(`DELETE FROM course WHERE program_id = $1`, [programId]);
-     // ลบ PLO ของ program
-      await pool.query(`DELETE FROM plo WHERE program_id = $1`, [programId]);
-
-     // ลบ program
-      await pool.query(`DELETE FROM program WHERE id = $1`, [programId]);
-      }
-
-    //ลบ faculty
-    const result = await pool.query(
-      `DELETE FROM faculty WHERE id = $1 RETURNING id`,
-      [id]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Faculty not found" });
-    }
-
-    res.json({ success: true, id });
-  } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to delete Faculty" });
-
-}
 });
 
 export default router;
