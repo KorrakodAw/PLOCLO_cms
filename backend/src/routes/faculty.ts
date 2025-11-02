@@ -107,5 +107,24 @@ router.post("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router.post("/", async (req, res) => {
+  const { university_id, name, name_th, abbreviation, abbreviation_th } = req.body;
 
+  try {
+    const faculty = await pool.query.create({
+      data: {
+        university_id: parseInt(university_id),
+        name,
+        name_th,
+        abbreviation,
+        abbreviation_th,
+      },
+    });
+
+    res.status(201).json({ message: "เพิ่มคณะสำเร็จ", faculty });
+  } catch (error) {
+    console.error("Error creating faculty:", error);
+    res.status(500).json({ error: "ไม่สามารถเพิ่มข้อมูลได้" });
+  }
+});
 export default router;
