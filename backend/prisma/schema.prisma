@@ -64,6 +64,7 @@ model faculty {
   abbreviation    String?    @postgres.VarChar(50)
   abbreviation_th String?    @postgres.VarChar(50)
   university      university @relation(fields: [university_id], references: [id])
+
   programs        program[]
 
   @@map("faculty")
@@ -71,12 +72,15 @@ model faculty {
 
 model course {
   id         Int     @id @default(autoincrement())
-  code       Int
+  code       String  @postgres.VarChar(50)
   name       String  @postgres.VarChar(255)
   name_th    String  @postgres.VarChar(255)
   program_id Int
   section    Int
+  semester   Int     @default(1)
   program    program @relation(fields: [program_id], references: [id])
+
+  clo       clo[]
 
   @@map("course")
 }
@@ -86,9 +90,22 @@ model student {
   student_id        String    @unique @postgres.VarChar(20)
   first_name        String    @postgres.VarChar(100)
   last_name         String    @postgres.VarChar(100)
-  email             String?   @unique @postgres.VarChar(150)
-  year_of_admission Int
   program_id        Int
   created_at        DateTime? @default(now()) @postgres.Timestamp(6)
   program           program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction)
+
+  @@map("student")
 }
+
+model clo {
+  id        Int     @id @default(autoincrement())
+  code      String  @postgres.VarChar(20)
+  name      String  @postgres.VarChar(255)
+  name_th   String  @postgres.VarChar(255)
+
+  course_id Int
+  course    course  @relation(fields: [course_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+
+  @@map("clo")
+}
+

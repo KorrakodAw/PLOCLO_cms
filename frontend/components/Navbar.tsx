@@ -36,12 +36,19 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
         <ul>
           {isLoggedIn && (
             <>
-              {/* ✅ เฉพาะ Admin */}
               {["admin", "instructor"].includes(user?.role || "") && (
                 <>
                   <NavLink href="/editProgram">{t("edit program")}</NavLink>
                   <NavLink href="/editCourse">{t("edit course")}</NavLink>
+                </>
+              )}
+              {/* ✅ เฉพาะ Admin */}
+              {["admin"].includes(user?.role || "") && (
+                <>
                   <NavLink href="/manageAccount">{t("manage account")}</NavLink>
+                  <NavLink href="/manageUniversity">
+                    {t("manage university")}
+                  </NavLink>
                 </>
               )}
 
@@ -59,7 +66,7 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
               ${
                 isActive
                   ? "text-black hover:text-red-500 hover:shadow-2xl hover:rounded-b-md"
-                  : ""
+                  : "text-black hover:text-red-500 hover:shadow-2xl hover:rounded-b-md"
               }`}
             >
               {t("logout")}

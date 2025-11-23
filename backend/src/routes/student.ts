@@ -11,18 +11,16 @@ router.get("/", authenticateToken, async (_req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
-        s.id,
-        s.student_id,
-        s.first_name,
-        s.last_name,
-        s.email,
-        s.year_of_admission,
+        student.id,
+        student.student_id,
+        student.first_name,
+        student.last_name,
         p.id AS program_id,
         p.program_name_en,
         p.program_name_th
-      FROM student s
-      JOIN program p ON s.program_id = p.id
-      ORDER BY s.id DESC`
+      FROM student student
+      JOIN program p ON student.program_id = p.id
+      ORDER BY student.id DESC`
     );
     res.json(result.rows);
   } catch (err) {
@@ -35,33 +33,19 @@ router.get("/", authenticateToken, async (_req, res) => {
  * ✅ POST create new student
  */
 router.post("/", authenticateToken, async (req, res) => {
-  const {
-    student_id,
-    first_name,
-    last_name,
-    email,
-    year_of_admission,
-    program_id,
-  } = req.body;
+  const { student_id, first_name, last_name, program_id } = req.body;
 
-  if (
-    !student_id ||
-    !first_name ||
-    !last_name ||
-    !email ||
-    !year_of_admission ||
-    !program_id
-  ) {
+  if (!student_id || !first_name || !last_name || !program_id) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
     const result = await pool.query(
       `INSERT INTO student 
-        (student_id, first_name, last_name, email, year_of_admission, program_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
+        (student_id, first_name, last_name, program_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [student_id, first_name, last_name, email, year_of_admission, program_id]
+      [student_id, first_name, last_name, program_id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -85,43 +69,101 @@ router.post("/", authenticateToken, async (req, res) => {
  * ✅ GET paginated students
  */
 router.get("/paginate", authenticateToken, async (req, res) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 10;
-  const offset = (page - 1) * limit;
-
   try {
-    // Get total count
-    const totalResult = await pool.query(`SELECT COUNT(*) FROM student`);
-    const total = parseInt(totalResult.rows[0].count, 10);
+    const universityId = req.query.universityId as string | undefined;
+    const facultyId = req.query.facultyId as string | undefined;
+    const programId = req.query.programId as string | undefined;
+    const year = req.query.year as string | undefined;
 
-    // Get student data joined with program info
-    const result = await pool.query(
-      `SELECT 
-           s.id,
-           s.student_id,
-           s.first_name,
-           s.last_name,
-           s.email,
-           s.year_of_admission,
-           s.program_id,
-           p.program_name_en,
-           p.program_name_th,
-           p.program_shortname_en,
-           p.program_shortname_th
-         FROM student s
-         LEFT JOIN program p ON s.program_id = p.id
-         ORDER BY s.id DESC
-         LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
 
-    res.json({
-      data: result.rows,
-      total,
-    });
+    let query = `
+      SELECT  
+        student.id,
+        student.student_id,
+        student.first_name,
+        student.last_name,
+        student.program_id,
+        program.program_shortname_th,
+        program.program_shortname_en,
+        program.program_year
+      FROM student
+      JOIN program ON student.program_id = program.id
+      JOIN faculty ON program.faculty_id = faculty.id
+      JOIN university ON faculty.university_id = university.id
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+
+    if (universityId) {
+      params.push(universityId);
+      query += ` AND university.id = $${params.length}`;
+    }
+    if (facultyId) {
+      params.push(facultyId);
+      query += ` AND faculty.id = $${params.length}`;
+    }
+    if (programId) {
+      params.push(programId);
+      query += ` AND program.program_code = $${params.length}`;
+    }
+    if (year) {
+      params.push(year);
+      query += ` AND program.program_year = $${params.length}`;
+    }
+
+    query += ` ORDER BY student.id ASC LIMIT $${params.length + 1} OFFSET $${
+      params.length + 2
+    }`;
+
+    params.push(limit, offset);
+
+    console.log("Final query:", query);
+    console.log("Params:", params);
+
+    const result = await pool.query(query, params);
+
+    // count query
+    let countQuery = `
+      SELECT COUNT(*) AS total
+      FROM student
+      JOIN program ON student.program_id = program.id
+      JOIN faculty ON program.faculty_id = faculty.id
+      JOIN university ON faculty.university_id = university.id
+      WHERE 1=1
+    `;
+
+    const countParams: any[] = [];
+
+    if (universityId) {
+      countParams.push(universityId);
+      countQuery += ` AND university.id = $${countParams.length}`;
+    }
+    if (facultyId) {
+      countParams.push(facultyId);
+      countQuery += ` AND faculty.id = $${countParams.length}`;
+    }
+    if (programId) {
+      countParams.push(programId);
+      countQuery += ` AND program.program_code = $${countParams.length}`;
+    }
+    if (year) {
+      countParams.push(year);
+      countQuery += ` AND program.program_year = $${countParams.length}`;
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
+    const total = parseInt(countResult.rows[0].total, 10);
+
+    res.json({ data: result.rows, total, page, limit });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch students" });
+    console.error("Pagination error:", err);
+    res.status(500).json({
+      error: "Unable to retrieve paginated student information",
+    });
   }
 });
 

@@ -41,8 +41,26 @@ export async function getPlos(token: string) {
 }
 
 // Get paginated PLOs
-export async function getPlosPaginated(token: string, page = 1, limit = 10) {
-  const res = await apiClient(`/api/plo/paginate?page=${page}&limit=${limit}`, {
+export async function getPlosPaginated(
+  token: string,
+  page = 1,
+  limit = 10,
+  filters?: {
+    universityId?: string;
+    facultyId?: string;
+    programId?: string;
+    year?: string;
+  }
+) {
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    ...(filters?.universityId ? { universityId: filters.universityId } : {}),
+    ...(filters?.facultyId ? { facultyId: filters.facultyId } : {}),
+    ...(filters?.programId ? { programId: filters.programId } : {}),
+    ...(filters?.year ? { year: filters.year } : {}),
+  });
+  const res = await apiClient(`/api/plo/paginate?${query.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {

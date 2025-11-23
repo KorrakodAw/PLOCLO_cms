@@ -23,11 +23,9 @@ router.get("/", authenticateToken, async (req, res) => {
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err: any) {
-    console.error(err);
     res.status(500).json({ error: "Unable to retrieve faculty information" });
   }
 });
-
 
 router.get("/paginate", authenticateToken, async (req, res) => {
   try {
@@ -69,7 +67,6 @@ router.get("/paginate", authenticateToken, async (req, res) => {
       .json({ error: "Unable to retrieve paginated faculty information" });
   }
 });
-
 
 router.post("/", authenticateToken, async (req, res) => {
   const { university_id, name, name_th, abbreviation, abbreviation_th } =

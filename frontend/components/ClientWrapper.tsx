@@ -22,11 +22,13 @@ export default function ClientWrapper({
   }, [pathname]);
 
   // สมมติ: /dashboard ต้อง login, ส่วน / และ /about ไม่บังคับ
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const protectedRoutes = [
     "/editCourse",
     "/editProgram",
     "/manageAccount",
     "/viewChart",
+    "/manageUniversity",
   ];
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function ClientWrapper({
         window.location.replace("/");
       }
     }
-  }, [initialized, isLoggedIn, pathname]);
+  }, [initialized, isLoggedIn, pathname, protectedRoutes]);
 
   if (!initialized) return null;
 

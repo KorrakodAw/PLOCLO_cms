@@ -24,7 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${kanit.variable} antialiased`}>
+      <body className={`${kanit.variable} font-kanit antialiased`}>
         <AuthProvider>
           <I18nProvider>
             <ClientWrapper>{children}</ClientWrapper>

@@ -1,0 +1,620 @@
+import { useTranslation } from "react-i18next";
+import { Table, Column } from "../../components/Table";
+import { useEffect, useState } from "react";
+import PaginationControlButton from "../../components/PaignateControlButton";
+import AddButton from "../../components/AddButton";
+
+// Ensure you have a get function for CLOs.
+// If it's named differently, update this import.
+import { addClo, getCLOsPaginate } from "../../utils/cloApi";
+import { getPrograms } from "../../utils/programApi";
+import { getUniversities } from "../../utils/universityApi";
+import { getFaculties } from "../../utils/facultyApi";
+import { getCourses } from "../../utils/courseApi";
+import { useToast } from "../../components/Toast";
+import { useAuth } from "../context/AuthContext";
+
+// --- Interfaces ---
+
+interface CLO {
+  id: string;
+  code: string; // Added code based on your AddButton placeholders
+  name: string;
+  name_th?: string; // Optional Thai name
+  course_id: string;
+}
+
+interface ExcelCLORow {
+  code?: string | number;
+  nameEn?: string;
+  nameTh?: string;
+  clo_name?: string;
+  clo_code?: string;
+  [key: string]: unknown;
+}
+
+interface university {
+  id: string;
+  name: string;
+}
+
+interface faculty {
+  id: string;
+  name: string;
+  university_id: string;
+}
+
+interface program {
+  id: string;
+  program_name_en: string;
+  program_shortname_en: string;
+  program_year: number;
+  faculty_id: string;
+}
+
+interface course {
+  id: string;
+  code: string;
+  name: string;
+  program_id: string;
+  year: number;
+  semester: number;
+  section: string;
+}
+
+interface CLOManagementProps {
+  universityId?: string;
+  facultyId?: string;
+  programId?: string;
+  year?: string;
+  semester?: string;
+  section?: string;
+  courseId?: string;
+}
+
+export default function CLOManagement({
+  universityId,
+  facultyId,
+  programId,
+  year,
+  semester,
+  section,
+  courseId,
+}: CLOManagementProps) {
+  const { t, i18n } = useTranslation("common");
+  const { showToast, ToastElement } = useToast();
+  const lang = i18n.language;
+  const { isLoggedIn, token } = useAuth();
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
+
+  // Filters
+  const [selectedUniversity, setSelectedUniversity] = useState("");
+  const [selectedFaculty, setSelectedFaculty] = useState("");
+  const [selectedProgram, setSelectedProgram] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+
+  // Options
+  const [universityOptions, setUniversityOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [facultyOptions, setFacultyOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [programOptions, setProgramOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [yearOptions, setYearOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [semesterOptions, setSemesterOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [sectionOptions, setSectionOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [courseOptions, setCourseOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+
+  // Store all rows that share the same Course Code (e.g., all rows for 305100)
+  const [courseVariants, setCourseVariants] = useState<course[]>([]);
+
+  // Store the final specific Database ID (e.g., 1, 7, 10)
+  const [specificCourseId, setSpecificCourseId] = useState<string>("");
+
+  // Data
+  const [clos, setClos] = useState<Array<CLO>>([]);
+  const [, setLoading] = useState(false);
+
+  // --- Filter Logic (Universities, Faculties, Programs, etc.) ---
+
+  useEffect(() => {
+    if (!isLoggedIn || !token) return;
+
+    const fetchUniversities = async () => {
+      try {
+        const data = await getUniversities(token);
+        setUniversityOptions([
+          { label: t("please select a university"), value: "" },
+          ...data.map((u: university) => ({
+            label: u.name,
+            value: String(u.id),
+          })),
+        ]);
+      } catch {
+        showToast("API university error", "error");
+      }
+    };
+    fetchUniversities();
+  }, [isLoggedIn, token, t, showToast, selectedUniversity]);
+
+  // Fetch Faculties
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedUniversity) {
+      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
+      setSelectedFaculty("");
+      setSelectedProgram("");
+      setSelectedYear("");
+
+      return;
+    }
+
+    const fetchFaculties = async () => {
+      try {
+        const data = await getFaculties(token, selectedUniversity);
+        const filtered = data.filter(
+          (f: faculty) => String(f.university_id) === selectedUniversity
+        );
+
+        if (filtered.length === 0) {
+          setFacultyOptions([
+            { label: t("no faculties available"), value: "" },
+          ]);
+          return;
+        }
+
+        setFacultyOptions([
+          { label: t("please select a faculty"), value: "" },
+          ...filtered.map((f: faculty) => ({
+            label: f.name,
+            value: String(f.id),
+          })),
+        ]);
+      } catch {
+        showToast("API faculty error", "error");
+      }
+    };
+    fetchFaculties();
+  }, [isLoggedIn, token, t, selectedUniversity, showToast]);
+
+  // Fetch Years
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedFaculty) {
+      setYearOptions([{ label: t("please select a year"), value: "" }]);
+      return;
+    }
+
+    if (selectedFaculty || !selectedFaculty) {
+      setSelectedYear("");
+      setSelectedProgram("");
+      setSelectedCourse("");
+      setSelectedSection("");
+      setSelectedSemester("");
+    }
+
+    getPrograms(token, selectedFaculty)
+      .then((data) => {
+        const years = Array.from(
+          new Set<number>(data.map((p: program) => Number(p.program_year)))
+        ).sort((a, b) => b - a);
+
+        if (years.length === 0) {
+          setYearOptions([{ label: t("no years available"), value: "" }]);
+        } else {
+          setYearOptions([
+            { label: t("please select a year"), value: "" },
+            ...years.map((y) => {
+              const label = lang === "en" ? String(y - 543) : String(y);
+              return { label, value: String(y) };
+            }),
+          ]);
+        }
+      })
+      .catch((err) => showToast("API program error: " + err.message, "error"));
+  }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
+
+  // Fetch Programs
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
+      setProgramOptions([{ label: t("please select a program"), value: "" }]);
+      return;
+    }
+
+    if (selectedYear || !selectedYear) {
+      setSelectedProgram("");
+      setSelectedCourse("");
+      setSelectedSection("");
+      setSelectedSemester("");
+    }
+
+    getPrograms(token, selectedFaculty)
+      .then((data) => {
+        const programs = data.filter(
+          (p: program) => String(p.program_year) === selectedYear
+        );
+
+        if (programs.length === 0) {
+          setProgramOptions([{ label: t("no programs available"), value: "" }]);
+        } else {
+          setProgramOptions([
+            { label: t("please select a program"), value: "" },
+            ...programs.map((p: program) => ({
+              label: p.program_shortname_en,
+              value: String(p.id),
+            })),
+          ]);
+        }
+      })
+      .catch((err) =>
+        showToast(
+          "API program error: " +
+            (err instanceof Error ? err.message : "unknown"),
+          "error"
+        )
+      );
+  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
+
+  // Fetch Courses
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedProgram) {
+      setCourseOptions([{ label: t("please select a course"), value: "" }]);
+      setSelectedCourse("");
+      return;
+    }
+
+    if (!selectedCourse) {
+      setSelectedSection("");
+      setSelectedSemester("");
+    }
+
+    const fetchCourses = async () => {
+      try {
+        const data = (await getCourses(token, selectedProgram)) as course[];
+        const uniqueCourses = Array.from(
+          new Map(data.map((c: course) => [c.code, c])).values()
+        );
+
+        setCourseOptions([
+          { label: "please select a course", value: "" },
+          ...uniqueCourses.map((c: course) => ({
+            label: `${c.code} - ${c.name}`, // Improved label
+            value: String(c.code), // NOTE: Assuming API filters by Course Code, not ID. If ID, change this.
+          })),
+        ]);
+      } catch {
+        showToast("API course error", "error");
+      }
+    };
+    fetchCourses();
+  }, [isLoggedIn, token, selectedProgram, selectedCourse, t, showToast]);
+
+  // Fetch Semesters & Sections
+  // 1. Fetch matching rows when Course Code changes
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedCourse) {
+      setCourseVariants([]);
+      // Reset downstream selections
+      setSelectedSemester("");
+      setSelectedSection("");
+      return;
+    }
+
+    const fetchVariants = async () => {
+      try {
+        const data = await getCourses(token, selectedProgram);
+
+        // Filter to get only rows matching the selected CODE
+        const courseData = data.filter(
+          (c: course) => String(c.code) === selectedCourse
+        );
+
+        setCourseVariants(courseData);
+
+        // Reset downstream selections when the main course changes
+        setSelectedSemester("");
+        setSelectedSection("");
+      } catch {
+        showToast("Error fetching course details", "error");
+      }
+    };
+
+    fetchVariants();
+  }, [isLoggedIn, token, selectedCourse, selectedProgram, showToast]);
+
+  // 2. Update Semester Options when Variants change
+  useEffect(() => {
+    if (courseVariants.length === 0) {
+      setSemesterOptions([{ label: "please select a semester", value: "" }]);
+      return;
+    }
+
+    const semesters = Array.from(
+      new Set(courseVariants.map((c: course) => String(c.semester)))
+    ) as string[];
+
+    // Sort numerically
+    semesters.sort((a, b) => Number(a) - Number(b));
+
+    setSemesterOptions([
+      { label: t("please select a semester"), value: "" },
+      ...semesters.map((s) => ({ label: s, value: s })),
+    ]);
+  }, [courseVariants, t]);
+
+  // 3. Update Section Options when Semester changes
+  useEffect(() => {
+    if (!selectedSemester || courseVariants.length === 0) {
+      setSectionOptions([{ label: "please select a section", value: "" }]);
+      return;
+    }
+
+    // Filter variants to find sections ONLY for the selected semester
+    const relevantRows = courseVariants.filter(
+      (c) => String(c.semester) === selectedSemester
+    );
+
+    const sections = Array.from(
+      new Set(relevantRows.map((c: course) => String(c.section)))
+    ) as string[];
+
+    // Sort numerically
+    sections.sort((a, b) => Number(a) - Number(b));
+
+    setSectionOptions([
+      { label: t("please select a section"), value: "" },
+      ...sections.map((s) => ({ label: s, value: s })),
+    ]);
+  }, [selectedSemester, courseVariants, t]);
+
+  useEffect(() => {
+    // We only run this if we have the variants and the user has selected both values
+    if (courseVariants.length > 0 && selectedSemester && selectedSection) {
+      // Find the specific row that matches both Semester and Section
+      const foundCourse = courseVariants.find(
+        (c) =>
+          String(c.semester) === String(selectedSemester) &&
+          String(c.section) === String(selectedSection)
+      );
+
+      if (foundCourse) {
+        console.log("Found Specific Database ID:", foundCourse.id);
+        setSpecificCourseId(foundCourse.id);
+
+        // You can now use foundCourse.id to fetch CLOs or other data
+        // e.g., fetchCLOs(foundCourse.id);
+      } else {
+        setSpecificCourseId("");
+      }
+    } else {
+      setSpecificCourseId("");
+    }
+  }, [selectedSemester, selectedSection, courseVariants]);
+
+  // --- CRUD Operations ---
+
+  const handleAddclo = async (data: Record<string, unknown>) => {
+    // 1. Check Authentication
+    if (!token) return;
+
+    // 2. CRITICAL: Check if specificCourseId exists
+    // If the user hasn't selected Semester/Section, this will be empty
+    if (!specificCourseId) {
+      showToast(
+        t("Please select a Semester and Section to identify the course"),
+        "error"
+      );
+      return;
+    }
+
+    try {
+      // Optional: Log data to console to debug
+      console.log("Sending Payload:", {
+        code: String(data.code),
+        name: String(data.nameEn),
+        name_th: String(data.nameTh || ""),
+        course_id: specificCourseId,
+      });
+
+      await addClo(
+        {
+          code: String(data.code),
+          name: String(data.nameEn),
+          name_th: String(data.nameTh || ""),
+          course_id: specificCourseId,
+        },
+        token
+      );
+      showToast(t("clo added successfully"), "success");
+      setPage(1);
+      window.location.reload();
+      // 3. Refresh the table data after adding
+    } catch {
+      showToast("Failed to add CLO", "error");
+    }
+  };
+
+  const handleExcelUpload = async (rows: ExcelCLORow[]) => {
+    if (!token || !specificCourseId) {
+      showToast(t("Please select a course before uploading"), "error");
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+
+    for (const [index, row] of rows.entries()) {
+      const code = row.code || row.clo_code || row.CLO_code;
+      const nameEn = row.nameEn || row.CLO_engname;
+      const nameTh = row.nameTh || row.CLO_name;
+
+      if (!code || !nameEn) {
+        failCount++;
+        errors.push(`Row ${index + 1}: Missing code or name`);
+        continue;
+      }
+
+      try {
+        await addClo(
+          {
+            code: String(code),
+            name: String(nameEn),
+            name_th: String(nameTh || ""),
+            course_id: specificCourseId,
+          },
+          token
+        );
+        successCount++;
+      } catch {
+        failCount++;
+        errors.push(`Row ${index + 1}: API Error`);
+      }
+    }
+
+    showToast(
+      `Success: ${successCount}, Failed: ${failCount}`,
+      failCount > 0 ? "error" : "success"
+    );
+    if (successCount > 0) {
+      setPage(1);
+      window.location.reload();
+    }
+  };
+
+  // --- Table Columns ---
+
+  const cloColumns: Column<CLO>[] = [
+    {
+      header: "Code",
+      accessor: "code",
+    },
+    {
+      header: "CLO Name (EN)",
+      accessor: "name",
+    },
+    {
+      header: "CLO Name (TH)",
+      accessor: "name_th",
+    },
+  ];
+
+  // --- Fetch CLOs ---
+  useEffect(() => {
+    if (!isLoggedIn || !token) return;
+
+    setLoading(true);
+
+    const filters: Record<string, string> = {};
+
+    // FIX: Use .toString().trim() to remove hidden spaces or tabs like %09
+    if (universityId) filters.universityId = universityId.toString().trim();
+    if (facultyId) filters.facultyId = facultyId.toString().trim();
+    if (programId) filters.programId = programId.toString().trim(); // <--- This fixes your specific error
+    if (year) filters.year = year.toString().trim();
+    if (semester) filters.semester = semester.toString().trim();
+    if (section) filters.section = section.toString().trim();
+    if (courseId) filters.courseId = courseId.toString().trim();
+
+    console.log("Cleaned Filters:", filters);
+
+    getCLOsPaginate(token, page, limit, filters)
+      .then((res) => {
+        const data = Array.isArray(res.data) ? res.data : [];
+        const total = res.total || 0;
+        setClos(data);
+        setTotalPages(Math.ceil(total / limit));
+      })
+      .catch((err) => {
+        showToast("API CLO error: " + err.message, "error");
+      })
+      .finally(() => setLoading(false));
+  }, [
+    isLoggedIn,
+    token,
+    page,
+    universityId,
+    facultyId,
+    programId,
+    year,
+    semester,
+    section,
+    courseId,
+    showToast,
+  ]);
+  // --- Render ---
+
+  return (
+    <div className="mt-5 p-5">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-extralight">{"clo manage"}</h1>
+        <AddButton
+          buttonText="add new clo"
+          placeholderText={{
+            code: "CLO Code (e.g., CLO1)",
+            nameEn: "CLO Name (EN)",
+            nameTh: "CLO Name (TH)",
+          }}
+          submitButtonText={{
+            insert: "insert clo",
+            upload: "upload clo (excel)",
+          }}
+          showAbbreviationInputs={false}
+          // Options
+          programOptions={programOptions}
+          universityOptions={universityOptions}
+          facultyOptions={facultyOptions}
+          yearOptions={yearOptions}
+          semesterOptions={semesterOptions}
+          sectionOptions={sectionOptions}
+          courseOptions={courseOptions}
+          // Selected Values
+          selectedProgram={selectedProgram}
+          selectedFaculty={selectedFaculty}
+          selectedUniversity={selectedUniversity}
+          selectedYear={selectedYear}
+          selectedSemester={selectedSemester}
+          selectedSection={selectedSection}
+          selectedCourse={selectedCourse}
+          // Handlers
+          onProgramChange={(e) => setSelectedProgram(e.target.value)}
+          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
+          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
+          onYearChange={(e) => setSelectedYear(e.target.value)}
+          onSemesterChange={(e) => setSelectedSemester(e.target.value)}
+          onSectionChange={(e) => setSelectedSection(e.target.value)}
+          onCourseChange={(e) => setSelectedCourse(e.target.value)}
+          onSubmit={handleAddclo}
+          onSubmitExcel={handleExcelUpload}
+        />
+      </div>
+
+      <hr className="my-3" />
+
+      <Table<CLO> columns={cloColumns} data={clos} />
+
+      <PaginationControlButton
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      />
+      <ToastElement />
+    </div>
+  );
+}

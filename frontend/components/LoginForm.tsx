@@ -6,6 +6,7 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { useAuth } from "../app/context/AuthContext";
 import { apiClient } from "../utils/apiClient";
 import { useTranslation } from "react-i18next";
+import { useToast } from "../components/Toast";
 
 export default function LoginForm() {
   const { t } = useTranslation("common");
@@ -15,6 +16,8 @@ export default function LoginForm() {
   const { login, isLoggedIn } = useAuth();
   const router = useRouter();
 
+  const { showToast, ToastElement } = useToast();
+
   const handleSubmit = async () => {
     try {
       const res = await apiClient("/api/users/login", {
@@ -23,14 +26,14 @@ export default function LoginForm() {
       });
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || "Login failed");
+        showToast(err.error || "Login failed", "error");
         return;
       }
       const data = await res.json();
       login(data.token);
     } catch (err) {
       console.error(err);
-      alert("Cannot reach backend. Check server.");
+      showToast("An error occurred during login", "error");
     }
   };
 
@@ -49,7 +52,6 @@ export default function LoginForm() {
       <h2 className="text-2xl font-bold text-center text-orange-400 mb-6">
         {t("login")}
       </h2>
-
       <div className="mb-4">
         <label className="flex">{t("email")}</label>
         <input
@@ -61,7 +63,6 @@ export default function LoginForm() {
           className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
       </div>
-
       <div className="mb-4 relative">
         <label className="flex">{t("password")}</label>
         <input
@@ -72,6 +73,7 @@ export default function LoginForm() {
           required
           className="w-full px-4 py-2 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
         />
+
         <button
           type="button"
           className="absolute right-3 top-[38px]"
@@ -80,13 +82,13 @@ export default function LoginForm() {
           {showPassword ? <FaEyeSlash /> : <FaEye />}
         </button>
       </div>
-
       <button
         type="submit"
         className="w-full py-2 bg-orange-400 text-white rounded-lg hover:bg-orange-500 transition"
       >
         {t("sign_in")}
       </button>
+      <ToastElement />
     </form>
   );
 }

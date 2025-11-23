@@ -12,113 +12,60 @@ export interface Course {
 export interface ExcelCourseRow {
   [key: string]: string | number | undefined;
 }
-export async function uploadCoursesExcel(
-  rows: ExcelCourseRow[],
+
+export async function getCoursePaginate(
   token: string,
-  programId: string | number
+  page = 1,
+  limit = 10,
+  filters?: {
+    universityId?: string;
+    facultyId?: string;
+    programId?: string;
+    year?: string;
+    semester?: string;
+    section?: string;
+  }
 ) {
-  // Fetch all existing courses for the selected program
-  const res = await apiClient(`/api/course/paginate?page=1&limit=10`, {
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    ...(filters?.universityId ? { universityId: filters.universityId } : {}),
+    ...(filters?.facultyId ? { facultyId: filters.facultyId } : {}),
+    ...(filters?.programId ? { programId: filters.programId } : {}),
+    ...(filters?.year ? { year: filters.year } : {}),
+    ...(filters?.semester ? { semester: filters.semester } : {}),
+    ...(filters?.section ? { section: filters.section } : {}),
+  });
+  const res = await apiClient(`/api/course/paginate?${query.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(await res.text());
-  const existingCourses: Course[] = (await res.json()).data;
-  const existingCodes = new Set(
-    existingCourses
-      .filter((c) => String(c.program_id) === String(programId))
-      .map((c) => String(c.code))
-  );
-
-  const results = [];
-  for (const row of rows) {
-    // Try to robustly extract the course code
-    let code = "";
-    for (const key of ["Course Id", "course_id", "รหัสหลักสูตร"]) {
-      if (
-        row[key] !== undefined &&
-        row[key] !== null &&
-        String(row[key]).trim() !== ""
-      ) {
-        code = String(row[key]).trim();
-        break;
-      }
-    }
-    // Debug log for developer
-    console.log("Excel row:", row, "Extracted code:", code);
-    if (!code) {
-      results.push({
-        code: "",
-        status: "error",
-        error: "No course code found in row",
-      });
-      continue;
-    }
-    if (existingCodes.has(code)) {
-      results.push({ code, status: "duplicate" });
-      continue;
-    }
-    try {
-      const payload = {
-        code: Number(code),
-        name: String(
-          row["Course Name (EN)"] ||
-            row["course_engname"] ||
-            row["ชื่อหลักสูตร (EN)"] ||
-            ""
-        ).trim(),
-        name_th: String(
-          row["Course Name (TH)"] ||
-            row["course_name"] ||
-            row["ชื่อหลักสูตร (TH)"] ||
-            ""
-        ).trim(),
-        program_id: Number(programId),
-      };
-      const addRes = await apiClient("/api/course", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (addRes.ok) {
-        results.push({ code, status: "added" });
-        existingCodes.add(code); // Prevent double add in same batch
-      } else {
-        const errorText = await addRes.text();
-        console.error("Failed to add course via Excel:", {
-          code,
-          payload,
-          errorText,
-        });
-        results.push({ code, status: "error", error: errorText });
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      results.push({ code, status: "error", error: errorMsg });
-    }
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Failed to fetch paginated Course");
   }
-  return results;
+  return await res.json();
 }
 
-export async function getCourses(token: string, page = 1, limit = 10) {
-  const res = await apiClient(
-    `/api/course/paginate?page=${page}&limit=${limit}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
+export async function getCourses(token: string, programId?: string) {
+  let query = "";
+  if (programId) query = `?programId=${programId}`;
+
+  const res = await apiClient(`/api/course${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function addCourse(
   data: {
-    code: number;
+    code: string;
     name: string;
     name_th: string;
-    program_id: number;
+    program_id: string;
+    section: string;
+    semester: string;
   },
   token: string
 ) {

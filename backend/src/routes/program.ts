@@ -3,8 +3,7 @@ import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { authorizeRoles } from "../middleware/roleMiddleware";
-import { parse } from "path";
-import { queryObjects } from "v8";
+
 const router = Router();
 
 // GET all programs (with faculty & university names)
@@ -64,16 +63,17 @@ router.post(
       program_year,
     } = req.body;
 
-    if (
-      !faculty_id ||
-      !program_code ||
-      !program_name_en ||
-      !program_name_th ||
-      !program_year
-    ) {
+    const missingFields = [];
+
+    if (!faculty_id) missingFields.push("faculty_id");
+    if (!program_code) missingFields.push("program_code");
+    if (!program_name_en) missingFields.push("program_name_en");
+    if (!program_name_th) missingFields.push("program_name_th");
+    if (!program_year) missingFields.push("program_year");
+
+    if (missingFields.length > 0) {
       return res.status(400).json({
-        error:
-          "faculty_id, program_code, program_name_en, program_name_th, and program_year are required",
+        error: `Missing required field(s): ${missingFields.join(", ")}`,
       });
     }
 
@@ -177,6 +177,12 @@ router.post(
     } catch (err: any) {
       await client.query("ROLLBACK");
       console.error(err);
+      // Detect unique violation and return 409 so client can show a helpful message
+      if (err && err.code === "23505") {
+        const message =
+          err.detail || "Duplicate program code detected in bulk upload";
+        return res.status(409).json({ error: message });
+      }
       res.status(500).json({ error: "Bulk upload failed" });
     } finally {
       client.release();
@@ -288,7 +294,6 @@ router.get("/paginate", authenticateToken, async (req, res) => {
       totalPages: Math.ceil(total / limit),
     });
   } catch (err: any) {
-    console.error("❌ Pagination error:", err.message);
     res.status(500).json({
       error: "Unable to retrieve paginated program information",
     });

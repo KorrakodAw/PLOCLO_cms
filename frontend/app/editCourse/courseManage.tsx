@@ -1,19 +1,38 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import AddButton from "../../components/AddButton";
-import { Table, Column } from "../../components/Table";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import {
-  getCourses,
-  addCourse,
-  uploadCoursesExcel,
-} from "../../utils/courseApi";
-import { getProgramsPaginated } from "../../utils/programApi";
+import AddButton from "../../components/AddButton";
+import { Table, Column } from "../../components/Table";
+import PaginationControlButton from "../../components/PaignateControlButton";
+import { getFaculties } from "../../utils/facultyApi";
+import { getUniversities } from "../../utils/universityApi";
+import { useToast } from "../../components/Toast";
+
+import { addCourse, getCoursePaginate } from "../../utils/courseApi";
 import { useAuth } from "../context/AuthContext";
-interface ProgramOption {
-  label: string;
-  value: string;
-  program_shortname_en?: string;
+import { getPrograms } from "../../utils/programApi";
+
+// interface ProgramOption {
+//   label: string;
+//   value: string;
+//   program_shortname_en?: string;
+// }
+
+interface university {
+  name: string;
+  id: string;
+}
+
+interface faculty {
+  name: string;
+  id: string;
+  university_id: number;
+}
+
+interface program {
+  id: number;
+  program_name_en: string;
+  program_code: string;
+  program_year: number;
 }
 
 interface Course {
@@ -22,100 +41,387 @@ interface Course {
   name: string;
   name_th: string;
   program_id: number;
+  section: number;
 }
 
-export default function CourseManagement() {
+interface CourseManagementProps {
+  universityId?: string;
+  facultyId?: string;
+  programId?: string;
+  year?: string;
+  semester?: string;
+  section?: string;
+}
+
+// Define this outside your component or in a types file
+interface ExcelCourseRow {
+  // Possible keys for Code
+  code?: string | number;
+  Code?: string | number;
+  course_id?: string | number;
+
+  // Possible keys for Thai Name
+  nameTh?: string;
+  course_name?: string;
+  "ชื่อไทย"?: string;
+
+  // Possible keys for English Name
+  nameEn?: string;
+  course_engname?: string;
+  "ชื่ออังกฤษ"?: string;
+  PLO_engname?: string;
+
+  // Allow other unknown columns from Excel without throwing errors
+  [key: string]: unknown; 
+}
+
+export default function CourseManagement({
+  universityId,
+  facultyId,
+  programId,
+  year,
+  semester,
+  section,
+}: CourseManagementProps) {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn, initialized } = useAuth();
+
   const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [, setLoadingCourse] = useState(false);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
   const limit = 10;
+  const [totalPages, setTotalPages] = useState(1);
+  const { showToast, ToastElement } = useToast();
 
-  const [programOptions, setProgramOptions] = useState<ProgramOption[]>([]);
+  const [yearOptions, setYearOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [programOptions, setProgramOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [universityOptions, setUniversityOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [facultyOptions, setFacultyOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [semesterOptions] = useState([
+    { label: "Please select a semester", value: "" },
+    { label: "semester 1", value: "1" },
+    { label: "semester 2", value: "2" },
+    { label: "summer", value: "3" },
+  ]);
+  const [sectionOptions] = useState([
+    { label: "Please select a section", value: "" },
+    { label: "section 1", value: "1" },
+    { label: "section 2", value: "2" },
+    { label: "section 3", value: "3" },
+  ]);
+
   const [selectedProgram, setSelectedProgram] = useState("");
-  // Fetch program options for dropdown
-  const fetchPrograms = async () => {
-    if (!token) return;
-    try {
-      const res = await getProgramsPaginated(token, 1, 10);
-      setProgramOptions([
-        { label: "กรุณาเลือกโปรแกรม", value: "" },
-        ...res.data.map((p: any) => ({
-          label: `${p.program_name_th || p.program_name_en} (${
-            p.program_year
-          })`,
-          value: String(p.id),
-        })),
-      ]);
-    } catch (err: any) {
-      alert("Failed to fetch programs: " + (err.message || err));
-    }
-  };
+  const [selectedUniversity, setSelectedUniversity] = useState("");
+  const [selectedFaculty, setSelectedFaculty] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
 
-  const fetchCourses = async (pageNum = page) => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const res = await getCourses(token, pageNum, limit);
-      setCourses(res.data);
-      setTotal(res.total || 0);
-    } catch (err: any) {
-      alert(t("Failed to fetch courses") + ": " + (err.message || err));
-    } finally {
-      setLoading(false);
+  // Fetch university options
+  useEffect(() => {
+    if (!isLoggedIn || !token) return;
+    const fetchUniversities = async () => {
+      try {
+        const data = await getUniversities(token);
+        setUniversityOptions([
+          { label: t("please select a university"), value: "" },
+          ...data.map((u: university) => ({
+            label: u.name,
+            value: String(u.id),
+          })),
+        ]);
+      } catch {
+        showToast("API university error", "error");
+      }
+    };
+    fetchUniversities();
+  }, [isLoggedIn, token, t, , showToast]);
+
+  //fetch Faculties
+  // // Fetch faculties for selected university (use parent universityId)
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedUniversity) {
+      setSelectedFaculty("");
+      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
+      return;
     }
-  };
+    const fetchFaculties = async () => {
+      try {
+        const data = await getFaculties(token, selectedUniversity);
+        setFacultyOptions([
+          { label: t("please select a faculty"), value: "" },
+          ...data
+            .filter(
+              (f: faculty) => String(f.university_id) === selectedUniversity
+            )
+            .map((f: faculty) => ({ label: f.name, value: String(f.id) })),
+        ]);
+      } catch {
+        showToast("API faculty error", "error");
+      }
+    };
+    fetchFaculties();
+  }, [isLoggedIn, token, t, selectedUniversity, showToast]);
 
   useEffect(() => {
-    if (isLoggedIn && initialized) {
-      fetchCourses(1);
-      fetchPrograms();
-      setPage(1);
+    if (!isLoggedIn || !token || !selectedFaculty) {
+      setYearOptions([{ label: t("please select a year"), value: "" }]);
+      return;
     }
-    // eslint-disable-next-line
-  }, [isLoggedIn, initialized, token]);
 
-  // Refetch when page changes
+    getPrograms(token, selectedFaculty)
+      .then((data) => {
+        // Explicitly tell TypeScript that these are numbers
+        const years = Array.from(
+          new Set<number>(
+            data.map((p: program) => Number(p.program_year)) // ensure numeric
+          )
+        ).sort((a, b) => b - a); // optional: sort descending
+
+        if (years.length === 0) {
+          setYearOptions([{ label: t("no years available"), value: "" }]);
+          return;
+        } else {
+          setYearOptions([
+            { label: t("please select a year"), value: "" },
+            ...years.map((y) => {
+              const label = lang === "en" ? String(y - 543) : String(y);
+              return { label, value: String(y) }; // display converted label, keep real value
+            }),
+          ]);
+        }
+      })
+      .catch((err) => showToast("API program error: " + err.message, "error"));
+  }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
+
   useEffect(() => {
-    if (isLoggedIn && initialized) {
-      fetchCourses(page);
+    if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
+      setProgramOptions([{ label: t("please select a program"), value: "" }]);
+      return;
     }
-    // eslint-disable-next-line
-  }, [page]);
+
+    // Fetch programs for the selected faculty
+    getPrograms(token, selectedFaculty)
+      .then((data) => {
+        // Filter programs by the selected year
+        const programs = data.filter(
+          (p: program) => String(p.program_year) === selectedYear
+        );
+
+        if (programs.length === 0) {
+          setProgramOptions([{ label: t("no programs available"), value: "" }]);
+        } else {
+          setProgramOptions([
+            { label: t("please select a program"), value: "" },
+            ...programs.map((p: program) => ({
+              label: p.program_name_en,
+              value: String(p.id),
+            })),
+          ]);
+        }
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error) {
+          showToast("API program error: " + err.message, "error");
+        } else {
+          showToast("API program error: unknown error", "error");
+        }
+      });
+  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
+
+  // Fetch courses
+  useEffect(() => {
+    if (!isLoggedIn || !token) return;
+    setLoadingCourse(true);
+    const filters: Record<string, string> = {};
+
+    if (universityId) filters.universityId = universityId;
+    if (facultyId) filters.facultyId = facultyId;
+    if (programId) filters.programId = programId;
+    if (year) filters.year = year;
+    if (semester) filters.semester = semester;
+    if (section) filters.section = section;
+
+    getCoursePaginate(token, page, 10, filters)
+      .then((res) => {
+        const data = Array.isArray(res) ? res : res.data || [];
+        const total = res.total || data.length || 1;
+        setCourses(data);
+        setTotalPages(Math.ceil(total / limit));
+      })
+      .catch((err) => {
+        showToast("API course error: " + err.message, "error");
+      })
+      .finally(() => setLoadingCourse(false));
+  }, [
+    isLoggedIn,
+    token,
+    page,
+    limit,
+    universityId,
+    facultyId,
+    programId,
+    year,
+    semester,
+    section,
+    showToast,
+  ]);
 
   const handleAddCourse = async (data: Record<string, unknown>) => {
     if (!token) return;
     if (!selectedProgram) {
-      alert("Please select a program.");
+      showToast("Please select the program from the filter above.", "error");
+      return;
+    }
+    if (!selectedSemester) {
+      showToast("Please select the semester from the filter above.", "error");
       return;
     }
     try {
       await addCourse(
         {
-          code: Number(data.code),
+          code: String(data.code),
           name: String(data.nameEn),
           name_th: String(data.nameTh),
-          program_id: Number(selectedProgram),
+          program_id: String(selectedProgram),
+          section: String(selectedSection),
+          semester: String(selectedSemester),
         },
         token
       );
-      alert("Course added successfully!");
-      fetchCourses(1);
-    } catch (err: any) {
-      alert("Error: " + (err.message || err));
+      showToast(t("Course added successfully!"), "success");
+      setPage(1);
+      window.location.reload();
+    } catch {
+      showToast(t("Failed to add course"), "error");
     }
   };
 
+  const handleAddCourseExcel = async (rows: ExcelCourseRow[]) => {
+    // 1. Guard Clauses
+    if (!initialized) {
+      showToast("Auth context not initialized.", "error");
+      return;
+    }
+    if (!isLoggedIn || !token) {
+      showToast(
+        "You are logged out or token expired. Please log in again.",
+        "error"
+      );
+      return;
+    }
+    if (!selectedProgram) {
+      showToast("Please select the program from the filter above.", "error");
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    const errorDetails: string[] = [];
+
+    // 2. Loop through rows
+    for (const [i, row] of rows.entries()) {
+      const missingFields: string[] = [];
+
+      // Safe access using the Interface keys
+      const code = row.code || row.Code || row.course_id;
+      const nameTh = row.nameTh || row.course_name || row["ชื่อไทย"];
+      const nameEn =
+        row.nameEn ||
+        row.course_engname ||
+        row["ชื่ออังกฤษ"] ||
+        row.PLO_engname;
+
+      // Validation
+      if (!code) missingFields.push("code");
+      if (!nameTh) missingFields.push("nameTh");
+      if (!nameEn) missingFields.push("nameEn");
+
+      if (missingFields.length > 0) {
+        failCount++;
+        errorDetails.push(`Row ${i + 1}: missing ${missingFields.join(", ")}`);
+        continue; // Skip to next row
+      }
+
+      // Prepare Payload (Ensure values are strings)
+      const payload = {
+        code: String(code),
+        name_th: String(nameTh),
+        name: String(nameEn),
+        program_id: selectedProgram,
+        semester: selectedSemester,
+        section: selectedSection,
+      };
+
+      // 3. API Call
+      try {
+        await addCourse(payload, token);
+        successCount++;
+        // REMOVED: window.location.reload() from here.
+        // Reloading inside the loop would stop the process after 1 item.
+      } catch (err: unknown) {
+        failCount++;
+
+        let backendMsg = "Unknown error";
+
+        // Safe Error Handling (Replacing 'any' logic)
+        if (err instanceof Error) {
+          backendMsg = err.message;
+        } else if (typeof err === "string") {
+          backendMsg = err;
+        } else {
+          // If your API throws a promise or custom object, handle it safely
+          try {
+            backendMsg = JSON.stringify(err);
+          } catch {
+            backendMsg = "Non-serializable error";
+          }
+        }
+
+        errorDetails.push(`Row ${i + 1}: backend error - ${backendMsg}`);
+        console.error(`Error adding row ${i + 1}:`, err);
+      }
+    }
+
+    // 4. Final Summary & State Update
+    let summary = `เพิ่มข้อมูลจาก Excel สำเร็จ: ${successCount} รายการ\nล้มเหลว: ${failCount} รายการ`;
+
+    if (errorDetails.length > 0) {
+      summary += `\n\nรายละเอียดข้อผิดพลาด:\n` + errorDetails.join("\n");
+    }
+
+    showToast(summary, failCount > 0 ? "error" : "success");
+
+    // Refresh Data
+    try {
+      // Only refresh/reload if at least one item succeeded
+      if (successCount > 0) {
+        setPage(1);
+        setSelectedProgram("");
+        // Ideally call your fetch function here instead of reloading the page
+        // await fetchCourses();
+
+        // If you must reload the page, do it here at the VERY END:
+        window.location.reload();
+      }
+    } catch {
+      showToast("Failed to refresh list after upload.", "error");
+    }
+  };
+
+  // Optional: render program name instead of ID
   // const programIdToShortName = (id: string | number) => {
   //   const found = programOptions.find((p) => p.value === String(id));
-  //   return found && found.program_shortname_en
-  //     ? found.program_shortname_en
-  //     : found
-  //     ? found.label
-  //     : id;
+  //   return found?.label || id;
   // };
 
   const courseColumns: Column<Course>[] = [
@@ -123,6 +429,7 @@ export default function CourseManagement() {
     lang === "en"
       ? { header: "Name", accessor: "name" }
       : { header: "ชื่อหลักสูตร", accessor: "name_th" },
+    { header: "section", accessor: "section" },
     // {
     //   header: t("program"),
     //   accessor: "program_id",
@@ -132,7 +439,7 @@ export default function CourseManagement() {
 
   return (
     <div className="mt-5 p-5">
-      <div className=" flex justify-between items-center">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-extralight">{t("course management")}</h1>
         <AddButton
           buttonText={t("create new course")}
@@ -140,84 +447,54 @@ export default function CourseManagement() {
             code: "Course Id",
             nameEn: "Course Name (EN)",
             nameTh: "Course Name (TH)",
-            abbrEn: "Course abbreviation (EN)",
-            abbrTh: "Course abbreviation (TH)",
-            year: "Year",
           }}
           submitButtonText={{
             insert: "Insert Course",
             upload: "Upload Course (Excel)",
           }}
           showAbbreviationInputs={false}
-          showYearInput={false}
           programOptions={programOptions}
+          universityOptions={universityOptions}
+          facultyOptions={facultyOptions}
+          yearOptions={yearOptions}
+          semesterOptions={semesterOptions}
+          sectionOptions={sectionOptions}
           selectedProgram={selectedProgram}
+          selectedFaculty={selectedFaculty}
+          selectedUniversity={selectedUniversity}
+          selectedYear={selectedYear}
+          selectedSemester={selectedSemester}
+          selectedSection={selectedSection}
           onProgramChange={(e) => setSelectedProgram(e.target.value)}
-          onSubmit={handleAddCourse}
-          onSubmitExcel={async (data: unknown[]) => {
-            if (!token || !selectedProgram) {
-              alert(t("Please select a program and ensure you are logged in."));
-              return;
-            }
-            try {
-              const results = await uploadCoursesExcel(
-                data as any[],
-                token,
-                selectedProgram
-              );
-              const added = results.filter(
-                (r: any) => r.status === "added"
-              ).length;
-              const duplicate = results.filter(
-                (r: any) => r.status === "duplicate"
-              ).length;
-              const error = results.filter(
-                (r: any) => r.status === "error"
-              ).length;
-              let msg = `${t("Upload summary")}\n`;
-              msg += `${t("Added")}: ${added}\n`;
-              msg += `${t("Duplicate")}: ${duplicate}\n`;
-              msg += `${t("Error")}: ${error}`;
-              alert(msg);
-              fetchCourses(1);
-            } catch (err: any) {
-              alert(t("Error uploading courses") + ": " + (err.message || err));
-            }
+          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
+          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
+          onYearChange={(e) => {
+            const selectedYear = e.target.value;
+            setSelectedYear(selectedYear);
           }}
+          onSemesterChange={(e) => {
+            const selectedSemester = e.target.value;
+            setSelectedSemester(selectedSemester);
+          }}
+          onSectionChange={(e) => {
+            const selectedSection = e.target.value;
+            setSelectedSection(selectedSection);
+          }}
+          onSubmit={handleAddCourse}
+          onSubmitExcel={handleAddCourseExcel}
         />
       </div>
+
       <hr className="my-3" />
-      {/* <p className="text-xl font-extralight">{t("course")}</p> */}
-      {/* Table */}
-      {loading ? (
-        <div>{t("loading")}</div>
-      ) : (
-        <>
-          <Table<Course> columns={courseColumns} data={courses} />
-          {/* Pagination Controls */}
-          <div className="flex justify-center items-center gap-4 mt-4">
-            <button
-              className="px-3 py-1 border rounded disabled:opacity-50"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              {t("previous")}
-            </button>
-            <span>
-              {t("page")} {page} / {Math.ceil(total / limit) || 1}
-            </span>
-            <button
-              className="px-3 py-1 border rounded disabled:opacity-50"
-              onClick={() =>
-                setPage((p) => (p < Math.ceil(total / limit) ? p + 1 : p))
-              }
-              disabled={page >= Math.ceil(total / limit)}
-            >
-              {t("next")}
-            </button>
-          </div>
-        </>
-      )}
+
+      <Table<Course> columns={courseColumns} data={courses} />
+      <PaginationControlButton
+        page={page}
+        totalPages={totalPages} // ✅ FIXED
+        onPageChange={setPage}
+      />
+
+      <ToastElement />
     </div>
   );
 }

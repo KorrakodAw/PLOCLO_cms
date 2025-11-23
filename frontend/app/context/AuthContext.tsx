@@ -38,7 +38,7 @@ function parseJwt(token: string) {
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | "">("");
   const [user, setUser] = useState<User | null>(null);
   const [initialized, setInitialized] = useState(false);
   const router = useRouter();
@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    setToken(null);
+    setToken("");
     setUser(null);
     router.replace("/");
   };

@@ -15,12 +15,16 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
-    if (initialized) {
-      if (!isLoggedIn) {
+    if (!initialized) return;
+    if (!isLoggedIn) {
+      // If token expired, reload to clear stale state
+      if (typeof window !== "undefined") {
+        window.location.replace("/");
+      } else {
         router.replace("/");
-      } else if (roles && !roles.includes(user?.role ?? "")) {
-        router.replace("/403"); // หน้า forbidden
       }
+    } else if (roles && !roles.includes(user?.role ?? "")) {
+      router.replace("/403"); // หน้า forbidden
     }
   }, [initialized, isLoggedIn, user, router, roles]);
 

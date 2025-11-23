@@ -21,6 +21,7 @@
   "login": "Login",
   "logout": "Logout",
   "manage account": "Manage Account",
+  "manage university": "Manage University",
   "password": "Password",
   "please input email": "Please Input Email",
   "please input password": "Please Input Password",
@@ -41,5 +42,19 @@
   "view chart": "View Chart",
   "welcome": "Welcome",
   "year": "Year",
-  "you are logged in": "You are logged in"
+  "you are logged in": "You are logged in",
+  "next": "Next",
+  "no years available": "No years available",
+  "no data available": "No data available",
+  "previous": "Previous",
+  "page": "Page",
+  "of": "Of",
+  "create new student": "Create New Student",
+  "student id": "Student ID",
+  "first name": "First Name",
+  "last name": "Last Name",
+  "year of admission": "Year of Admission",
+  "please select a university": "Please select a university",
+  "please select a program": "Please select a program",
+  "please select a year": "Please select a year"
 }

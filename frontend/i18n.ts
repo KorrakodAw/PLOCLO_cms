@@ -1,5 +1,5 @@
-import i18n from "./node_modules/i18next";
-import { initReactI18next } from "./node_modules/react-i18next";
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
 
 import enCommon from "./locales/en/common.json";
 import thCommon from "./locales/th/common.json";

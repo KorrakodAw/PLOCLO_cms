@@ -40,7 +40,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: "30m" }
+      { expiresIn: "1hr" }
     );
 
     // ✅ ส่งทั้ง token และ user ข้อมูลหลัก
@@ -174,3 +174,55 @@ router.delete("/:id", authenticateToken, async (req: AuthRequest, res) => {
 });
 
 export default router;
+
+// ===== EDIT USER INFO (email, username, role) =====
+router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { username, email, role } = req.body;
+  const requester = req.user;
+
+  try {
+    // 🔒 Only admins can change roles
+    if (role && requester?.role !== "admin") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: only admin can change roles" });
+    }
+
+    // ✅ Check if user exists
+    const existingUser = await pool.query("SELECT * FROM users WHERE id=$1", [
+      id,
+    ]);
+    if (existingUser.rows.length === 0)
+      return res.status(404).json({ error: "User not found" });
+
+    const current = existingUser.rows[0];
+
+    // ✅ Update the provided fields only
+    const result = await pool.query(
+      `
+      UPDATE users
+      SET
+        username = $1,
+        email = $2,
+        role = $3
+      WHERE id = $4
+      RETURNING id, username, email, role, created_at
+      `,
+      [
+        username || current.username,
+        email || current.email,
+        role || current.role,
+        id,
+      ]
+    );
+
+    res.json({
+      message: "User updated successfully",
+      user: result.rows[0],
+    });
+  } catch (err: any) {
+    console.error("Error updating user:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});

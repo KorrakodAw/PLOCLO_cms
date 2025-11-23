@@ -1,10 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import * as XLSX from "xlsx";
 import DropdownSelect from "./DropdownSelect";
 
+// Interface for the Manual Input Form
 interface FormData {
   code: string;
   nameEn: string;
@@ -12,20 +14,43 @@ interface FormData {
   abbrEn: string;
   abbrTh: string;
   year: string;
+  [key: string]: string; // Allow dynamic access for validation loop
 }
 
-interface FormPopupProps {
+// 1. Make Props Generic <T> to match AddButton
+interface FormPopupProps<T> {
   requiredFields?: string[];
-  fieldMap?: Record<string, string>; // { internalName: externalName }
+  fieldMap?: Record<string, string>;
   facultyOptions?: { label: string; value: string }[];
   programOptions?: { label: string; value: string }[];
+  universityOptions?: { label: string; value: string }[];
+  yearOptions?: { label: string; value: string }[];
+  semesterOptions?: { label: string; value: string }[];
+  sectionOptions?: { label: string; value: string }[];
+  courseOptions?: { label: string; value: string }[];
+
+  selectedUniversity?: string;
+  selectedYear?: number | string;
   selectedFaculty?: string;
   selectedProgram?: string;
+  selectedSemester?: number | string;
+  selectedSection?: number | string;
+  selectedCourse?: string;
+
+  onUniversityChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   onFacultyChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   onProgramChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onYearChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onSemesterChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onSectionChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onCourseChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+
   onClose: () => void;
   onSubmit: (data: FormData) => Promise<void> | void;
-  onSubmitExcel?: (rows: unknown[]) => Promise<void> | void;
+
+  // 2. Update onSubmitExcel to accept T[]
+  onSubmitExcel?: (rows: T[]) => Promise<void> | void;
+
   placeholderText: Partial<FormData>;
   submitButtonText?: {
     insert?: string;
@@ -35,30 +60,45 @@ interface FormPopupProps {
   showYearInput?: boolean;
 }
 
-export default function FormPopup({
+// 3. Add <T,> to the component definition
+export default function FormPopup<T>({
   onClose,
   onSubmit,
   onSubmitExcel,
   placeholderText,
   submitButtonText = {},
   showAbbreviationInputs = false,
-  showYearInput = false,
+  // showYearInput = false, // Unused in current logic, but kept in props
   facultyOptions = [],
   programOptions = [],
+  universityOptions = [],
+  yearOptions = [],
+  semesterOptions = [],
+  sectionOptions = [],
+  courseOptions = [],
+  selectedUniversity = "",
+  selectedYear = 0,
   selectedFaculty = "",
   selectedProgram = "",
+  selectedSemester = "",
+  selectedSection = "",
+  selectedCourse = "",
   onFacultyChange,
   onProgramChange,
+  onUniversityChange,
+  onYearChange,
+  onSemesterChange,
+  onCourseChange,
+  onSectionChange,
   requiredFields = ["code", "nameEn", "nameTh"],
   fieldMap = {},
-}: FormPopupProps) {
+}: FormPopupProps<T>) {
   const {
     code = "",
     nameEn = "",
     nameTh = "",
     abbrEn = "",
     abbrTh = "",
-    year = "",
   } = placeholderText;
 
   const { insert = "Insert", upload = "Upload" } = submitButtonText;
@@ -75,6 +115,25 @@ export default function FormPopup({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
+  // Sync year prop to formData
+  useEffect(() => {
+    if (
+      selectedYear !== undefined &&
+      selectedYear !== null &&
+      String(selectedYear) !== "0"
+    ) {
+      setFormData((prev) => ({ ...prev, year: String(selectedYear) }));
+    }
+  }, [selectedYear]);
+
+  // Disable background scroll
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -84,9 +143,8 @@ export default function FormPopup({
   const validate = () => {
     const newErrors: Record<string, string> = {};
     requiredFields.forEach((internalKey) => {
-      // Use fieldMap if provided, otherwise use internalKey
       const propKey = fieldMap[internalKey] || internalKey;
-      const value = formData[propKey as keyof typeof formData];
+      const value = formData[propKey];
       if (!value || String(value).trim() === "") {
         newErrors[propKey] = "This field is required.";
       }
@@ -103,11 +161,11 @@ export default function FormPopup({
     }
     try {
       setLoading(true);
-      await onSubmit(formData); // 👈 delegate to parent
-      window.location.reload();
+      await onSubmit(formData);
       onClose();
     } catch (err) {
       console.error(err);
+      // Consider using a proper toast here instead of alert
       alert("Failed to submit form");
     } finally {
       setLoading(false);
@@ -123,101 +181,159 @@ export default function FormPopup({
       const workbook = XLSX.read(data, { type: "array" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rows: unknown[] = XLSX.utils.sheet_to_json(worksheet);
+
+      // 4. Convert to JSON and Cast to T[]
+      const rows = XLSX.utils.sheet_to_json(worksheet);
 
       console.log("Excel Data:", rows);
 
       if (onSubmitExcel) {
-        await onSubmitExcel(rows); // 👈 ส่งข้อมูลกลับไป parent
+        // Cast rows (any[]) to T[] to satisfy the strict generic type
+        await onSubmitExcel(rows as T[]);
         onClose();
       }
     } catch (error) {
       console.error(error);
       alert("Upload failed!");
+    } finally {
+      // Optional: Clear the input value so the same file can be selected again
+      e.target.value = "";
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black opacity-50"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
         onClick={onClose}
       ></div>
 
       {/* Modal */}
-      <div className="relative z-10 bg-white p-6 rounded shadow-lg w-2/3 max-w-3xl">
-        <div className="flex justify-end items-center mb-5">
+      <div className="relative z-10 bg-white p-8 rounded-2xl shadow-2xl w-[90%] max-w-3xl transition-all max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-end mb-6 border-b pb-3">
           <X
             onClick={onClose}
-            className="text-gray-600 hover:text-black cursor-pointer"
+            className="text-gray-500 hover:text-gray-800 cursor-pointer transition-colors"
           />
         </div>
 
-        <form onSubmit={handleSubmit} noValidate>
-          {/* Faculty Dropdown */}
-          {facultyOptions.length > 0 && onFacultyChange && (
-            <div className="mb-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {/* Dropdown Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {universityOptions.length > 0 && onUniversityChange && (
               <DropdownSelect
-                label="Faculty"
+                value={selectedUniversity}
+                onChange={onUniversityChange}
+                options={universityOptions}
+                // label="University"
+              />
+            )}
+
+            {facultyOptions.length > 0 && onFacultyChange && (
+              <DropdownSelect
                 value={selectedFaculty}
                 onChange={onFacultyChange}
                 options={facultyOptions}
+                disabled={!selectedUniversity}
+                // label="Faculty"
               />
-            </div>
-          )}
-          {/* Program Dropdown */}
-          {programOptions.length > 0 && onProgramChange && (
-            <div className="mb-4">
+            )}
+
+            {yearOptions.length > 0 && onYearChange && (
               <DropdownSelect
-                label="Program"
+                value={selectedYear}
+                onChange={onYearChange}
+                options={yearOptions}
+                disabled={!selectedFaculty}
+                // label="Year"
+              />
+            )}
+
+            {programOptions.length > 0 && onProgramChange && (
+              <DropdownSelect
                 value={selectedProgram}
                 onChange={onProgramChange}
                 options={programOptions}
+                disabled={!selectedYear}
+                // label="Program"
               />
-            </div>
-          )}
+            )}
 
-          {/* Code, Name EN, Name TH */}
-          {[
-            { name: "code", placeholder: code },
-            { name: "nameEn", placeholder: nameEn },
-            { name: "nameTh", placeholder: nameTh },
-          ].map(({ name, placeholder }) => (
-            <div key={name} className="mb-4">
-              <input
-                type="text"
-                name={name}
-                placeholder={placeholder}
-                value={formData[name as keyof FormData]}
-                onChange={handleChange}
-                className={`w-full px-3 py-2 rounded border ${
-                  errors[name] ? "border-red-500" : "border"
-                }`}
+            {courseOptions.length > 0 && onCourseChange && (
+              <DropdownSelect
+                value={selectedCourse}
+                onChange={onCourseChange}
+                options={courseOptions}
+                disabled={!selectedProgram}
+                // label="Course"
               />
-              {errors[name] && (
-                <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
-              )}
-            </div>
-          ))}
+            )}
 
-          {/* Abbreviation */}
+            {semesterOptions.length > 0 && onSemesterChange && (
+              <DropdownSelect
+                value={selectedSemester}
+                onChange={onSemesterChange}
+                options={semesterOptions}
+                disabled={!selectedProgram}
+                // label="Semester"
+              />
+            )}
+
+            {sectionOptions.length > 0 && onSectionChange && (
+              <DropdownSelect
+                value={selectedSection}
+                onChange={onSectionChange}
+                options={sectionOptions}
+                disabled={!selectedSemester}
+                // label="Section"
+              />
+            )}
+          </div>
+
+          {/* Input Fields */}
+          <div className="grid grid-cols-1 gap-4">
+            {[
+              { name: "code", placeholder: code },
+              { name: "nameEn", placeholder: nameEn },
+              { name: "nameTh", placeholder: nameTh },
+            ].map(({ name, placeholder }) => (
+              <div key={name}>
+                <input
+                  type="text"
+                  name={name}
+                  placeholder={placeholder}
+                  value={formData[name]}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2.5 rounded-lg border ${
+                    errors[name] ? "border-red-500" : "border-gray-300"
+                  } focus:outline-none focus:ring-2 focus:ring-blue-400`}
+                />
+                {errors[name] && (
+                  <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Abbreviation Fields */}
           {showAbbreviationInputs && (
-            <div className="flex gap-2 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 { name: "abbrEn", placeholder: abbrEn },
                 { name: "abbrTh", placeholder: abbrTh },
               ].map(({ name, placeholder }) => (
-                <div key={name} className="w-full">
+                <div key={name}>
                   <input
                     type="text"
                     name={name}
                     placeholder={placeholder}
-                    value={formData[name as keyof FormData]}
+                    value={formData[name]}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 rounded border ${
-                      errors[name] ? "border-red-500" : "border"
-                    }`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      errors[name] ? "border-red-500" : "border-gray-300"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   />
                   {errors[name] && (
                     <p className="text-red-500 text-sm mt-1">{errors[name]}</p>
@@ -227,42 +343,28 @@ export default function FormPopup({
             </div>
           )}
 
-          {/* Year */}
-          {showYearInput && (
-            <div className="mb-4">
-              <input
-                type="text"
-                name="year"
-                placeholder={year}
-                value={formData.year}
-                onChange={handleChange}
-                className={`w-full px-3 py-2 rounded border ${
-                  errors.year ? "border-red-500" : "border"
-                }`}
-              />
-              {errors.year && (
-                <p className="text-red-500 text-sm mt-1">{errors.year}</p>
-              )}
-            </div>
-          )}
-
-          <div className="flex justify-between gap-2">
+          {/* Buttons */}
+          <div className="flex flex-col md:flex-row justify-end gap-3 mt-6">
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 bg-blue-400 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="w-full md:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition disabled:opacity-50"
             >
               {loading ? "Submitting..." : insert}
             </button>
-            <label className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-700 text-center cursor-pointer">
-              {upload}
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
+
+            {/* Excel Upload Button */}
+            {onSubmitExcel && (
+              <label className="w-full md:w-auto px-5 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 cursor-pointer text-center transition">
+                {upload}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+            )}
           </div>
         </form>
       </div>

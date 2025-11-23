@@ -55,59 +55,94 @@ router.get("/", authenticateToken, async (_req, res) => {
 
 // ดึงข้อมูล PLO แบบแบ่งหน้า
 // GET /api/plo/paginate?page=1&limit=10
-// GET /api/plo/paginate?page=1&limit=10&program_id=2&sort=code&order=asc
 router.get("/paginate", authenticateToken, async (req, res) => {
-  let page = parseInt(req.query.page as string) || 1;
-  let limit = parseInt(req.query.limit as string) || 10;
-  const program_id = req.query.program_id
-    ? parseInt(req.query.program_id as string)
-    : null;
-  const sort = ["id", "code", "name"].includes(req.query.sort as string)
-    ? req.query.sort
-    : "id";
-  const order = req.query.order === "desc" ? "DESC" : "ASC";
-
-  if (page < 1) page = 1;
-  if (limit < 1) limit = 10;
-  const offset = (page - 1) * limit;
-
   try {
-    let whereClause = "";
+    const universityId = req.query.universityId as string | undefined;
+    const facultyId = req.query.facultyId as string | undefined;
+    const programId = req.query.programId as string | undefined;
+    const year = req.query.year as string | undefined;
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    let query = `
+      SELECT 
+        plo.id, plo.code, plo.program_id, plo.name, plo.engname,
+        program.program_shortname_th, program.program_shortname_en, program.program_year
+      FROM plo
+      JOIN program ON plo.program_id = program.id
+      JOIN faculty ON program.faculty_id = faculty.id
+      JOIN university ON faculty.university_id = university.id
+      WHERE 1=1
+    `;
     const params: any[] = [];
-    if (program_id) {
-      params.push(program_id);
-      whereClause = `WHERE plo.program_id = $${params.length}`;
+
+    if (universityId) {
+      params.push(universityId);
+      query += ` AND university.id = $${params.length}`;
+    }
+    if (facultyId) {
+      params.push(facultyId);
+      query += ` AND faculty.id = $${params.length}`;
+    }
+    if (programId) {
+      params.push(programId);
+      query += ` AND program.program_code = $${params.length}`;
+    }
+    if (year) {
+      params.push(year);
+      query += ` AND program.program_year = $${params.length}`;
     }
 
-    const countResult = await pool.query(
-      `SELECT COUNT(*) FROM plo ${whereClause}`,
-      params
-    );
-    const total = parseInt(countResult.rows[0].count, 10);
+    query += ` ORDER BY plo.id ASC LIMIT $${params.length + 1} OFFSET $${
+      params.length + 2
+    }`;
+    params.push(limit, offset);
 
-    params.push(limit, offset); // for LIMIT and OFFSET
-    const dataResult = await pool.query(
-      `SELECT 
-         plo.id, plo.code, plo.program_id, plo.name, plo.engname,
-         program.program_shortname_th, program.program_shortname_en, program.program_year
-       FROM plo
-       JOIN program ON plo.program_id = program.id
-       ${whereClause}
-       ORDER BY ${sort} ${order}
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
+    const result = await pool.query(query, params);
+
+    // Get total count for pagination
+    let countQuery = `
+      SELECT COUNT(*) AS total
+      FROM plo
+      JOIN program ON plo.program_id = program.id
+      JOIN faculty ON program.faculty_id = faculty.id
+      JOIN university ON faculty.university_id = university.id
+      WHERE 1=1
+    `;
+    const countParams: any[] = [];
+
+    if (universityId) {
+      countParams.push(universityId);
+      countQuery += ` AND university.id = $${countParams.length}`;
+    }
+    if (facultyId) {
+      countParams.push(facultyId);
+      countQuery += ` AND faculty.id = $${countParams.length}`;
+    }
+    if (programId) {
+      countParams.push(programId);
+      countQuery += ` AND program.program_code = $${countParams.length}`;
+    }
+    if (year) {
+      countParams.push(year);
+      countQuery += ` AND program.program_year = $${countParams.length}`;
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
+    const total = parseInt(countResult.rows[0].total, 10);
 
     res.json({
-      data: dataResult.rows,
+      data: result.rows,
+      total,
       page,
       limit,
-      total,
-      totalPages: Math.ceil(total / limit),
     });
   } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "ไม่สามารถดึงข้อมูล PLO แบบแบ่งหน้าได้" });
+    res.status(500).json({
+      error: "Unable to retrieve paginated plos information",
+    });
   }
 });
 

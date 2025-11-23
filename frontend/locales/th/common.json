@@ -21,6 +21,7 @@
   "login": "เข้าสู่ระบบ",
   "logout": "ออกจากระบบ",
   "manage account": "จัดการบัญชี",
+  "manage university": "จัดการมหาวิทยาลัย",
   "password": "รหัสผ่าน",
   "please input email": "กรุณากรอกอีเมล",
   "please input password": "กรุณากรอกรหัสผ่าน",
@@ -41,5 +42,19 @@
   "view chart": "ดูแผนภูมิ",
   "welcome": "ยินดีตอนรับ",
   "year": "ปีการศึกษา",
-  "you are logged in": "คุณเข้าสู่ระบบแล้ว"
+  "you are logged in": "คุณเข้าสู่ระบบแล้ว",
+  "next": "ถัดไป",
+  "no years available": "ไม่มีปีการศึกษาที่ใช้ได้",
+  "no data available": "ไม่มีข้อมูลที่ใช้ได้",
+  "previous": "ก่อนหน้า",
+  "page": "หน้า",
+  "of": "จาก",
+  "create new student": "เพิ่มนักศึกษาใหม่",
+  "student id": "รหัสนักศึกษา",
+  "first name": "ชื่อ",
+  "last name": "นามสกุล",
+  "year of admission": "ปีที่เข้าศึกษา",
+  "please select a university": "กรุณาเลือกมหาวิทยาลัย",
+  "please select a program": "กรุณาเลือกแผนการเรียน",
+  "please select a year": "กรุณาเลือกปีการศึกษา"
 }
