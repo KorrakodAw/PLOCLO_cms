@@ -55,4 +55,6 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+//path DELETE /faculty/:id
+
 export default router;

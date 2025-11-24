@@ -54,4 +54,10 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+//path DELETE /university/:id
+router.delete("/university/:id",(req, res) => {
+  const id = req.params.id
+  
+  
+})
 export default router;
