@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
+import { BadgeIndianRupee, University } from "lucide-react";
+import { Client } from "pg";
 
 const router = Router();
 
@@ -57,7 +59,9 @@ router.post("/", authenticateToken, async (req, res) => {
 //path DELETE /university/:id
 router.delete("/university/:id",(req, res) => {
   const id = req.params.id
-  
+    // SELECT id from university
+    'SELECT University INTO'
+
   
 })
 export default router;
