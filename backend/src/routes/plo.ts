@@ -36,20 +36,31 @@ router.post("/", authenticateToken, async (req, res) => {
 
 // ดึงข้อมูล PLO ทั้งหมด
 // GET /api/plo
-router.get("/", authenticateToken, async (_req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
+    // FIX 1: Use req.query.programId instead of req.params.id
+    // The frontend sends: /plo?programId=123
+    const programId = parseInt(req.query.programId as string);
+
+    if (!programId) {
+      return res.status(400).json({ error: "Program ID is required" });
+    }
+
     const result = await pool.query(
       `SELECT 
-         plo.id, plo.code, plo.program_id, plo.name, plo.engname,
-         program.program_shortname_th, program.program_shortname_en, program.program_year
+          plo.id, plo.code, plo.program_id, plo.name, plo.engname,
+          program.program_shortname_th, program.program_shortname_en, program.program_year
        FROM plo
        JOIN program ON plo.program_id = program.id
-       ORDER BY plo.id`
+       WHERE plo.program_id = $1`, // FIX 2: Filter by program_id, not plo.id
+      [programId]
     );
+
+    // FIX 3: Return all rows (array), not just the first one
     res.json(result.rows);
-  } catch (err: any) {
+  } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "ไม่สามารถดึงข้อมูล PLO ได้" });
+    res.status(500).json({ error: "Unable to retrieve plo information" });
   }
 });
 

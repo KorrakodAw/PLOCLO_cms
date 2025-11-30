@@ -16,6 +16,7 @@ import { getUniversities } from "../../utils/universityApi";
 import PaginationControlButton from "../../components/PaignateControlButton";
 import { useToast } from "../../components/Toast";
 import LoadingOverlay from "../../components/LoadingOverlay";
+import axios from "axios";
 
 interface ProgramManagementProps {
   universityId?: string;
@@ -140,47 +141,24 @@ export default function ProgramManagement({
     setYearOptions(years);
   }, [t]);
 
-  // ✅ Fetch programs (filtered + paginated)
-  useEffect(() => {
+  const fetchPrograms = async () => {
     if (!isLoggedIn || !token) return;
-
-    // 1. Clear state before starting the new fetch
-    setSelectedFaculty("");
-    setPrograms([]);
-    setTotalPages(1); // Reset total pages to avoid display issues
-    setLoading(true);
-
-    // Build query filters — only include filters with actual values
-    const filters: Record<string, string | undefined> = {};
-
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
-
-    getProgramsPaginated(token, page, limit, filters)
-      .then((res) => {
-        // Handle both { data, total } and plain array
-        const data = Array.isArray(res) ? res : res.data || [];
-        const total = res.total || data.length || 1;
-        setPrograms(data);
-        setTotalPages(Math.ceil(total / limit));
-      })
-      .catch((err) => {
-        showToast(err.message || "Failed to fetch programs", "error");
-      })
-      .finally(() => setLoading(false));
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    limit,
-    universityId,
-    facultyId,
-    programId,
-    year,
-    showToast,
-  ]);
+    try {
+      const data = await getProgramsPaginated(token, page, limit, {
+        universityId,
+        facultyId,
+        programId,
+        year,
+      });
+      setPrograms(data.data || data); // Handle both response types
+      const total = data.total || (Array.isArray(data) ? data.length : 0);
+      setTotalPages(Math.ceil(total / limit));
+    } catch (err: any) {
+      showToast(err.message || "Failed to fetch programs", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Add single program
   const handleAddProgram = async (data: Record<string, unknown>) => {
@@ -209,9 +187,9 @@ export default function ProgramManagement({
       };
       if (universityToUse) payload.university_id = universityToUse;
       await addProgram(payload as any, token!);
+      fetchPrograms();
       showToast(t("Program added successfully!"), "success");
       setPage(1);
-      window.location.reload();
     } catch (err: any) {
       if (err && err.status === 409) {
         showToast(err.message || "Duplicate program code detected", "error");
@@ -222,37 +200,60 @@ export default function ProgramManagement({
   };
 
   // Bulk upload programs from Excel
+
+  // ... inside your component
+
   const handleFileUpload = async (mappedRows: any[]) => {
+    // 1. Determine Faculty
     const facultyToUse =
       mappedRows.length > 0
         ? mappedRows[0].faculty_id
         : selectedFaculty || facultyId;
+
     if (!facultyToUse) {
       showToast("Please select a faculty before uploading", "error");
-      setLoading(false);
       return;
     }
+
     setLoading(true);
+
     try {
-      const rowsWithFaculty = mappedRows.map((row) => ({
-        ...row,
-        faculty_id: row.faculty_id || facultyToUse,
+      // 2. DATA TRANSFORMATION (Crucial Step)
+      // We must ensure the keys match exactly what the backend expects.
+      // We also use String() and parseInt() to prevent type errors.
+
+      const formattedRows = mappedRows.map((row) => ({
+        program_code: String(
+          row.program_code || row["code"] || row["Program Code"]
+        ),
+        program_name_en: String(row.program_name_en || row["nameEn"]),
+        program_name_th: String(row.program_name_th || row["nameTh"]),
+        program_shortname_en: String(row.program_shortname_en || row["abbrEn"]),
+        program_shortname_th: String(row.program_shortname_th || row["abbrTh"]),
+        // Convert year to number safely
+        program_year: parseInt(String(row.program_year || row["year"]), 10),
+        faculty_id: facultyToUse,
       }));
-      await bulkUploadPrograms(rowsWithFaculty, token!);
+
+      // Debug: Check your console to see if the data looks correct before sending
+      console.log("Sending to API:", formattedRows);
+
+      await bulkUploadPrograms(formattedRows, token!);
+      fetchPrograms();
       showToast("Programs uploaded successfully!", "success");
       setPage(1);
-      window.location.reload();
     } catch (err: any) {
-      if (err && err.status === 409) {
-        showToast(
-          err.message || "Duplicate program code detected in upload",
-          "error"
-        );
+      console.error("Full Error Object:", err);
+
+      if (axios.isAxiosError(err)) {
+        // Log the server response to see the REAL error message
+        console.log("Server Response Data:", err.response?.data);
+
+        const errorMsg = err.response?.data?.error || "Upload failed";
+        showToast(errorMsg, "error");
       } else {
-        showToast("Upload failed: " + (err.message || err), "error");
+        showToast("An unexpected error occurred", "error");
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -270,6 +271,11 @@ export default function ProgramManagement({
       render: (value: any) => (lang === "en" ? Number(value) - 543 : value),
     },
   ];
+
+  useEffect(() => {
+    fetchPrograms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
 
   return (
     <div className="mt-5 p-5">

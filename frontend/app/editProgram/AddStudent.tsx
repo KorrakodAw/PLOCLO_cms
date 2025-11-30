@@ -167,8 +167,7 @@ export default function AddStudent({
       });
   }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
 
-  // 🧩 Load paginated student list
-  useEffect(() => {
+  const fetchStudents = async () => {
     if (!isLoggedIn || !token) return;
     setLoadingStudent(true);
     const filters: Record<string, string | undefined> = {};
@@ -189,17 +188,7 @@ export default function AddStudent({
         showToast("API student error: " + err.message, "error");
       })
       .finally(() => setLoadingStudent(false));
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    limit,
-    universityId,
-    facultyId,
-    programId,
-    year,
-    showToast,
-  ]);
+  };
 
   // 🧩 Add from Excel
   const handleAddStudentExcel = async (rows: any[]) => {
@@ -241,7 +230,8 @@ export default function AddStudent({
       try {
         await addStudent(payload, token);
         successCount++;
-        window.location.reload();
+        fetchStudents();
+        setPage(1); // Reset to first page to see new entries
       } catch (err: any) {
         failCount++;
         errorDetails.push(`Row ${i + 1}: ${err.message}`);
@@ -291,15 +281,17 @@ export default function AddStudent({
 
     try {
       await addStudent(payload, token);
+      fetchStudents();
       showToast("Student added successfully!", "success");
-      // Update students table
-      getStudentsPaginated(token, page, limit).then((res) =>
-        setStudents(res.data)
-      );
+      setPage(1); // Reset to first page to see new entries
     } catch (err: any) {
       showToast("Failed to add student: " + err.message, "error");
     }
   };
+
+  useEffect(() => {
+    fetchStudents();
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
 
   return (
     <div className="mt-5 p-5">

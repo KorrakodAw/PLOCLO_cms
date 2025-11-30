@@ -45,17 +45,6 @@ model program {
   @@map("program")
 }
 
-model plo {
-  id         Int     @id @default(autoincrement())
-  code       String  @postgres.VarChar(50)
-  program_id Int
-  name       String
-  engname    String
-  program    program @relation(fields: [program_id], references: [id])
-
-  @@map("plo")
-}
-
 model faculty {
   id              Int        @id @default(autoincrement())
   university_id   Int
@@ -79,7 +68,6 @@ model course {
   section    Int
   semester   Int     @default(1)
   program    program @relation(fields: [program_id], references: [id])
-
   clo       clo[]
 
   @@map("course")
@@ -97,15 +85,41 @@ model student {
   @@map("student")
 }
 
+model plo {
+  id         Int     @id @default(autoincrement())
+  code       String  @postgres.VarChar(50)
+  program_id Int
+  name       String
+  engname    String
+  program    program @relation(fields: [program_id], references: [id])
+  clo_plo_mappings clo_plo_mapping[]
+
+  @@map("plo")
+}
+
 model clo {
   id        Int     @id @default(autoincrement())
   code      String  @postgres.VarChar(20)
   name      String  @postgres.VarChar(255)
   name_th   String  @postgres.VarChar(255)
-
   course_id Int
   course    course  @relation(fields: [course_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+  clo_plo_mappings clo_plo_mapping[]
 
   @@map("clo")
 }
 
+model clo_plo_mapping {
+  id        Int      @id @default(autoincrement())
+  cloId     Int      @map("clo_id")
+  ploId     Int      @map("plo_id")
+  weight    Int?     @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  clo       clo      @relation(fields: [cloId], references: [id], onDelete: Cascade)
+  plo       plo      @relation(fields: [ploId], references: [id], onDelete: Cascade)
+
+  @@unique([cloId, ploId], map: "unique_clo_plo")
+  @@map("clo_plo_mapping")
+}

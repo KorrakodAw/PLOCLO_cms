@@ -58,6 +58,7 @@ interface FormPopupProps<T> {
   };
   showAbbreviationInputs?: boolean;
   showYearInput?: boolean;
+  showCodeInput?: boolean;
 }
 
 // 3. Add <T,> to the component definition
@@ -67,7 +68,8 @@ export default function FormPopup<T>({
   onSubmitExcel,
   placeholderText,
   submitButtonText = {},
-  showAbbreviationInputs = false,
+  showAbbreviationInputs = true,
+  showCodeInput = true,
   // showYearInput = false, // Unused in current logic, but kept in props
   facultyOptions = [],
   programOptions = [],
@@ -90,7 +92,7 @@ export default function FormPopup<T>({
   onSemesterChange,
   onCourseChange,
   onSectionChange,
-  requiredFields = ["code", "nameEn", "nameTh"],
+  requiredFields = [],
   fieldMap = {},
 }: FormPopupProps<T>) {
   const {
@@ -160,12 +162,10 @@ export default function FormPopup<T>({
       return;
     }
     try {
-      setLoading(true);
       await onSubmit(formData);
       onClose();
     } catch (err) {
       console.error(err);
-      // Consider using a proper toast here instead of alert
       alert("Failed to submit form");
     } finally {
       setLoading(false);
@@ -221,7 +221,7 @@ export default function FormPopup<T>({
 
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           {/* Dropdown Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
             {universityOptions.length > 0 && onUniversityChange && (
               <DropdownSelect
                 value={selectedUniversity}
@@ -292,10 +292,35 @@ export default function FormPopup<T>({
             )}
           </div>
 
+          {showCodeInput && (
+            <div>
+              {[{ name: "code", placeholder: code }].map(
+                ({ name, placeholder }) => (
+                  <div key={name}>
+                    <input
+                      type="text"
+                      name={name}
+                      placeholder={placeholder}
+                      value={formData[name]}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        errors[name] ? "border-red-500" : "border-gray-300"
+                      } focus:outline-none focus:ring-2 focus:ring-blue-400`}
+                    />
+                    {errors[name] && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors[name]}
+                      </p>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
           {/* Input Fields */}
           <div className="grid grid-cols-1 gap-4">
             {[
-              { name: "code", placeholder: code },
               { name: "nameEn", placeholder: nameEn },
               { name: "nameTh", placeholder: nameTh },
             ].map(({ name, placeholder }) => (
@@ -348,7 +373,7 @@ export default function FormPopup<T>({
             <button
               type="submit"
               disabled={loading}
-              className="w-full md:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition disabled:opacity-50"
+              className="w-full md:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition cursor-pointer disabled:opacity-50"
             >
               {loading ? "Submitting..." : insert}
             </button>

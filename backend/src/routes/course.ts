@@ -50,7 +50,7 @@ router.get("/paginate", authenticateToken, async (req, res) => {
     const year = req.query.year as string | undefined;
     const semester = req.query.semester as string | undefined;
     const section = req.query.section as string | undefined;
-
+    const course = req.query.course as string | undefined;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
@@ -74,14 +74,15 @@ router.get("/paginate", authenticateToken, async (req, res) => {
       params.push(facultyId);
       query += ` AND faculty.id = $${params.length}`;
     }
-    if (programId) {
-      params.push(programId);
-      query += ` AND program.program_code = $${params.length}`;
-    }
     if (year) {
       params.push(year);
       query += ` AND program.program_year = $${params.length}`;
     }
+    if (programId) {
+      params.push(programId);
+      query += ` AND program.program_code = $${params.length}`;
+    }
+
     if (semester) {
       params.push(semester);
       query += ` AND course.semester = $${params.length}`;
@@ -114,14 +115,15 @@ router.get("/paginate", authenticateToken, async (req, res) => {
       countParams.push(facultyId);
       countQuery += ` AND faculty.id = $${countParams.length}`;
     }
-    if (programId) {
-      countParams.push(programId);
-      countQuery += ` AND program.program_code = $${countParams.length}`;
-    }
     if (year) {
       countParams.push(year);
       countQuery += ` AND program.program_year = $${countParams.length}`;
     }
+    if (programId) {
+      countParams.push(programId);
+      countQuery += ` AND program.program_code = $${countParams.length}`;
+    }
+
     if (semester) {
       countParams.push(semester);
       countQuery += ` AND course.semester = $${countParams.length}`;

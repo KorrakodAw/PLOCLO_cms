@@ -8,6 +8,13 @@ export interface University {
   abbreviation_th?: string;
 }
 
+export interface CreateUniversityPayload {
+  name: string;
+  name_th?: string;
+  abbreviation?: string;
+  abbreviation_th?: string;
+}
+
 /**
  * Fetches the list of universities.
  * @param token The user's authentication token.
@@ -15,11 +22,11 @@ export interface University {
  */
 
 export async function getUniversities(token: string) {
-  const res = await apiClient("/api/university", {
+  const res = await apiClient.get("/university", {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+
+  return res.data;
 }
 
 /**
@@ -27,23 +34,11 @@ export async function getUniversities(token: string) {
  */
 export async function createUniversity(
   token: string,
-  payload: {
-    name: string;
-    name_th?: string;
-    abbreviation?: string;
-    abbreviation_th?: string;
-  }
+  payload: CreateUniversityPayload
 ) {
-  const res = await apiClient(`/api/university`, {
-    method: "POST",
+  const res = await apiClient.post("/university", payload, {
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || "Failed to create university");
-  }
-
-  return res.json();
+  return res.data;
 }

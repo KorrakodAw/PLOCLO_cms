@@ -7,7 +7,7 @@ export function Toast({
   type = "success",
   visible,
   onClose,
-  duration = 10000,
+  duration = 5000,
   toastKey,
 }: {
   message: string;
@@ -67,14 +67,14 @@ export function Toast({
         </button>
       </div>
 
-      <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+      {/* <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
         <div
           className={`h-1 ${
             type === "success" ? "bg-green-500" : "bg-red-500"
           } transition-all duration-75 ease-linear`}
           style={{ width: `${progress}%` }}
         ></div>
-      </div>
+      </div> */}
     </div>
   );
 }
@@ -91,7 +91,7 @@ export function useToast() {
     type: "success",
     visible: false,
     key: 0,
-    duration: 10000,
+    duration: 5000,
   });
 
   // refs to avoid adding toast.duration/toast.visible to deps
@@ -108,7 +108,7 @@ export function useToast() {
     (
       message: string,
       type: "success" | "error" = "success",
-      duration = 10000
+      duration = 5000
     ) => {
       setToast({
         message,

@@ -16,6 +16,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin_container
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@admin.com"
+      PGADMIN_DEFAULT_PASSWORD: "admin"
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres  # ✅ FIXED: Changed from 'db' to 'postgres'
+
   backend:
     build: ./backend
     container_name: backend
@@ -38,13 +49,15 @@ services:
     container_name: frontend
     volumes:
       - ./frontend:/app
-      - /app/node_modules     # prevent overwriting node_modules
-      - /app/.next            # prevent permission conflicts
+      - /app/node_modules
+      - /app/.next
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
     command: npm run dev
+    env_file:
+      - ./.env
 
 volumes:
   pgdata:

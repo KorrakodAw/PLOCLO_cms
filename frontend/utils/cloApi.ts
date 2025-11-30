@@ -1,6 +1,6 @@
 import { apiClient } from "./apiClient";
 
-// 1. Updated Interface to include description
+// 1. Interfaces
 export interface CLO {
   id: string;
   code: string;
@@ -10,7 +10,6 @@ export interface CLO {
   course_id: string;
 }
 
-// 2. Updated Filters to include courseCode (since your dropdown uses code)
 export interface CLOFilters {
   universityId?: string;
   facultyId?: string;
@@ -19,7 +18,7 @@ export interface CLOFilters {
   semester?: string;
   section?: string;
   courseId?: string;
-  courseCode?: string; // Added this
+  courseCode?: string;
 }
 
 export interface ExcelCLORow {
@@ -32,42 +31,21 @@ export async function getCLOsPaginate(
   token: string,
   page: number = 1,
   limit: number = 10,
-  filters?: CLOFilters // Assuming this interface is defined elsewhere
+  filters?: CLOFilters
 ) {
-  // 1. Create the params object
-  const params = new URLSearchParams();
-
-  // 2. Always append pagination (converted to string)
-  params.append("page", page.toString());
-  params.append("limit", limit.toString());
-
-  // 3. Conditionally append filters if they exist
-  if (filters) {
-    if (filters.universityId)
-      params.append("universityId", String(filters.universityId));
-    if (filters.facultyId)
-      params.append("facultyId", String(filters.facultyId));
-    if (filters.programId)
-      params.append("programId", String(filters.programId));
-    if (filters.year) params.append("year", String(filters.year));
-    if (filters.semester) params.append("semester", String(filters.semester));
-    if (filters.section) params.append("section", String(filters.section));
-    if (filters.courseId) params.append("courseId", String(filters.courseId));
-  }
-
-  // 4. Make the request
-  const res = await apiClient(`/api/clo/paginate?${params.toString()}`, {
+  // Axios automatically handles the ?page=1&limit=10 logic via the 'params' object
+  const response = await apiClient.get("/clo/paginate", {
     headers: { Authorization: `Bearer ${token}` },
+    params: {
+      page,
+      limit,
+      ...filters, // Spread all filters directly; undefined values are ignored by Axios automatically
+    },
   });
 
-  // 5. Handle Errors
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to fetch paginated CLOs");
-  }
-
-  return await res.json();
+  return response.data;
 }
+
 // --- Add CLO ---
 
 export async function addClo(
@@ -79,29 +57,21 @@ export async function addClo(
   },
   token: string
 ) {
-  const res = await apiClient("/api/clo", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to add CLO");
-  }
-
-  return await res.json();
-}
-
-// --- Simple Get (Optional, kept from your original code) ---
-
-export async function getCLOs(token: string, page = 1, limit = 10) {
-  const res = await apiClient(`/api/clo/paginate?page=${page}&limit=${limit}`, {
+  // Axios automatically stringifies the body to JSON
+  const response = await apiClient.post("/clo", data, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(await res.text());
-  return await res.json();
+
+  return response.data;
+}
+
+// --- Simple Get ---
+
+export async function getCLOs(token: string, page = 1, limit = 10) {
+  const response = await apiClient.get("/clo/paginate", {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { page, limit },
+  });
+
+  return response.data;
 }

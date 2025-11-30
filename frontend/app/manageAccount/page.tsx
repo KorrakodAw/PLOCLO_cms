@@ -36,18 +36,10 @@ export default function ManageAccount() {
 
     const fetchUsers = async () => {
       try {
-        const res = await apiClient("/api/users", {
+        const res = await apiClient.get("/users", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!res.ok) {
-          const err = await res.json();
-          showToast(err.error || "Failed to fetch users", "error");
-          return;
-        }
-
-        const data = await res.json();
-        setUsers(data);
+        setUsers(res.data);
       } catch {
         showToast("Cannot reach API. Check backend.", "error");
       } finally {
@@ -65,18 +57,12 @@ export default function ManageAccount() {
     if (!userToDelete) return;
 
     try {
-      const res = await apiClient(`/api/users/${userToDelete.id}`, {
-        method: "DELETE",
+      await apiClient.delete(`/users/${userToDelete.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || "Failed to delete user", "error");
-        return;
-      }
-
       setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+
       showToast("User deleted successfully", "success");
     } catch {
       showToast("Cannot reach API. Check backend.", "error");
@@ -93,27 +79,20 @@ export default function ManageAccount() {
     if (!selectedUser) return;
 
     try {
-      const res = await apiClient(`/api/users/${selectedUser.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const res = await apiClient.patch(
+        `/users/${selectedUser.id}`,
+        {
           username: selectedUser.username,
           email: selectedUser.email,
           role: selectedUser.role,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || "Failed to update user", "error");
-        return;
-      }
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       setUsers((prev) =>
-        prev.map((u) => (u.id === selectedUser.id ? selectedUser : u))
+        prev.map((u) => (u.id === selectedUser.id ? res.data : u))
       );
 
       showToast("User updated successfully", "success");

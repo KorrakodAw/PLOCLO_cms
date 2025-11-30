@@ -126,7 +126,7 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Update user by ID
-router.put("/:id", authenticateToken, async (req: AuthRequest, res) => {
+router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.params.id;
   const { username, email, password, role } = req.body;
 
@@ -172,8 +172,6 @@ router.delete("/:id", authenticateToken, async (req: AuthRequest, res) => {
     return res.status(404).json({ error: "User not found" });
   res.json({ message: `User deleted: ${result.rows[0].username}` });
 });
-
-export default router;
 
 // ===== EDIT USER INFO (email, username, role) =====
 router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
@@ -226,3 +224,5 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+export default router;

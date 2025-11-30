@@ -30,6 +30,7 @@ interface faculty {
 
 interface program {
   id: number;
+  program_shortname_en: string;
   program_name_en: string;
   program_code: string;
   program_year: number;
@@ -51,6 +52,7 @@ interface CourseManagementProps {
   year?: string;
   semester?: string;
   section?: string;
+  course?: string;
 }
 
 // Define this outside your component or in a types file
@@ -63,16 +65,16 @@ interface ExcelCourseRow {
   // Possible keys for Thai Name
   nameTh?: string;
   course_name?: string;
-  "ชื่อไทย"?: string;
+  ชื่อไทย?: string;
 
   // Possible keys for English Name
   nameEn?: string;
   course_engname?: string;
-  "ชื่ออังกฤษ"?: string;
+  ชื่ออังกฤษ?: string;
   PLO_engname?: string;
 
   // Allow other unknown columns from Excel without throwing errors
-  [key: string]: unknown; 
+  [key: string]: unknown;
 }
 
 export default function CourseManagement({
@@ -150,8 +152,14 @@ export default function CourseManagement({
   // // Fetch faculties for selected university (use parent universityId)
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedUniversity) {
-      setSelectedFaculty("");
+      setProgramOptions([{ label: t("please select a program"), value: "" }]);
+      setYearOptions([{ label: t("please select a year"), value: "" }]);
       setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
+      setSelectedProgram("");
+      setSelectedFaculty("");
+      setSelectedSection("");
+      setSelectedYear("");
+      setSelectedSemester("");
       return;
     }
     const fetchFaculties = async () => {
@@ -223,7 +231,7 @@ export default function CourseManagement({
           setProgramOptions([
             { label: t("please select a program"), value: "" },
             ...programs.map((p: program) => ({
-              label: p.program_name_en,
+              label: p.program_shortname_en,
               value: String(p.id),
             })),
           ]);
@@ -238,52 +246,17 @@ export default function CourseManagement({
       });
   }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
 
-  // Fetch courses
-  useEffect(() => {
-    if (!isLoggedIn || !token) return;
-    setLoadingCourse(true);
-    const filters: Record<string, string> = {};
-
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
-    if (semester) filters.semester = semester;
-    if (section) filters.section = section;
-
-    getCoursePaginate(token, page, 10, filters)
-      .then((res) => {
-        const data = Array.isArray(res) ? res : res.data || [];
-        const total = res.total || data.length || 1;
-        setCourses(data);
-        setTotalPages(Math.ceil(total / limit));
-      })
-      .catch((err) => {
-        showToast("API course error: " + err.message, "error");
-      })
-      .finally(() => setLoadingCourse(false));
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    limit,
-    universityId,
-    facultyId,
-    programId,
-    year,
-    semester,
-    section,
-    showToast,
-  ]);
-
   const handleAddCourse = async (data: Record<string, unknown>) => {
     if (!token) return;
     if (!selectedProgram) {
       showToast("Please select the program from the filter above.", "error");
       return;
     }
-    if (!selectedSemester) {
-      showToast("Please select the semester from the filter above.", "error");
+    if (!selectedSemester || !selectedSection) {
+      showToast(
+        "Please complete the selection from the filter above.",
+        "error"
+      );
       return;
     }
     try {
@@ -298,9 +271,9 @@ export default function CourseManagement({
         },
         token
       );
-      showToast(t("Course added successfully!"), "success");
+      fetchCourses();
       setPage(1);
-      window.location.reload();
+      showToast(t("Course added successfully!"), "success");
     } catch {
       showToast(t("Failed to add course"), "error");
     }
@@ -319,8 +292,8 @@ export default function CourseManagement({
       );
       return;
     }
-    if (!selectedProgram) {
-      showToast("Please select the program from the filter above.", "error");
+    if (!selectedSemester || !selectedSection) {
+      showToast("Please complete the selection from the filter.", "error");
       return;
     }
 
@@ -405,13 +378,13 @@ export default function CourseManagement({
     try {
       // Only refresh/reload if at least one item succeeded
       if (successCount > 0) {
+        fetchCourses();
         setPage(1);
         setSelectedProgram("");
         // Ideally call your fetch function here instead of reloading the page
         // await fetchCourses();
 
         // If you must reload the page, do it here at the VERY END:
-        window.location.reload();
       }
     } catch {
       showToast("Failed to refresh list after upload.", "error");
@@ -436,6 +409,48 @@ export default function CourseManagement({
     //   render: (value) => programIdToShortName(value),
     // },
   ];
+  const fetchCourses = async () => {
+    if (!isLoggedIn || !token) return;
+    setLoadingCourse(true);
+    const filters: Record<string, string> = {};
+
+    if (universityId) filters.universityId = universityId;
+    if (facultyId) filters.facultyId = facultyId;
+    if (programId) filters.programId = programId;
+    if (year) filters.year = year;
+    if (semester) filters.semester = semester;
+    if (section) filters.section = section;
+
+    try {
+      const res = await getCoursePaginate(token, page, 10, filters);
+      const data = Array.isArray(res) ? res : res.data || [];
+      const total = res.total || 1;
+      setCourses(data);
+      setTotalPages(Math.ceil(total / limit));
+    } catch (err: unknown) {
+      showToast(
+        "API course error: " +
+          (err instanceof Error ? err.message : String(err)),
+        "error"
+      );
+    } finally {
+      setLoadingCourse(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, [
+    isLoggedIn,
+    token,
+    page,
+    universityId,
+    facultyId,
+    programId,
+    year,
+    semester,
+    section,
+  ]);
 
   return (
     <div className="mt-5 p-5">

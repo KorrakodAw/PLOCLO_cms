@@ -121,9 +121,6 @@ router.get("/paginate", authenticateToken, async (req, res) => {
 
     params.push(limit, offset);
 
-    console.log("Final query:", query);
-    console.log("Params:", params);
-
     const result = await pool.query(query, params);
 
     // count query

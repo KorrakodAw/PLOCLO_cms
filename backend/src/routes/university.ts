@@ -53,4 +53,73 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const universityId = parseInt(req.params.id, 10);
+
+  if (isNaN(universityId)) {
+    return res.status(400).json({ error: "Invalid university ID" });
+  }
+
+  try {
+    // Check if university exists
+    const checkResult = await pool.query(
+      `SELECT id FROM university WHERE id = $1`,
+      [universityId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: "University not found" });
+    }
+
+    // Delete university
+    await pool.query(`DELETE FROM university WHERE id = $1`, [universityId]);
+    res.status(204).send();
+  } catch (err) {
+    console.error("Database error:", err);
+    res.status(500).json({ error: "Unable to delete university record" });
+  }
+});
+
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const universityId = parseInt(req.params.id, 10);
+
+  if (isNaN(universityId)) {
+    return res.status(400).json({ error: "Invalid university ID" });
+  }
+  const { name, name_th, abbreviation, abbreviation_th } = req.body;
+
+  // Validate input
+  if (!name || !name_th || !abbreviation || !abbreviation_th) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+  try {
+    // Check if university exists
+    const checkResult = await pool.query(
+      `SELECT id FROM university WHERE id = $1`,
+      [universityId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: "University not found" });
+    }
+    // Update university
+    const result = await pool.query(
+      `UPDATE university
+        SET name = $1, name_th = $2, abbreviation = $3, abbreviation_th = $4
+        WHERE id = $5
+        RETURNING id, name, name_th, abbreviation, abbreviation_th`,
+      [name, name_th, abbreviation, abbreviation_th, universityId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "University not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Database error:", err);
+    res.status(500).json({ error: "Unable to update university record" });
+  }
+});
+
 export default router;

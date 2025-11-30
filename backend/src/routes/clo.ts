@@ -119,35 +119,19 @@ router.get("/paginate", authenticateToken, async (req, res) => {
 // =========================================
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const programId = req.query.programId as string | undefined;
+    const courseId = req.query.courseId as string | undefined;
 
-    let query = `
-      SELECT 
-         c.id,
-         c.code,
-         c.name,
-         c.name_th,
-         c.description,
-         c.course_id, -- Fixed: Added comma here
-         p.id AS program_id
-       FROM clo c
-       JOIN course co ON c.course_id = co.id
-       JOIN program p ON co.program_id = p.id
-    `;
-    const params: any[] = [];
+    const result = await pool.query(
+      `SELECT id, code, name, name_th, course_id FROM clo
+       ${courseId ? "WHERE course_id = $1" : ""}
+       ORDER BY id ASC`,
+      courseId ? [courseId] : []
+    );
 
-    if (programId) {
-      query += ` WHERE p.id = $1`;
-      params.push(programId);
-    }
-
-    query += ` ORDER BY c.id DESC`;
-
-    const result = await pool.query(query, params);
     res.json(result.rows);
-  } catch (err: any) {
+  } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch CLOs" });
+    res.status(500).json({ error: "Unable to retrieve clo information" });
   }
 });
 

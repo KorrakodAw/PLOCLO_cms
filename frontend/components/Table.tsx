@@ -13,8 +13,6 @@ export interface Column<T> {
   accessor: Extract<keyof T, string>;
   className?: string;
   render?: (value: T[keyof T], row: T) => React.ReactNode;
-
-  // NEW: actions field
   actions?: TableAction<T>[];
 }
 
@@ -43,7 +41,9 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
 
   return (
     <div className={`overflow-x-auto mt-5 ${className}`}>
-      <table className={`border border-gray-300 w-full ${fontSize}`}>
+      <table
+        className={`border border-gray-300 w-full ${fontSize} border-collapse`}
+      >
         <thead className="bg-gray-100 border-b border-gray-300">
           <tr>
             {columns.map((col, i) => (
@@ -80,37 +80,41 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                     return (
                       <td
                         key={colIndex}
-                        className="px-4 py-2 border-b border-r border-gray-300 flex gap-2"
+                        // REMOVED 'flex gap-2' from here. Added 'align-middle'
+                        className="px-4 py-2 border-b border-r border-gray-300 align-middle"
                       >
-                        {col.actions.map((action, i) => {
-                          const colorClass =
-                            action.color === "red"
-                              ? "bg-red-500"
-                              : action.color === "blue"
-                              ? "bg-blue-500"
-                              : action.color === "green"
-                              ? "bg-green-500"
-                              : "bg-gray-500";
+                        {/* ADDED DIV WRAPPER HERE */}
+                        <div className="flex gap-2 items-center">
+                          {col.actions.map((action, i) => {
+                            const colorClass =
+                              action.color === "red"
+                                ? "bg-red-500"
+                                : action.color === "blue"
+                                ? "bg-blue-500"
+                                : action.color === "green"
+                                ? "bg-green-500"
+                                : "bg-gray-500";
 
-                          const hoverClass =
-                            action.hoverColor === "red"
-                              ? "hover:bg-red-600"
-                              : action.hoverColor === "blue"
-                              ? "hover:bg-blue-600"
-                              : action.hoverColor === "green"
-                              ? "hover:bg-green-600"
-                              : "hover:bg-gray-600";
+                            const hoverClass =
+                              action.hoverColor === "red"
+                                ? "hover:bg-red-600"
+                                : action.hoverColor === "blue"
+                                ? "hover:bg-blue-600"
+                                : action.hoverColor === "green"
+                                ? "hover:bg-green-600"
+                                : "hover:bg-gray-600";
 
-                          return (
-                            <button
-                              key={i}
-                              onClick={() => action.onClick(row)}
-                              className={`${colorClass} ${hoverClass} text-white px-2 py-1 rounded text-xs cursor-pointer`}
-                            >
-                              {action.label}
-                            </button>
-                          );
-                        })}
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => action.onClick(row)}
+                                className={`${colorClass} ${hoverClass} text-white px-2 py-1 rounded text-xs cursor-pointer whitespace-nowrap`}
+                              >
+                                {action.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </td>
                     );
                   }
@@ -119,7 +123,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                   return (
                     <td
                       key={colIndex}
-                      className={`px-4 py-2 border-b border-r border-gray-300 ${
+                      className={`px-4 py-2 border-b border-r border-gray-300 align-middle ${
                         col.className ?? ""
                       }`}
                     >

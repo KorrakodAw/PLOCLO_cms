@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { useAuth } from "../app/context/AuthContext";
-import { apiClient } from "../utils/apiClient";
+import { apiClient } from "../utils/apiClient"; // Ensure this is your Axios instance
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
+import axios from "axios"; // Import axios to check isAxiosError
 
 export default function LoginForm() {
   const { t } = useTranslation("common");
@@ -20,20 +21,27 @@ export default function LoginForm() {
 
   const handleSubmit = async () => {
     try {
-      const res = await apiClient("/api/users/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
+      // Axios handles JSON.stringify and Content-Type automatically
+      const res = await apiClient.post("/users/login", {
+        email,
+        password,
       });
-      if (!res.ok) {
-        const err = await res.json();
-        showToast(err.error || "Login failed", "error");
-        return;
-      }
-      const data = await res.json();
-      login(data.token);
-    } catch (err) {
+
+      // Access data directly
+      login(res.data.token);
+    } catch (err: any) {
       console.error(err);
-      showToast("An error occurred during login", "error");
+
+      let errorMessage = "An error occurred during login";
+
+      // specific check for Axios errors
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      showToast(errorMessage, "error");
     }
   };
 

@@ -24,38 +24,26 @@ export async function getCoursePaginate(
     year?: string;
     semester?: string;
     section?: string;
+    course?:string;
   }
 ) {
-  const query = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-    ...(filters?.universityId ? { universityId: filters.universityId } : {}),
-    ...(filters?.facultyId ? { facultyId: filters.facultyId } : {}),
-    ...(filters?.programId ? { programId: filters.programId } : {}),
-    ...(filters?.year ? { year: filters.year } : {}),
-    ...(filters?.semester ? { semester: filters.semester } : {}),
-    ...(filters?.section ? { section: filters.section } : {}),
-  });
-  const res = await apiClient(`/api/course/paginate?${query.toString()}`, {
+  const res = await apiClient.get("/course/paginate", {
     headers: { Authorization: `Bearer ${token}` },
+    params: {
+      page,
+      limit,
+      ...filters,
+    },
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to fetch paginated Course");
-  }
-  return await res.json();
+  return res.data;
 }
 
 export async function getCourses(token: string, programId?: string) {
-  let query = "";
-  if (programId) query = `?programId=${programId}`;
-
-  const res = await apiClient(`/api/course${query}`, {
+  const res = await apiClient.get("/course", {
     headers: { Authorization: `Bearer ${token}` },
+    params: programId ? { programId: programId } : {},
   });
-
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return res.data;
 }
 
 export async function addCourse(
@@ -69,27 +57,15 @@ export async function addCourse(
   },
   token: string
 ) {
-  const res = await apiClient("/api/course", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
+  const res = await apiClient.post("/course", data, {
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (res.status === 409) {
-    const err = await res.json();
-    throw new Error(err.error || "Duplicate course code in this program");
-  }
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return res.data;
 }
 
 export async function deleteCourse(id: number, token: string) {
-  const res = await apiClient(`/api/course/${id}`, {
-    method: "DELETE",
+  const res = await apiClient.delete(`/course/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return res.data;
 }

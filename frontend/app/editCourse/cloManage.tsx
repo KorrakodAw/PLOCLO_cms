@@ -49,7 +49,7 @@ interface program {
   program_name_en: string;
   program_shortname_en: string;
   program_year: number;
-  faculty_id: string;
+  facultyId: string;
 }
 
 interface course {
@@ -159,9 +159,15 @@ export default function CLOManagement({
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedUniversity) {
       setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
-      setSelectedFaculty("");
+      setProgramOptions([{ label: t("please select a program"), value: "" }]);
+      setYearOptions([{ label: t("please select a year"), value: "" }]);
+      setSectionOptions([{ label: "please select a section", value: "" }]);
+      setSemesterOptions([{ label: "please select a semester", value: "" }]);
       setSelectedProgram("");
+      setSelectedFaculty("");
+      setSelectedSection("");
       setSelectedYear("");
+      setSelectedSemester("");
 
       return;
     }
@@ -194,27 +200,35 @@ export default function CLOManagement({
     fetchFaculties();
   }, [isLoggedIn, token, t, selectedUniversity, showToast]);
 
-  // Fetch Years
+  // 1. Add a state to store the raw API data
+  const [allPrograms, setAllPrograms] = useState<program[]>([]);
+
+  // -------------------------------------------------------
+  // STEP 1: Fetch Data & Set Years (When Faculty Changes)
+  // -------------------------------------------------------
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedFaculty) {
+      setAllPrograms([]);
       setYearOptions([{ label: t("please select a year"), value: "" }]);
+      setProgramOptions([{ label: t("please select a program"), value: "" }]);
       return;
     }
 
-    if (selectedFaculty || !selectedFaculty) {
-      setSelectedYear("");
-      setSelectedProgram("");
-      setSelectedCourse("");
-      setSelectedSection("");
-      setSelectedSemester("");
-    }
+    // Reset downstream selections
+    setSelectedYear("");
+    setSelectedProgram("");
 
+    // Fetch ALL programs for this faculty once
     getPrograms(token, selectedFaculty)
       .then((data) => {
+        setAllPrograms(data); // Store raw data for Step 2
+
+        // A. Extract Unique Years
         const years = Array.from(
           new Set<number>(data.map((p: program) => Number(p.program_year)))
         ).sort((a, b) => b - a);
 
+        // B. Set Year Options
         if (years.length === 0) {
           setYearOptions([{ label: t("no years available"), value: "" }]);
         } else {
@@ -230,51 +244,38 @@ export default function CLOManagement({
       .catch((err) => showToast("API program error: " + err.message, "error"));
   }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
 
-  // Fetch Programs
+  // -------------------------------------------------------
+  // STEP 2: Set Programs (When Year is Selected)
+  // -------------------------------------------------------
   useEffect(() => {
-    if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
+    // Wait until we have a year selected and data available
+    if (!selectedYear || allPrograms.length === 0) {
       setProgramOptions([{ label: t("please select a program"), value: "" }]);
       return;
     }
 
-    if (selectedYear || !selectedYear) {
-      setSelectedProgram("");
-      setSelectedCourse("");
-      setSelectedSection("");
-      setSelectedSemester("");
+    // Filter the stored data by the selected Year
+    const filteredPrograms = allPrograms.filter(
+      (p: program) => String(p.program_year) === selectedYear
+    );
+
+    if (filteredPrograms.length === 0) {
+      setProgramOptions([{ label: t("no programs available"), value: "" }]);
+    } else {
+      setProgramOptions([
+        { label: t("please select a program"), value: "" },
+        ...filteredPrograms.map((p: program) => ({
+          label: p.program_shortname_en, // Or p.name_en
+          value: String(p.id),
+        })),
+      ]);
     }
-
-    getPrograms(token, selectedFaculty)
-      .then((data) => {
-        const programs = data.filter(
-          (p: program) => String(p.program_year) === selectedYear
-        );
-
-        if (programs.length === 0) {
-          setProgramOptions([{ label: t("no programs available"), value: "" }]);
-        } else {
-          setProgramOptions([
-            { label: t("please select a program"), value: "" },
-            ...programs.map((p: program) => ({
-              label: p.program_shortname_en,
-              value: String(p.id),
-            })),
-          ]);
-        }
-      })
-      .catch((err) =>
-        showToast(
-          "API program error: " +
-            (err instanceof Error ? err.message : "unknown"),
-          "error"
-        )
-      );
-  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
+  }, [selectedYear, allPrograms, t]);
 
   // Fetch Courses
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedProgram) {
-      setCourseOptions([{ label: t("please select a course"), value: "" }]);
+      setCourseOptions([{ label: "please select a course", value: "" }]);
       setSelectedCourse("");
       return;
     }
@@ -310,7 +311,8 @@ export default function CLOManagement({
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedCourse) {
       setCourseVariants([]);
-      // Reset downstream selections
+      setSectionOptions([{ label: "please select a section", value: "" }]);
+      setSemesterOptions([{ label: "please select a semester", value: "" }]);
       setSelectedSemester("");
       setSelectedSection("");
       return;
@@ -354,7 +356,7 @@ export default function CLOManagement({
 
     setSemesterOptions([
       { label: t("please select a semester"), value: "" },
-      ...semesters.map((s) => ({ label: s, value: s })),
+      ...semesters.map((s) => ({ label: "semester " + s, value: s })),
     ]);
   }, [courseVariants, t]);
 
@@ -379,7 +381,7 @@ export default function CLOManagement({
 
     setSectionOptions([
       { label: t("please select a section"), value: "" },
-      ...sections.map((s) => ({ label: s, value: s })),
+      ...sections.map((s) => ({ label: "section " + s, value: s })),
     ]);
   }, [selectedSemester, courseVariants, t]);
 
@@ -441,9 +443,10 @@ export default function CLOManagement({
         },
         token
       );
+      fetchCLOs();
       showToast(t("clo added successfully"), "success");
       setPage(1);
-      window.location.reload();
+
       // 3. Refresh the table data after adding
     } catch {
       showToast("Failed to add CLO", "error");
@@ -488,13 +491,13 @@ export default function CLOManagement({
       }
     }
 
-    showToast(
-      `Success: ${successCount}, Failed: ${failCount}`,
-      failCount > 0 ? "error" : "success"
-    );
     if (successCount > 0) {
+      fetchCLOs();
+      showToast(
+        `Success: ${successCount}, Failed: ${failCount}`,
+        failCount > 0 ? "error" : "success"
+      );
       setPage(1);
-      window.location.reload();
     }
   };
 
@@ -515,29 +518,23 @@ export default function CLOManagement({
     },
   ];
 
-  // --- Fetch CLOs ---
-  useEffect(() => {
+  const fetchCLOs = () => {
     if (!isLoggedIn || !token) return;
-
     setLoading(true);
-
     const filters: Record<string, string> = {};
 
     // FIX: Use .toString().trim() to remove hidden spaces or tabs like %09
-    if (universityId) filters.universityId = universityId.toString().trim();
-    if (facultyId) filters.facultyId = facultyId.toString().trim();
-    if (programId) filters.programId = programId.toString().trim(); // <--- This fixes your specific error
-    if (year) filters.year = year.toString().trim();
-    if (semester) filters.semester = semester.toString().trim();
-    if (section) filters.section = section.toString().trim();
-    if (courseId) filters.courseId = courseId.toString().trim();
-
-    console.log("Cleaned Filters:", filters);
-
+    if (universityId) filters.universityId = universityId;
+    if (facultyId) filters.facultyId = facultyId;
+    if (programId) filters.programId = programId; // <--- This fixes your specific error
+    if (year) filters.year = year;
+    if (semester) filters.semester = semester;
+    if (section) filters.section = section;
+    if (courseId) filters.courseId = courseId;
     getCLOsPaginate(token, page, limit, filters)
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : [];
-        const total = res.total || 0;
+        const total = res.total || 1;
         setClos(data);
         setTotalPages(Math.ceil(total / limit));
       })
@@ -545,6 +542,12 @@ export default function CLOManagement({
         showToast("API CLO error: " + err.message, "error");
       })
       .finally(() => setLoading(false));
+  };
+
+  // Initial Fetch & Refetch on Page Change
+  useEffect(() => {
+    fetchCLOs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isLoggedIn,
     token,
@@ -556,9 +559,7 @@ export default function CLOManagement({
     semester,
     section,
     courseId,
-    showToast,
   ]);
-  // --- Render ---
 
   return (
     <div className="mt-5 p-5">

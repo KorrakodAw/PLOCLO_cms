@@ -1,4 +1,3 @@
-// backend/src/routes/program.ts
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
@@ -6,7 +5,9 @@ import { authorizeRoles } from "../middleware/roleMiddleware";
 
 const router = Router();
 
-// GET all programs (with faculty & university names)
+// =========================================
+// 1. GET ALL (Dropdowns / Non-paginated)
+// =========================================
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const facultyId = req.query.facultyId as string | undefined;
@@ -31,13 +32,12 @@ router.get("/", authenticateToken, async (req, res) => {
 
     const params: any[] = [];
 
-    // Add facultyId filter if provided
     if (facultyId) {
       query += ` WHERE p.faculty_id = $1`;
       params.push(facultyId);
     }
 
-    query += ` ORDER BY p.id DESC`;
+    query += ` ORDER BY p.program_code ASC`; // Sorted by code usually better for dropdowns
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -47,7 +47,189 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// Create single program
+// =========================================
+// 2. PAGINATION (Refactored)
+// =========================================
+router.get("/paginate", authenticateToken, async (req, res) => {
+  try {
+    const universityId = req.query.universityId as string | undefined;
+    const facultyId = req.query.facultyId as string | undefined;
+    const programId = req.query.programId as string | undefined; // program_code
+    const year = req.query.year as string | undefined;
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    // --- 1. Build Filter Conditions (Write logic ONCE) ---
+    const params: any[] = [];
+    const conditions: string[] = [];
+
+    // Helper to add condition safely
+    const addCondition = (sql: string, value: any) => {
+      params.push(value);
+      conditions.push(`${sql} = $${params.length}`);
+    };
+
+    if (universityId) addCondition("f.university_id", universityId);
+    if (facultyId) addCondition("p.faculty_id", facultyId);
+    if (programId) addCondition("p.program_code", programId);
+    if (year) addCondition("p.program_year", year);
+
+    // Combine conditions
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    // --- 2. Construct Queries ---
+    const dataQuery = `
+      SELECT 
+        p.id, p.program_code, p.program_name_en, p.program_name_th, 
+        p.program_shortname_en, p.program_shortname_th, p.program_year, 
+        p.faculty_id, f.university_id
+      FROM program p
+      JOIN faculty f ON p.faculty_id = f.id
+      ${whereClause}
+      ORDER BY p.id ASC 
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM program p
+      JOIN faculty f ON p.faculty_id = f.id
+      ${whereClause}
+    `;
+
+    // --- 3. Execute in Parallel (Faster) ---
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(dataQuery, [...params, limit, offset]), // Pass limit/offset here
+      pool.query(countQuery, params), // Pass only filter params here
+    ]);
+
+    const total = parseInt(countResult.rows[0].total || "0", 10);
+
+    res.json({
+      data: dataResult.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err: any) {
+    console.error("Pagination Error:", err);
+    res.status(500).json({
+      error: "Unable to retrieve paginated program information",
+    });
+  }
+});
+
+// =========================================
+// 3. BULK UPLOAD
+// =========================================
+router.post(
+  "/bulk",
+  authenticateToken,
+  authorizeRoles("admin", "instructor"),
+  async (req, res) => {
+    // IMPORTANT: Frontend sends array directly, OR { programs: [] }.
+    // This logic handles direct array. If your frontend sends { programs: [...] }, change this line.
+    const programs = req.body;
+
+    if (!Array.isArray(programs) || programs.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Request body must be a non-empty array" });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const insertedPrograms: any[] = [];
+
+      for (const p of programs) {
+        // Sanitize / Default values
+        const faculty_id = p.faculty_id;
+        const program_code = String(p.program_code).trim();
+        const program_name_en = p.program_name_en;
+        const program_name_th = p.program_name_th;
+        const program_shortname_en = p.program_shortname_en || null;
+        const program_shortname_th = p.program_shortname_th || null;
+        const program_year = Number(p.program_year);
+
+        // Validation
+        if (
+          !faculty_id ||
+          !program_code ||
+          !program_name_en ||
+          !program_name_th ||
+          !program_year
+        ) {
+          throw new Error(
+            `Missing required fields for program code: ${
+              program_code || "UNKNOWN"
+            }`
+          );
+        }
+
+        const result = await client.query(
+          `INSERT INTO program
+            (faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)
+          ON CONFLICT (program_code, program_year) 
+          DO UPDATE SET
+          program_name_en = EXCLUDED.program_name_en,
+          program_name_th = EXCLUDED.program_name_th,
+          program_shortname_en = EXCLUDED.program_shortname_en,
+          program_shortname_th = EXCLUDED.program_shortname_th,
+          faculty_id = EXCLUDED.faculty_id
+          
+          RETURNING id, program_code`,
+          [
+            faculty_id,
+            program_code,
+            program_name_en,
+            program_name_th,
+            program_shortname_en,
+            program_shortname_th,
+            program_year,
+          ]
+        );
+
+        insertedPrograms.push(result.rows[0]);
+      }
+
+      await client.query("COMMIT");
+      res.status(201).json({
+        message: "Programs uploaded successfully",
+        data: insertedPrograms,
+      });
+    } catch (err: any) {
+      await client.query("ROLLBACK");
+      console.error("Bulk Upload Error:", err);
+
+      // Handle Unique Constraint Violation (Code 23505)
+      if (err.code === "23505") {
+        return res.status(409).json({
+          error: "Duplicate program code detected. Please check your file.",
+        });
+      }
+
+      // Handle Custom Validation Error
+      if (err.message && err.message.includes("Missing required fields")) {
+        return res.status(400).json({ error: err.message });
+      }
+
+      res.status(500).json({ error: "Bulk upload failed" });
+    } finally {
+      client.release();
+    }
+  }
+);
+
+// =========================================
+// 4. CREATE SINGLE PROGRAM
+// =========================================
 router.post(
   "/",
   authenticateToken,
@@ -63,26 +245,25 @@ router.post(
       program_year,
     } = req.body;
 
-    const missingFields = [];
-
-    if (!faculty_id) missingFields.push("faculty_id");
-    if (!program_code) missingFields.push("program_code");
-    if (!program_name_en) missingFields.push("program_name_en");
-    if (!program_name_th) missingFields.push("program_name_th");
-    if (!program_year) missingFields.push("program_year");
-
-    if (missingFields.length > 0) {
+    // Validate
+    if (
+      !faculty_id ||
+      !program_code ||
+      !program_name_en ||
+      !program_name_th ||
+      !program_year
+    ) {
       return res.status(400).json({
-        error: `Missing required field(s): ${missingFields.join(", ")}`,
+        error: "Missing required fields",
       });
     }
 
     try {
       const result = await pool.query(
         `INSERT INTO program 
-         (faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING id, faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year`,
+          (faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
+          RETURNING *`,
         [
           faculty_id,
           program_code,
@@ -105,199 +286,5 @@ router.post(
     }
   }
 );
-
-// Bulk upload programs
-router.post(
-  "/bulk",
-  authenticateToken,
-  authorizeRoles("admin", "instructor"),
-  async (req, res) => {
-    const programs = req.body; // expect array
-
-    if (!Array.isArray(programs) || programs.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "Request body must be a non-empty array" });
-    }
-
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      const insertedPrograms: any[] = [];
-
-      for (const p of programs) {
-        const {
-          faculty_id,
-          program_code,
-          program_name_en,
-          program_name_th,
-          program_shortname_en,
-          program_shortname_th,
-          program_year,
-        } = p;
-
-        if (
-          !faculty_id ||
-          !program_code ||
-          !program_name_en ||
-          !program_name_th ||
-          !program_year
-        ) {
-          await client.query("ROLLBACK");
-          return res.status(400).json({
-            error:
-              "Each program must include faculty_id, program_code, program_name_en, program_name_th, and program_year",
-          });
-        }
-
-        const result = await client.query(
-          `INSERT INTO program
-           (faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)
-           RETURNING id, faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year`,
-          [
-            faculty_id,
-            program_code,
-            program_name_en,
-            program_name_th,
-            program_shortname_en || null,
-            program_shortname_th || null,
-            Number(program_year),
-          ]
-        );
-
-        insertedPrograms.push(result.rows[0]);
-      }
-
-      await client.query("COMMIT");
-      res.status(201).json({
-        message: "Programs uploaded successfully",
-        data: insertedPrograms,
-      });
-    } catch (err: any) {
-      await client.query("ROLLBACK");
-      console.error(err);
-      // Detect unique violation and return 409 so client can show a helpful message
-      if (err && err.code === "23505") {
-        const message =
-          err.detail || "Duplicate program code detected in bulk upload";
-        return res.status(409).json({ error: message });
-      }
-      res.status(500).json({ error: "Bulk upload failed" });
-    } finally {
-      client.release();
-    }
-  }
-);
-
-// GET paginated programs
-
-router.get("/paginate", authenticateToken, async (req, res) => {
-  try {
-    const universityId = req.query.universityId as string | undefined;
-    const facultyId = req.query.facultyId as string | undefined;
-    const programId = req.query.programId as string | undefined; // This is now program_code
-    const year = req.query.year as string | undefined;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const offset = (page - 1) * limit;
-
-    // 🧩 Start building query with JOIN to support university filter
-    let baseQuery = `
-      SELECT 
-        p.id, 
-        p.program_code, 
-        p.program_name_en, 
-        p.program_name_th, 
-        p.program_shortname_en, 
-        p.program_shortname_th, 
-        p.program_year, 
-        p.faculty_id,
-        f.university_id
-      FROM program p
-      JOIN faculty f ON p.faculty_id = f.id
-    `;
-    const params: any[] = [];
-    const conditions: string[] = [];
-
-    // 🧠 Build WHERE conditions dynamically
-    if (universityId) {
-      conditions.push(`f.university_id = $${params.length + 1}`);
-      params.push(universityId);
-    }
-    if (facultyId) {
-      conditions.push(`p.faculty_id = $${params.length + 1}`);
-      params.push(facultyId);
-    }
-    if (programId) {
-      // Filter by program_code (not id) to get all years of the same program
-      conditions.push(`p.program_code = $${params.length + 1}`);
-      params.push(programId);
-    }
-    if (year) {
-      conditions.push(`p.program_year = $${params.length + 1}`);
-      params.push(year);
-    }
-
-    // Add WHERE clause if conditions exist
-    if (conditions.length > 0) {
-      baseQuery += ` WHERE ${conditions.join(" AND ")}`;
-    }
-
-    // 🧮 Pagination
-    baseQuery += ` ORDER BY p.id ASC LIMIT $${params.length + 1} OFFSET $${
-      params.length + 2
-    }`;
-    params.push(limit, offset);
-
-    // 📦 Execute main data query
-    const result = await pool.query(baseQuery, params);
-
-    // 📊 Count total records for pagination (use same conditions)
-    let countQuery = `
-      SELECT COUNT(*) 
-      FROM program p
-      JOIN faculty f ON p.faculty_id = f.id
-    `;
-    const countParams: any[] = [];
-    const countConditions: string[] = [];
-
-    if (universityId) {
-      countConditions.push(`f.university_id = $${countParams.length + 1}`);
-      countParams.push(universityId);
-    }
-    if (facultyId) {
-      countConditions.push(`p.faculty_id = $${countParams.length + 1}`);
-      countParams.push(facultyId);
-    }
-    if (programId) {
-      countConditions.push(`p.program_code = $${countParams.length + 1}`);
-      countParams.push(programId);
-    }
-    if (year) {
-      countConditions.push(`p.program_year = $${countParams.length + 1}`);
-      countParams.push(year);
-    }
-
-    if (countConditions.length > 0) {
-      countQuery += ` WHERE ${countConditions.join(" AND ")}`;
-    }
-
-    const countResult = await pool.query(countQuery, countParams);
-    const total = parseInt(countResult.rows[0].count, 10);
-
-    res.json({
-      data: result.rows,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      error: "Unable to retrieve paginated program information",
-    });
-  }
-});
 
 export default router;

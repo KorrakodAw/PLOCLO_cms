@@ -14,30 +14,26 @@ export async function addPlo(
   },
   token: string
 ) {
-  const res = await apiClient("/api/plo", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+  const res = await apiClient.post(
+    "/plo",
+    {
+      code,
+      name,
+      engname,
+      program_id,
     },
-    body: JSON.stringify({ code, name, engname, program_id }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to add PLO");
-  }
-  return await res.json();
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return res.data;
 }
 
 export async function getPlos(token: string) {
-  const res = await apiClient("/api/plo", {
+  const res = await apiClient.get("/plo", {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to fetch PLOs");
-  }
-  return await res.json();
+  return res.data;
 }
 
 // Get paginated PLOs
@@ -52,20 +48,13 @@ export async function getPlosPaginated(
     year?: string;
   }
 ) {
-  const query = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-    ...(filters?.universityId ? { universityId: filters.universityId } : {}),
-    ...(filters?.facultyId ? { facultyId: filters.facultyId } : {}),
-    ...(filters?.programId ? { programId: filters.programId } : {}),
-    ...(filters?.year ? { year: filters.year } : {}),
-  });
-  const res = await apiClient(`/api/plo/paginate?${query.toString()}`, {
+  const res = await apiClient.get("/plo/paginate", {
     headers: { Authorization: `Bearer ${token}` },
+    params: {
+      page,
+      limit,
+      ...filters,
+    },
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to fetch paginated PLOs");
-  }
-  return await res.json();
+  return res.data;
 }

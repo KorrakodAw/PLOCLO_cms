@@ -14,6 +14,7 @@ import TabButton from "../../components/TabButton";
 import { getUniversities } from "../../utils/universityApi";
 import { getFaculties } from "../../utils/facultyApi";
 import { getPrograms } from "../../utils/programApi";
+import { Course } from "../../utils/courseApi";
 
 interface University {
   name: string;
@@ -71,7 +72,6 @@ export default function EditCourse() {
   const [courseOptions, setCourseOptions] = useState<
     { label: string; value: string }[]
   >([]);
-  
 
   const tabs = [
     { id: "general", label: t("general information") },
@@ -129,15 +129,25 @@ export default function EditCourse() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token || !university) {
-      setFacultyOptions([{ label: t("all"), value: "" }]);
       setFaculty("");
       setProgram("");
       setYear("");
+      setSection("");
+      setSemester("");
       setFacultyOptions([{ label: t("all"), value: "" }]);
       setProgramOptions([{ label: t("all"), value: "" }]);
       setYearOptions([{ label: t("all"), value: "" }]);
-
       return;
+    }
+
+    if (university) {
+      setFaculty("");
+      setProgram("");
+      setYear("");
+      setSection("");
+      setSemester("");
+      setProgramOptions([{ label: t("all"), value: "" }]);
+      setYearOptions([{ label: t("all"), value: "" }]);
     }
 
     getFaculties(token, university)
@@ -163,6 +173,7 @@ export default function EditCourse() {
 
       return;
     }
+    console.log("facultyId: ", faculty);
 
     getPrograms(token, faculty) // ← ส่ง facultyId ไป
       .then((data) => {
@@ -224,7 +235,7 @@ export default function EditCourse() {
       .catch(() => setYearOptions([{ label: t("all"), value: "" }]));
   }, [program, faculty, t, lang]);
 
-  useEffect(() => { 
+  useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token || !faculty || !program || !year) {
       setCourseOptions([{ label: t("all"), value: "" }]);
@@ -236,7 +247,7 @@ export default function EditCourse() {
     const fetchCourses = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/course/paginate?facultyId=${faculty}&programId=${program}&year=${year}&limit=1000`,
+          `${process.env.NEXT_PUBLIC_API_URL}/course/paginate?facultyId=${faculty}&programCode=${program}&year=${year}&limit=10`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -251,7 +262,7 @@ export default function EditCourse() {
         const data = await res.json();
         setCourseOptions([
           { label: t("all"), value: "" },
-          ...data.data.map((course: any) => ({
+          ...data.data.map((course: Course) => ({
             label: course.name,
             value: String(course.id),
           })),
@@ -288,7 +299,7 @@ export default function EditCourse() {
 
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
-      <div className="max-w-[1100px] h-full">
+      <div className="w-full h-full">
         <p className="font-extralight text-2xl">{t("course information")}</p>
 
         <div className="flex gap-3 mt-5 px-3 py-2 ">
@@ -304,7 +315,7 @@ export default function EditCourse() {
             />
           ))}
         </div>
-        <hr />
+        <hr className="max-w-[900px]" />
 
         <div className="max-w-200 flex gap-3 mt-5 items-center">
           <DropdownSelect
@@ -372,15 +383,17 @@ export default function EditCourse() {
             section={section}
           />
         )}
-        {activeTab === "clo" && <CLOManagement
-          universityId={university}
-          facultyId={faculty}
-          programId={program}
-          year={year}
-          courseId={course}
-          semester={semester}
-          section={section}
-        />}
+        {activeTab === "clo" && (
+          <CLOManagement
+            universityId={university}
+            facultyId={faculty}
+            programId={program}
+            year={year}
+            courseId={course}
+            semester={semester}
+            section={section}
+          />
+        )}
         {activeTab === "clo-plo-mapping" && <CLOPLOMapping />}
         {activeTab === "assignment" && <AssignmentMapping />}
         {activeTab === "course-clo-mapping" && <CourseCLOMapping />}

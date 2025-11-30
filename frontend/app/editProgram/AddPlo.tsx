@@ -176,6 +176,29 @@ export default function AddPlo({
       });
   }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
 
+  const fetchPlos = async () => {
+    if (!isLoggedIn || !token) return;
+    setLoadingPlos(true);
+    const filters: Record<string, string | undefined> = {};
+
+    if (universityId) filters.universityId = universityId;
+    if (facultyId) filters.facultyId = facultyId;
+    if (programId) filters.programId = programId;
+    if (year) filters.year = year;
+
+    getPlosPaginated(token, page, limit, filters)
+      .then((res) => {
+        const data = Array.isArray(res) ? res : res.data || [];
+        const total = res.total || data.length || 1;
+        setPlos(data);
+        setTotalPages(Math.ceil(total / limit));
+      })
+      .catch((err) => {
+        showToast("API program error: " + err.message, "error");
+      })
+      .finally(() => setLoadingPlos(false));
+  };
+
   // ฟังก์ชันสำหรับเพิ่ม PLO จาก Excel
   const handleAddPloExcel = async (rows: any[]) => {
     if (!initialized) {
@@ -242,45 +265,12 @@ export default function AddPlo({
     showToast(summary, failCount > 0 ? "error" : "success");
     // รีเฟรชรายการ PLO หลังเพิ่ม
     try {
+      fetchPlos();
       setPage(1);
-      window.location.reload();
     } catch {
       showToast("Failed to refresh PLO list after Excel upload.", "error");
     }
   };
-
-  useEffect(() => {
-    if (!isLoggedIn || !token) return;
-    setLoadingPlos(true);
-    const filters: Record<string, string | undefined> = {};
-
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
-
-    getPlosPaginated(token, page, 10, filters)
-      .then((res) => {
-        const data = Array.isArray(res) ? res : res.data || [];
-        const total = res.total || data.length || 1;
-        setPlos(data);
-        setTotalPages(Math.ceil(total / limit));
-      })
-      .catch((err) => {
-        showToast("API program error: " + err.message, "error");
-      })
-      .finally(() => setLoadingPlos(false));
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    limit,
-    universityId,
-    facultyId,
-    programId,
-    year,
-    showToast,
-  ]);
 
   // ฟังก์ชันสำหรับเพิ่ม PLO
   const handleAddPlo = async (data: Record<string, unknown>) => {
@@ -324,9 +314,9 @@ export default function AddPlo({
         },
         token
       );
+      fetchPlos();
       showToast(t("PLO added successfully!"), "success");
       setPage(1);
-      window.location.reload();
     } catch (err: unknown) {
       if (err instanceof Error) {
         showToast("Error: " + err.message, "error");
@@ -358,6 +348,11 @@ export default function AddPlo({
       render: (value) => (lang === "en" ? Number(value) - 543 : value),
     },
   ];
+
+  useEffect(() => {
+    fetchPlos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
 
   return (
     <div className="mt-5 p-5">
