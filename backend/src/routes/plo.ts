@@ -90,4 +90,13 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   }
 });
 
+//path DELETE
+router.delete("/plo:id", (req,res) =>{
+  const id:string = req.params.id
+  const ploID = Number(id)
+  
+  const plo = await
+})
+
+
 export default router;

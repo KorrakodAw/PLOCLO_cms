@@ -1,9 +1,13 @@
-import { Router } from "express";
+import { response, Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
-import { BadgeIndianRupee, University } from "lucide-react";
 import { Client } from "pg";
+import { PrismaClient } from '@prisma/client';
+import { Param } from "@prisma/client/runtime/library";
+import { error } from "console";
+import { notFound } from "next/navigation";
 
+const prisma = new PrismaClient();
 const router = Router();
 
 // GET all universities for dropdowns
@@ -57,11 +61,26 @@ router.post("/", authenticateToken, async (req, res) => {
 });
 
 //path DELETE /university/:id
-router.delete("/university/:id",(req, res) => {
-  const id = req.params.id
-    // SELECT id from university
-    'SELECT University INTO'
-
+router.delete("/university/:id", authenticateToken, async (req, res) => {
+    const id: string = req.params.id
+    const universityID = Number(id)
   
+  try{
+  const university = await prisma.university.findUnique({
+    where: { id: universityID },
+    
+  })
+  if(!university){
+    return res.status(404).json({error:"University not found"});
+  }
+    const deleteUniversity = await prisma.university.delete({
+      where: {id:universityID}
+    })
+    return res.json({success: true, id})
+    }catch(err:any){
+    return res.status(500).json({error:"Unable to delete University"})
+  }
 })
+
+
 export default router;

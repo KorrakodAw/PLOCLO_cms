@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
+import { PrismaClient } from '@prisma/client';
 
+const prisma = new PrismaClient();
 const router = Router();
 
 // ดึงข้อมูลคณะทั้งหมด (faculty) สำหรับ dropdown
@@ -56,5 +58,25 @@ router.post("/", authenticateToken, async (req, res) => {
 });
 
 //path DELETE /faculty/:id
+router.delete("/:id",authenticateToken, async (req, res) => {
+    const id: string = req.params.id
+    const facultyID = Number(id)
+    
+    try{
+    const faculty = await prisma.faculty.findUnique({
+      where: { id: facultyID },
+    })
+    if(!faculty){
+      return res.status(404).json({error:"Faculty not found"});
+    }
+      const deleteUniversity = await prisma.faculty.delete({
+        where: {id:facultyID}
+      })
+      return res.json({success: true, id})
+      }catch(err:any){
+      return res.status(500).json({error: "Unable to delete University"})
+    }
+  })
+
 
 export default router;

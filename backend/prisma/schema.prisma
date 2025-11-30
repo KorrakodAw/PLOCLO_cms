@@ -23,6 +23,7 @@ model university {
   abbreviation    String?   @postgres.VarChar(50)
   abbreviation_th String?   @postgres.VarChar(50)
   faculties       faculty[]
+  deletedAt       DateTime? @map("deleted_at")  // Nullable column
 
   @@map("university")
 }
