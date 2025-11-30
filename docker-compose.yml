@@ -23,7 +23,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - ./.env
+      - ./backend/.env
     volumes:
       - ./backend:/app
       - /app/node_modules
