@@ -12,6 +12,7 @@ import cloRoutes from "./routes/clo";
 import studentRoutes from "./routes/student";
 import { seedAdminUser } from "./routes/seed";
 import mappingRoutes from "./routes/mapping";
+import assignmentRoutes from "./routes/ assignment";
 
 const app = express();
 app.use(morgan("dev"));
@@ -34,8 +35,9 @@ app.use("/api/university", univisityRoutes);
 app.use("/api/clo", cloRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/mapping", mappingRoutes);
+app.use("/api/assignments", assignmentRoutes);
 
 app.listen(3001, async () => {
   await seedAdminUser();
-  console.log("API on http://localhost:3001");
+  console.log("API on " + process.env.NEXT_PUBLIC_API_URL);
 });

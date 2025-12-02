@@ -69,6 +69,7 @@ model course {
   semester   Int     @default(1)
   program    program @relation(fields: [program_id], references: [id])
   clo       clo[]
+  assignments Assignment[] 
 
   @@map("course")
 }
@@ -123,3 +124,18 @@ model clo_plo_mapping {
   @@unique([cloId, ploId], map: "unique_clo_plo")
   @@map("clo_plo_mapping")
 }
+
+model Assignment {
+  id          Int      @id @default(autoincrement())
+  courseId    Int      @map("course_id")
+  name        String
+  description String?
+  maxScore    Decimal  @default(100) @map("max_score") 
+  weight      Decimal  @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  course      course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("assignment") // Ensures the table name is lowercase 'assignment' in Postgres
+}
+
