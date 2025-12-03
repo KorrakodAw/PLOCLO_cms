@@ -61,7 +61,7 @@ export default function ProgramManagement({
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [limit] = useState(10); // You can make this configurable if needed
+  const limit = 10; // You can make this configurable if needed
 
   const { showToast, ToastElement } = useToast();
   // Fetch universities
@@ -151,7 +151,7 @@ export default function ProgramManagement({
         year,
       });
       setPrograms(data.data || data); // Handle both response types
-      const total = data.total || (Array.isArray(data) ? data.length : 0);
+      const total = data.total || (Array.isArray(data) ? data.length : 1);
       setTotalPages(Math.ceil(total / limit));
     } catch (err: any) {
       showToast(err.message || "Failed to fetch programs", "error");

@@ -25,10 +25,13 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      - postgres  # ✅ FIXED: Changed from 'db' to 'postgres'
+      - postgres
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        - DATABASE_URL=${DATABASE_URL}
     container_name: backend
     depends_on:
       postgres:
