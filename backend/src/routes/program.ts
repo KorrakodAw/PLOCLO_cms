@@ -89,7 +89,7 @@ router.get("/paginate", authenticateToken, async (req, res) => {
       FROM program p
       JOIN faculty f ON p.faculty_id = f.id
       ${whereClause}
-      ORDER BY p.id ASC 
+      ORDER BY p.program_code ASC 
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
 
@@ -283,6 +283,82 @@ router.post(
         });
       }
       res.status(500).json({ error: "Failed to create program" });
+    }
+  }
+);
+
+router.patch(
+  "/:id",
+  authenticateToken,
+  authorizeRoles("admin", "instructor"),
+  async (req, res) => {
+    const programId = req.params.id;
+    const {
+      program_code,
+      program_name_en,
+      program_name_th,
+      program_shortname_en,
+      program_shortname_th,
+      program_year,
+    } = req.body;
+
+    try {
+      const result = await pool.query(
+        `UPDATE program SET
+         
+          program_code = $1,
+          program_name_en = $2,
+          program_name_th = $3,
+          program_shortname_en = $4,
+          program_shortname_th = $5,
+          program_year = $6
+        WHERE id = $7
+        RETURNING *`,
+        [
+          program_code,
+          program_name_en,
+          program_name_th,
+          program_shortname_en,
+          program_shortname_th,
+          Number(program_year),
+          programId,
+        ]
+      );
+      res.status(200).json(result.rows[0]);
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === "23505") {
+        return res.status(409).json({
+          error: "Program with the same code already exists",
+        });
+      }
+      res.status(500).json({ error: "Failed to update program" });
+    }
+  }
+);
+
+router.delete(
+  "/:id",
+  authenticateToken,
+  authorizeRoles("admin", "instructor"),
+  async (req, res) => {
+    const programId = req.params.id;
+
+    try {
+      const result = await pool.query(
+        `DELETE FROM program WHERE id = $1 RETURNING id, program_code`,
+        [programId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Program not found" });
+      }
+      res.status(200).json({
+        message: "Program deleted successfully",
+        data: result.rows[0],
+      });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to delete program" });
     }
   }
 );

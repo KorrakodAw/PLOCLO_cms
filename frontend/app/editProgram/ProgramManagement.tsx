@@ -7,6 +7,7 @@ import {
   addProgram,
   bulkUploadPrograms,
   getProgramsPaginated,
+  Program,
 } from "../../utils/programApi";
 import { Column, Table } from "../../components/Table";
 import AddButton from "../../components/AddButton";
@@ -18,21 +19,15 @@ import { useToast } from "../../components/Toast";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import axios from "axios";
 
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
+import { apiClient } from "../../utils/apiClient";
+
 interface ProgramManagementProps {
   universityId?: string;
   facultyId?: string;
   programId?: string; // Now this will be program_code instead of id
   year?: string;
-}
-
-interface Program {
-  id: number;
-  program_code: number;
-  program_name_en: string;
-  program_name_th: string;
-  program_shortname_en: string;
-  program_shortname_th: string;
-  program_year: number;
 }
 
 export default function ProgramManagement({
@@ -58,6 +53,10 @@ export default function ProgramManagement({
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("");
   const [selectedUniversity, setSelectedUniversity] = useState("");
+  const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
+  const [programToDelete, setProgramToDelete] = useState<Program | null>(null);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -270,7 +269,80 @@ export default function ProgramManagement({
       accessor: "program_year",
       render: (value: any) => (lang === "en" ? Number(value) - 543 : value),
     },
+    {
+      header: "Actions",
+      accessor: "id",
+      actions: [
+        {
+          label: "Edit",
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Program) => {
+            setSelectedProgram(row);
+            setShowEditPopup(true);
+          },
+        },
+        {
+          label: "Delete",
+          color: "red",
+          hoverColor: "red",
+          onClick: (row: Program) => {
+            setProgramToDelete(row);
+            setShowDeletePopup(true);
+          },
+        },
+      ],
+    },
   ];
+
+  const saveEdit = async () => {
+    if (!selectedProgram || !token) return;
+
+    try {
+      const res = await apiClient.patch(
+        `/program/${selectedProgram.id}`,
+        {
+          program_code: selectedProgram.program_code,
+          program_name_en: selectedProgram.program_name_en,
+          program_name_th: selectedProgram.program_name_th,
+          program_shortname_en: selectedProgram.program_shortname_en,
+          program_shortname_th: selectedProgram.program_shortname_th,
+          program_year: selectedProgram.program_year,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setPrograms((prev) =>
+        prev.map((prog) => (prog.id === selectedProgram.id ? res.data : prog))
+      );
+      showToast("Program updated successfully", "success");
+    } catch {
+      showToast("Failed to update program", "error");
+    } finally {
+      setShowEditPopup(false);
+      setSelectedProgram(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!programToDelete || !token) return;
+
+    try {
+      await apiClient.delete(`/program/${programToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPrograms((prev) =>
+        prev.filter((prog) => prog.id !== programToDelete.id)
+      );
+      showToast("Program deleted successfully", "success");
+    } catch {
+      showToast("Failed to delete program", "error");
+    } finally {
+      setShowDeletePopup(false);
+      setProgramToDelete(null);
+    }
+  };
 
   useEffect(() => {
     fetchPrograms();
@@ -314,6 +386,57 @@ export default function ProgramManagement({
       <hr className="my-3" />
       {/* Table Component for Programs */}
       <Table<Program> columns={programColumns} data={programs} />
+
+      {/* Edit Popup */}
+      {showEditPopup && selectedProgram && (
+        <FormEditPopup
+          title="Edit Program"
+          data={selectedProgram}
+          fields={[
+            { label: "Program Code", key: "program_code", type: "text" },
+            {
+              label: "Program Name (EN)",
+              key: "program_name_en",
+              type: "text",
+            },
+            {
+              label: "Program Name (TH)",
+              key: "program_name_th",
+              type: "text",
+            },
+            {
+              label: "Abbreviation (EN)",
+              key: "program_shortname_en",
+              type: "text",
+            },
+            {
+              label: "Abbreviation (TH)",
+              key: "program_shortname_th",
+              type: "text",
+            },
+            { label: "Year", key: "program_year", type: "number" },
+          ]}
+          onChange={(update) => {
+            setSelectedProgram(update);
+          }}
+          onClose={() => setShowEditPopup(false)}
+          onSave={saveEdit}
+        />
+      )}
+
+      {/* Delete Popup */}
+      <AlertPopup
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete the program "${
+          programToDelete?.program_name_en || ""
+        }"? This action cannot be undone.`}
+        isOpen={showDeletePopup}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setProgramToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+      />
       <PaginationControlButton
         page={page}
         totalPages={totalPages}

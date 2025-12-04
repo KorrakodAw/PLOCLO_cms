@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 
-type FieldType = "text" | "email" | "select";
+type FieldType = "text" | "email" | "select" | "number";
 
 interface FieldConfig<T> {
   label: string;
@@ -28,6 +28,17 @@ export default function FormEditPopup<T>({
   onSave,
   onClose,
 }: FormEditPopupProps<T>) {
+  // 1. Lock the background scroll when the popup opens
+  useEffect(() => {
+    // Disable scrolling on the body
+    document.body.style.overflow = "hidden";
+
+    // Re-enable scrolling when component unmounts (closes)
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -45,8 +56,10 @@ export default function FormEditPopup<T>({
               {field.label}
             </label>
 
-            {/* TEXT / EMAIL INPUT */}
-            {(field.type === "text" || field.type === "email") && (
+            {/* TEXT / EMAIL / NUMBER INPUT */}
+            {(field.type === "text" ||
+              field.type === "email" ||
+              field.type === "number") && (
               <input
                 type={field.type}
                 className="w-full border rounded px-3 py-2"
