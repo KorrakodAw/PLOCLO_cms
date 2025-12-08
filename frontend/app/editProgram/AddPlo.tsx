@@ -10,6 +10,9 @@ import { getUniversities } from "../../utils/universityApi";
 import { getFaculties } from "../../utils/facultyApi";
 import { getPrograms } from "../../utils/programApi";
 import { useToast } from "../../components/Toast";
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
+import { apiClient } from "../../utils/apiClient";
 
 interface AddPloProps {
   universityId?: string;
@@ -25,9 +28,9 @@ interface Plo {
   code: string;
   program_shortname_en: string;
   program_shortname_th: string;
-  program_year: number;
+  program_year: string;
   program_id: number;
-  year: number;
+  year: string;
 }
 
 export default function AddPlo({
@@ -63,6 +66,11 @@ export default function AddPlo({
   const [selectedUniversity, setSelectedUniversity] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
+
+  const [selectedPlo, setSelectedPlo] = useState<Plo | null>(null);
+  const [ploToDelete, setPloToDelete] = useState<Plo | null>(null);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
 
   const { showToast, ToastElement } = useToast();
 
@@ -161,7 +169,7 @@ export default function AddPlo({
           setProgramOptions([
             { label: t("please select a program"), value: "" },
             ...programs.map((p: any) => ({
-              label: p.program_name_en,
+              label: p.program_shortname_en,
               value: String(p.id),
             })),
           ]);
@@ -326,6 +334,47 @@ export default function AddPlo({
     }
   };
 
+  const confirmDelete = async () => {
+    if (!ploToDelete || !token) return;
+
+    try {
+      await apiClient.delete(`/plo/${ploToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast("PLO deleted successfully", "success");
+      setPlos((prev) => prev.filter((plo) => plo.id !== ploToDelete.id));
+    } catch {
+      showToast("Failed to delete PLO", "error");
+    } finally {
+      setShowDeletePopup(false);
+      setPloToDelete(null);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!selectedPlo || !token) return;
+
+    try {
+      await apiClient.patch(
+        `/plo/${selectedPlo.id}`,
+        {
+          code: selectedPlo.code,
+          name: selectedPlo.name,
+          engname: selectedPlo.engname,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      fetchPlos();
+      showToast("PLO updated successfully", "success");
+    } catch {
+      showToast("Failed to update PLO", "error");
+    } finally {
+      setSelectedPlo(null);
+    }
+  };
+
   const ploColumns: Column<Plo>[] = [
     { header: t("code"), accessor: "code" },
     lang === "en"
@@ -346,6 +395,30 @@ export default function AddPlo({
       header: t("year"),
       accessor: "program_year",
       render: (value) => (lang === "en" ? Number(value) - 543 : value),
+    },
+    {
+      header: "Actions",
+      accessor: "id",
+      actions: [
+        {
+          label: t("edit"),
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Plo) => {
+            setSelectedPlo(row);
+            setShowEditPopup(true);
+          },
+        },
+        {
+          label: t("delete"),
+          color: "red",
+          hoverColor: "red",
+          onClick: (row: Plo) => {
+            setPloToDelete(row);
+            setShowDeletePopup(true);
+          },
+        },
+      ],
     },
   ];
 
@@ -392,18 +465,46 @@ export default function AddPlo({
       </div>
 
       <hr className="my-3" />
-      {/* Pagination Controls */}
+      <Table<any> columns={ploColumns} data={plos} />
 
-      <div className="mt-4">
-        <Table<any> columns={ploColumns} data={plos} />
-
-        <PaginationControlButton
-          page={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
+      {/* Edit PLO Popup */}
+      {showEditPopup && selectedPlo && (
+        <FormEditPopup
+          title={t("edit plo")}
+          data={selectedPlo}
+          fields={[
+            { label: "PLO Code", key: "code", type: "text" },
+            { label: "PLO Name (TH)", key: "name", type: "text" },
+            { label: "PLO Name (EN)", key: "engname", type: "text" },
+          ]}
+          onClose={() => {
+            setShowEditPopup(false);
+            setSelectedPlo(null);
+          }}
+          onChange={(updated) => setSelectedPlo(updated)}
+          onSave={saveEdit}
         />
-        <ToastElement />
-      </div>
+      )}
+
+      {/* Delete PLO Popup */}
+      <AlertPopup
+        isOpen={showDeletePopup}
+        type="confirm"
+        title="Delete PLO"
+        message="Are you sure you want to delete this university?"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setPloToDelete(null);
+        }}
+      />
+
+      <PaginationControlButton
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      />
+      <ToastElement />
     </div>
   );
 }

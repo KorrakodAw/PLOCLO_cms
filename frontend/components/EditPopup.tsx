@@ -39,13 +39,18 @@ export default function FormEditPopup<T>({
     };
   }, []);
 
+  const adjustHeight = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-lg p-6 w-96"
+        className="bg-white rounded-lg shadow-lg p-6 w-[700px] max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-4">{title}</h2>
@@ -60,13 +65,18 @@ export default function FormEditPopup<T>({
             {(field.type === "text" ||
               field.type === "email" ||
               field.type === "number") && (
-              <input
-                type={field.type}
-                className="w-full border rounded px-3 py-2"
+              <textarea
+                rows={1}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500  outline-none transition-all resize-none overflow-hidden"
                 value={String(data[field.key] ?? "")}
-                onChange={(e) =>
-                  onChange({ ...data, [field.key]: e.target.value })
-                }
+                onChange={(e) => {
+                  onChange({ ...data, [field.key]: e.target.value });
+                  adjustHeight(e.target);
+                }}
+                // Adjust height on initial render
+                ref={(textarea) => {
+                  if (textarea) adjustHeight(textarea);
+                }}
               />
             )}
 

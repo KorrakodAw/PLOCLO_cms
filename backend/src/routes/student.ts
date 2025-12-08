@@ -164,4 +164,50 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   }
 });
 
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const studentId = req.params.id;
+  const { first_name, last_name, student_id } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE student
+       SET first_name = $1,
+           last_name = $2,
+           student_id = $3
+       WHERE id = $4
+       RETURNING *`,
+      [first_name, last_name, student_id, studentId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    console.error("Error updating student:", err);
+    res.status(500).json({ error: "Failed to update student" });
+  }
+});
+
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const studentId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      `DELETE FROM student WHERE id = $1 RETURNING *`,
+      [studentId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    res.json({ message: "Student deleted successfully" });
+  } catch (err: any) {
+    console.error("Error deleting student:", err);
+    res.status(500).json({ error: "Failed to delete student" });
+  }
+});
+
 export default router;

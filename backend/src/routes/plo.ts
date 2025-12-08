@@ -157,4 +157,35 @@ router.get("/paginate", authenticateToken, async (req, res) => {
   }
 });
 
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const { code, name, engname } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE plo SET code = $1, name = $2, engname = $3 WHERE id = $4 RETURNING *`,
+      [code, name, engname, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    console.error("Error updating PLO:", err);
+    res.status(500).json({ error: "Failed to update PLO" });
+  }
+});
+
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const ploId = parseInt(req.params.id);
+  if (!ploId) {
+    return res.status(400).json({ error: "PLO ID is required" });
+  }
+  try {
+    await pool.query(`DELETE FROM plo WHERE id = $1`, [ploId]);
+    res.status(204).send();
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "ไม่สามารถลบข้อมูล PLO ได้" });
+  }
+});
+
 export default router;

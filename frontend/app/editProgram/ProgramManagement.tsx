@@ -427,6 +427,7 @@ export default function ProgramManagement({
       {/* Delete Popup */}
       <AlertPopup
         title="Confirm Deletion"
+        type="confirm"
         message={`Are you sure you want to delete the program "${
           programToDelete?.program_name_en || ""
         }"? This action cannot be undone.`}

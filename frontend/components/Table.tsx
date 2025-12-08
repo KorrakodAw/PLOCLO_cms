@@ -127,7 +127,9 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                         col.className ?? ""
                       }`}
                     >
-                      {col.render ? col.render(value, row) : String(value)}
+                      {col.render
+                        ? col.render(value, row)
+                        : String(value) || "-"}
                     </td>
                   );
                 })}

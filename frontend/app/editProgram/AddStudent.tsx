@@ -12,6 +12,10 @@ import { getUniversities } from "../../utils/universityApi";
 import { getPrograms } from "../../utils/programApi";
 import { useToast } from "../../components/Toast";
 
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
+import { apiClient } from "../../utils/apiClient";
+
 interface AddStudentProps {
   universityId?: string;
   facultyId?: string;
@@ -60,6 +64,11 @@ export default function AddStudent({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
+
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
 
   const { showToast, ToastElement } = useToast();
 
@@ -149,7 +158,7 @@ export default function AddStudent({
           setProgramOptions([
             { label: t("please select a program"), value: "" },
             ...programs.map((p: any) => ({
-              label: p.program_name_en,
+              label: p.program_shortname_en,
               value: String(p.id),
             })),
           ]);
@@ -262,7 +271,70 @@ export default function AddStudent({
       accessor: lang === "en" ? "program_shortname_en" : "program_shortname_th",
       render: (v) => v || "-",
     },
+    {
+      header: t("actions"),
+      accessor: "id",
+      actions: [
+        {
+          label: t("Edit"),
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Student) => {
+            setSelectedStudent(row);
+            setShowEditPopup(true);
+          },
+        },
+        {
+          label: t("Delete"),
+          color: "red",
+          hoverColor: "red",
+          onClick: (row: Student) => {
+            setStudentToDelete(row);
+            setShowDeletePopup(true);
+          },
+        },
+      ],
+    },
   ];
+
+  const saveEdit = async () => {
+    if (!selectedStudent || !token) return;
+
+    try {
+      await apiClient.patch(
+        `/student/${selectedStudent.id}`,
+        {
+          student_id: selectedStudent.student_id,
+          first_name: selectedStudent.first_name,
+          last_name: selectedStudent.last_name,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      showToast("Student updated successfully!", "success");
+      setShowEditPopup(false);
+      fetchStudents();
+    } catch (err: any) {
+      showToast("Failed to update student: " + err.message, "error");
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!studentToDelete || !token) return;
+
+    try {
+      await apiClient.delete(`/student/${studentToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast("Student deleted successfully!", "success");
+      setShowDeletePopup(false);
+      setStudentToDelete(null);
+      fetchStudents();
+    } catch (err: any) {
+      showToast("Failed to delete student: " + err.message, "error");
+    }
+  };
 
   // 🧩 Add single student manually
   const handleAddStudent = async (data: Record<string, unknown>) => {
@@ -334,18 +406,44 @@ export default function AddStudent({
 
       <hr className="my-3" />
 
-      <div className="mt-4">
-        <Table<any> columns={studentColumns} data={students} />
+      <Table<any> columns={studentColumns} data={students} />
 
-        {/* Simple Pagination */}
-        <PaginationControlButton
-          page={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
+      {selectedStudent && showEditPopup && (
+        <FormEditPopup
+          title={t("edit student")}
+          data={selectedStudent}
+          fields={[
+            { label: "student id", key: "student_id", type: "number" },
+            { label: "first name", key: "first_name", type: "text" },
+            { label: "last name", key: "last_name", type: "text" },
+          ]}
+          onChange={(update) => {
+            setSelectedStudent(update);
+          }}
+          onClose={() => setShowEditPopup(false)}
+          onSave={saveEdit}
         />
+      )}
 
-        <ToastElement />
-      </div>
+      <AlertPopup
+        title={t("delete student")}
+        type="confirm"
+        message={t("are you sure you want to delete this student?")}
+        isOpen={showDeletePopup}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setStudentToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+      {/* Simple Pagination */}
+      <PaginationControlButton
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      />
+
+      <ToastElement />
     </div>
   );
 }
