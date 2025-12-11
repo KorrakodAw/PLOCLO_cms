@@ -3,47 +3,23 @@ import { useEffect, useState } from "react";
 import AddButton from "../../components/AddButton";
 import { Table, Column } from "../../components/Table";
 import PaginationControlButton from "../../components/PaignateControlButton";
-import { getFaculties } from "../../utils/facultyApi";
-import { getUniversities } from "../../utils/universityApi";
+import { getFaculties, Faculty } from "../../utils/facultyApi";
+import { getUniversities, University } from "../../utils/universityApi";
 import { useToast } from "../../components/Toast";
 
-import { addCourse, getCoursePaginate } from "../../utils/courseApi";
+import { addCourse, getCoursePaginate, Course } from "../../utils/courseApi";
 import { useAuth } from "../context/AuthContext";
-import { getPrograms } from "../../utils/programApi";
+import { getPrograms, Program } from "../../utils/programApi";
+
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
+import { apiClient } from "../../utils/apiClient";
 
 // interface ProgramOption {
 //   label: string;
 //   value: string;
 //   program_shortname_en?: string;
 // }
-
-interface university {
-  name: string;
-  id: string;
-}
-
-interface faculty {
-  name: string;
-  id: string;
-  university_id: number;
-}
-
-interface program {
-  id: number;
-  program_shortname_en: string;
-  program_name_en: string;
-  program_code: string;
-  program_year: number;
-}
-
-interface Course {
-  id: number;
-  code: number;
-  name: string;
-  name_th: string;
-  program_id: number;
-  section: number;
-}
 
 interface CourseManagementProps {
   universityId?: string;
@@ -128,6 +104,11 @@ export default function CourseManagement({
   const [selectedSemester, setSelectedSemester] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
 
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+
   // Fetch university options
   useEffect(() => {
     if (!isLoggedIn || !token) return;
@@ -136,7 +117,7 @@ export default function CourseManagement({
         const data = await getUniversities(token);
         setUniversityOptions([
           { label: t("please select a university"), value: "" },
-          ...data.map((u: university) => ({
+          ...data.map((u: University) => ({
             label: u.name,
             value: String(u.id),
           })),
@@ -169,9 +150,9 @@ export default function CourseManagement({
           { label: t("please select a faculty"), value: "" },
           ...data
             .filter(
-              (f: faculty) => String(f.university_id) === selectedUniversity
+              (f: Faculty) => String(f.university_id) === selectedUniversity
             )
-            .map((f: faculty) => ({ label: f.name, value: String(f.id) })),
+            .map((f: Faculty) => ({ label: f.name, value: String(f.id) })),
         ]);
       } catch {
         showToast("API faculty error", "error");
@@ -191,7 +172,7 @@ export default function CourseManagement({
         // Explicitly tell TypeScript that these are numbers
         const years = Array.from(
           new Set<number>(
-            data.map((p: program) => Number(p.program_year)) // ensure numeric
+            data.map((p: Program) => Number(p.program_year)) // ensure numeric
           )
         ).sort((a, b) => b - a); // optional: sort descending
 
@@ -222,7 +203,7 @@ export default function CourseManagement({
       .then((data) => {
         // Filter programs by the selected year
         const programs = data.filter(
-          (p: program) => String(p.program_year) === selectedYear
+          (p: Program) => String(p.program_year) === selectedYear
         );
 
         if (programs.length === 0) {
@@ -230,7 +211,7 @@ export default function CourseManagement({
         } else {
           setProgramOptions([
             { label: t("please select a program"), value: "" },
-            ...programs.map((p: program) => ({
+            ...programs.map((p: Program) => ({
               label: p.program_shortname_en,
               value: String(p.id),
             })),
@@ -403,11 +384,30 @@ export default function CourseManagement({
       ? { header: "Name", accessor: "name" }
       : { header: "ชื่อหลักสูตร", accessor: "name_th" },
     { header: "section", accessor: "section" },
-    // {
-    //   header: t("program"),
-    //   accessor: "program_id",
-    //   render: (value) => programIdToShortName(value),
-    // },
+    {
+      header: "Actions",
+      accessor: "id",
+      actions: [
+        {
+          label: t("edit"),
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Course) => {
+            setSelectedCourse(row);
+            setShowEditPopup(true);
+          },
+        },
+        {
+          label: t("delete"),
+          color: "red",
+          hoverColor: "red",
+          onClick: (row: Course) => {
+            setCourseToDelete(row);
+            setShowDeletePopup(true);
+          },
+        },
+      ],
+    },
   ];
   const fetchCourses = async () => {
     if (!isLoggedIn || !token) return;
@@ -451,6 +451,40 @@ export default function CourseManagement({
     semester,
     section,
   ]);
+
+  const saveEdit = async () => {
+    if (!selectedCourse || !token) return;
+
+    try {
+      await apiClient.patch(`/course/${selectedCourse.id}`, selectedCourse, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast(t("Course updated successfully!"), "success");
+      fetchCourses();
+    } catch {
+      showToast(t("Failed to update course"), "error");
+    } finally {
+      setShowEditPopup(false);
+      setSelectedCourse(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!courseToDelete || !token) return;
+
+    try {
+      await apiClient.delete(`/course/${courseToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast(t("Course deleted successfully!"), "success");
+      fetchCourses();
+    } catch {
+      showToast(t("Failed to delete course"), "error");
+    } finally {
+      setShowDeletePopup(false);
+      setCourseToDelete(null);
+    }
+  };
 
   return (
     <div className="mt-5 p-5">
@@ -503,6 +537,48 @@ export default function CourseManagement({
       <hr className="my-3" />
 
       <Table<Course> columns={courseColumns} data={courses} />
+
+      {selectedCourse && showEditPopup && (
+        <FormEditPopup
+          title="Edit Course"
+          data={selectedCourse}
+          fields={[
+            { label: "Course ID", key: "code", type: "text" },
+            {
+              label: lang === "en" ? "Course Name" : "ชื่อหลักสูตร",
+              key: lang === "en" ? "name" : "name_th",
+              type: "text",
+            },
+            {
+              label: "Section",
+              key: "section",
+              type: "select",
+              options: ["1", "2", "3"],
+            },
+          ]}
+          onChange={(update) => {
+            setSelectedCourse(update);
+          }}
+          onClose={() => {
+            setShowEditPopup(false);
+            setSelectedCourse(null);
+          }}
+          onSave={saveEdit}
+        />
+      )}
+
+      <AlertPopup
+        title="Delete Course"
+        type="confirm"
+        message={`Are you sure you want to delete the course ${courseToDelete?.code}?`}
+        isOpen={showDeletePopup}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setCourseToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+
       <PaginationControlButton
         page={page}
         totalPages={totalPages} // ✅ FIXED

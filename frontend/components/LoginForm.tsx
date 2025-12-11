@@ -29,19 +29,20 @@ export default function LoginForm() {
 
       // Access data directly
       login(res.data.token);
-    } catch (err: any) {
-      console.error(err);
-
-      let errorMessage = "An error occurred during login";
-
-      // specific check for Axios errors
-      if (axios.isAxiosError(err) && err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.message) {
-        errorMessage = err.message;
+    } catch (err) {
+      if (err instanceof Error) {
+        if (axios.isAxiosError(err) && err.response) {
+          // Axios error with response
+          const errorMessage =
+            err.response.data?.error || "Login failed. Please try again.";
+          showToast(errorMessage, "error");
+        } else {
+          // General error
+          showToast(err.message, "error");
+        }
+      } else {
+        showToast("An unknown error occurred during login.", "error");
       }
-
-      showToast(errorMessage, "error");
     }
   };
 
@@ -51,51 +52,73 @@ export default function LoginForm() {
 
   return (
     <form
-      className="w-full max-w-md mx-auto p-5 bg-white rounded-2xl shadow-lg"
+      // Form Container: Increased shadow and rounded corners for a softer look
+      className="w-full max-w-sm mx-auto p-8 bg-white rounded-3xl shadow-xl border border-gray-100"
       onSubmit={(e) => {
         e.preventDefault();
         handleSubmit();
       }}
     >
-      <h2 className="text-2xl font-bold text-center text-orange-400 mb-6">
+      <h2 className="text-3xl font-extrabold text-center text-orange-600 mb-8">
         {t("login")}
       </h2>
-      <div className="mb-4">
-        <label className="flex">{t("email")}</label>
+
+      {/* Email Input Group */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {t("email")}
+        </label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder={t("enter_email")}
           required
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+          // Input Style: Cleaner border, focus ring in primary color
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-xl transition-colors duration-150 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
         />
       </div>
-      <div className="mb-4 relative">
-        <label className="flex">{t("password")}</label>
+
+      {/* Password Input Group */}
+      <div className="mb-8 relative">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {t("password")}
+        </label>
         <input
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder={t("enter_password")}
           required
-          className="w-full px-4 py-2 pr-12 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+          // Input Style: Cleaner border, focus ring, increased right padding for icon
+          className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-xl transition-colors duration-150 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
         />
 
+        {/* Password Toggle Button */}
         <button
           type="button"
-          className="absolute right-3 top-[38px]"
+          // Positioning: Adjusted top value to align perfectly with the input padding
+          className="absolute right-3 top-[37px] text-gray-400 hover:text-orange-500 transition-colors"
           onClick={() => setShowPassword((p) => !p)}
         >
-          {showPassword ? <FaEyeSlash /> : <FaEye />}
+          {/* Assuming FaEyeSlash and FaEye are correctly imported */}
+          {showPassword ? (
+            <FaEyeSlash className="h-5 w-5" />
+          ) : (
+            <FaEye className="h-5 w-5" />
+          )}
         </button>
       </div>
+
+      {/* Submit Button */}
       <button
         type="submit"
-        className="w-full py-2 bg-orange-400 text-white rounded-lg hover:bg-orange-500 transition"
+        // Button Style: Stronger color, more padding, shadow for depth
+        className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-all shadow-md hover:shadow-lg cursor-pointer"
       >
         {t("sign_in")}
       </button>
+
       <ToastElement />
     </form>
   );

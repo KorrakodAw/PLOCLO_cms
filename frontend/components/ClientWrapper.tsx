@@ -35,7 +35,6 @@ export default function ClientWrapper({
     if (initialized && !isLoggedIn && protectedRoutes.includes(pathname)) {
       // Prevent infinite reloads by checking if already on /
       if (pathname !== "/") {
-        // Reload the page and redirect to login
         window.location.replace("/");
       }
     }

@@ -102,6 +102,13 @@ export default function EditProgram() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
+    if (!university) {
+      setUniversity("");
+      setFaculty("");
+      setProgram("");
+      setYear("");
+    }
+
     getUniversities(token)
       .then((data) => {
         setUniversityOptions([
@@ -232,7 +239,7 @@ export default function EditProgram() {
 
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
-      <div className="max-w-[1100px] h-full">
+      <div className="max-w-[1400px] h-full flex flex-col mx-auto">
         <p className="font-extralight text-2xl ">{t("program information")}</p>
 
         {/* Tabs */}

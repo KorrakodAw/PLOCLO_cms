@@ -13,6 +13,7 @@ import { useToast } from "../../components/Toast";
 import FormEditPopup from "../../components/EditPopup";
 import AlertPopup from "../../components/AlertPopup";
 import { apiClient } from "../../utils/apiClient";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 interface AddPloProps {
   universityId?: string;
@@ -44,7 +45,7 @@ export default function AddPlo({
   const { token, isLoggedIn, initialized } = useAuth();
 
   const [plos, setPlos] = useState<Plo[]>([]);
-  const [, setLoadingPlos] = useState(false);
+  const [loadingPlos, setLoadingPlos] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10);
@@ -428,19 +429,24 @@ export default function AddPlo({
   }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
 
   return (
-    <div className="mt-5 p-5">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-extralight">{t("plo management")}</h1>
+    <div className="p-5 md:p-8 min-h-screen">
+      {loadingPlos && <LoadingOverlay />}
+      <ToastElement />
+      <div className="mb-6 flex justify-between items-center border-b pb-4">
+        <h1 className="text-3xl font-extrabold text-gray-800">
+          {t("plo management")}
+        </h1>
         <AddButton
           buttonText={t("create new plo")}
           placeholderText={{
-            code: "PLO Code",
-            nameEn: "PLO Name (EN)",
-            nameTh: "PLO Name (TH)",
+            code: t("plo code"),
+            nameEn: t("plo name (en)"),
+            nameTh: t("plo name (th)"),
           }}
           showAbbreviationInputs={false}
           submitButtonText={{
-            insert: "Insert PLO",
+            insert: t("insert plo"),
+            upload: t("upload plo (excel)"),
           }}
           onSubmit={handleAddPlo}
           onSubmitExcel={handleAddPloExcel}
@@ -464,8 +470,16 @@ export default function AddPlo({
         />
       </div>
 
-      <hr className="my-3" />
-      <Table<any> columns={ploColumns} data={plos} />
+      <div className="bg-white p-4 rounded-lg shadow-xl">
+        <Table<Plo> columns={ploColumns} data={plos} />
+        <div className="pt-4 flex justify-end">
+          <PaginationControlButton
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
+      </div>
 
       {/* Edit PLO Popup */}
       {showEditPopup && selectedPlo && (
@@ -498,13 +512,6 @@ export default function AddPlo({
           setPloToDelete(null);
         }}
       />
-
-      <PaginationControlButton
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
-      <ToastElement />
     </div>
   );
 }

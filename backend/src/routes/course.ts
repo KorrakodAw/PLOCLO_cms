@@ -205,4 +205,42 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   }
 });
 
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { code, name, name_th, program_id, section, semester } = req.body;
+
+  if (!code || !name || !name_th || !program_id || !section || !semester) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  try {
+    // Check for duplicate code in the same program and section, excluding current course
+    const dup = await pool.query(
+      `SELECT id FROM course 
+       WHERE code = $1 AND program_id = $2 AND semester = $3 AND section = $4 AND id != $5`,
+      [code, program_id, semester, section, id]
+    );
+    if (dup.rows.length > 0) {
+      return res
+        .status(400)
+        .json({ error: "This section already exists for this course." });
+    }
+    const result = await pool.query(
+      `UPDATE course 
+       SET code = $1, name = $2, name_th = $3, program_id = $4, section = $5, semester = $6
+       WHERE id = $7
+       RETURNING id, code, name, name_th, program_id, section, semester`,
+      [code, name, name_th, program_id, section, semester, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: "Unable to update course" });
+  }
+});
+
 export default router;

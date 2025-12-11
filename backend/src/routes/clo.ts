@@ -165,4 +165,51 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const cloId = parseInt(req.params.id);
+
+  try {
+    const result = await pool.query(`DELETE FROM clo WHERE id = $1`, [cloId]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "CLO not found" });
+    }
+
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to delete CLO" });
+  }
+});
+
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const cloId = parseInt(req.params.id);
+  const { code, name, name_th } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE clo 
+       SET code = $1, name = $2, name_th = $3
+       WHERE id = $4
+       RETURNING id, code, name, name_th, course_id`,
+      [code, name, name_th, cloId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "CLO not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    if (err.code === "23505") {
+      return res
+        .status(409)
+        .json({ error: "This CLO code already exists in this course" });
+    }
+
+    console.error(err);
+    res.status(500).json({ error: "Unable to update CLO" });
+  }
+});
+
 export default router;

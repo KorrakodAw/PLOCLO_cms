@@ -83,14 +83,14 @@ export default function FormEditPopup<T>({
             {/* SELECT INPUT */}
             {field.type === "select" && (
               <select
-                className="w-full border rounded px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500  outline-none transition-all resize-none overflow-hidden"
                 value={String(data[field.key] ?? "")}
                 onChange={(e) =>
                   onChange({ ...data, [field.key]: e.target.value })
                 }
               >
                 {field.options?.map((opt) => (
-                  <option key={opt} value={opt}>
+                  <option key={opt} value={opt} >
                     {opt}
                   </option>
                 ))}

@@ -1,12 +1,16 @@
 // Import Course type for type safety
+
 import { apiClient } from "./apiClient";
 // Local Course type for Excel upload and API
 export interface Course {
-  id: number;
-  code: number;
+  id: string;
+  code: string;
   name: string;
   name_th: string;
-  program_id: number;
+  program_id: string;
+  year: number;
+  semester: number;
+  section: string;
 }
 // Upload multiple courses from Excel, only add if not duplicate
 export interface ExcelCourseRow {
@@ -24,7 +28,7 @@ export async function getCoursePaginate(
     year?: string;
     semester?: string;
     section?: string;
-    course?:string;
+    course?: string;
   }
 ) {
   const res = await apiClient.get("/course/paginate", {

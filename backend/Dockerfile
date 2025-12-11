@@ -19,6 +19,6 @@ COPY . .
 
 RUN npm run build
 
-EXPOSE 3001
+EXPOSE 9771
 
 CMD ["sh", "-c", "./wait-for-db.sh postgres && node dist/index.js"]

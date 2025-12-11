@@ -299,7 +299,7 @@ export default function EditCourse() {
 
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
-      <div className="w-full h-full">
+      <div className="max-w-[1400px] h-full flex flex-col mx-auto">
         <p className="font-extralight text-2xl">{t("course information")}</p>
 
         <div className="flex gap-3 mt-5 px-3 py-2 ">
@@ -315,9 +315,9 @@ export default function EditCourse() {
             />
           ))}
         </div>
-        <hr className="max-w-[900px]" />
+        <hr />
 
-        <div className="max-w-200 flex gap-3 mt-5 items-center">
+        <div className="flex gap-3 mt-5 items-center">
           <DropdownSelect
             label={t("university")}
             value={university}

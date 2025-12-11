@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -12,8 +12,8 @@ import {
 import { Column, Table } from "../../components/Table";
 import AddButton from "../../components/AddButton";
 import { useTranslation } from "react-i18next";
-import { getFaculties } from "../../utils/facultyApi";
-import { getUniversities } from "../../utils/universityApi";
+import { Faculty, getFaculties } from "../../utils/facultyApi";
+import { getUniversities, University } from "../../utils/universityApi";
 import PaginationControlButton from "../../components/PaignateControlButton";
 import { useToast } from "../../components/Toast";
 import LoadingOverlay from "../../components/LoadingOverlay";
@@ -83,7 +83,10 @@ export default function ProgramManagement({
         // If data exists, map it and prepend the default option
         setUniversityOptions([
           { label: t("please select a university"), value: "" },
-          ...data.map((u: any) => ({ label: u.name, value: String(u.id) })),
+          ...data.map((u: University) => ({
+            label: u.name,
+            value: String(u.id),
+          })),
         ]);
       } catch {
         showToast("API university error", "error");
@@ -105,7 +108,7 @@ export default function ProgramManagement({
         const data = await getFaculties(token, selectedUniversity);
 
         const filteredFaculties = data.filter(
-          (f: any) => String(f.university_id) === selectedUniversity
+          (f: Faculty) => String(f.university_id) === selectedUniversity
         );
 
         if (filteredFaculties.length === 0) {
@@ -115,7 +118,7 @@ export default function ProgramManagement({
 
         setFacultyOptions([
           { label: t("please select a faculty"), value: "" },
-          ...filteredFaculties.map((f: any) => ({
+          ...filteredFaculties.map((f: Faculty) => ({
             label: f.name,
             value: String(f.id),
           })),
@@ -142,6 +145,7 @@ export default function ProgramManagement({
 
   const fetchPrograms = async () => {
     if (!isLoggedIn || !token) return;
+
     try {
       const data = await getProgramsPaginated(token, page, limit, {
         universityId,
@@ -152,8 +156,12 @@ export default function ProgramManagement({
       setPrograms(data.data || data); // Handle both response types
       const total = data.total || (Array.isArray(data) ? data.length : 1);
       setTotalPages(Math.ceil(total / limit));
-    } catch (err: any) {
-      showToast(err.message || "Failed to fetch programs", "error");
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Error fetching programs: " + err.message, "error");
+      } else {
+        showToast("Error fetching programs", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -189,11 +197,13 @@ export default function ProgramManagement({
       fetchPrograms();
       showToast(t("Program added successfully!"), "success");
       setPage(1);
-    } catch (err: any) {
-      if (err && err.status === 409) {
-        showToast(err.message || "Duplicate program code detected", "error");
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Failed to add program: " + err.message, "error");
+      } else if (typeof err === "string") {
+        showToast("Failed to add program: " + err, "error");
       } else {
-        showToast("Error: " + (err.message || err), "error");
+        showToast("Failed to add program: An unknown error occurred", "error");
       }
     }
   };
@@ -274,7 +284,7 @@ export default function ProgramManagement({
       accessor: "id",
       actions: [
         {
-          label: "Edit",
+          label: t("edit"),
           color: "blue",
           hoverColor: "blue",
           onClick: (row: Program) => {
@@ -283,7 +293,7 @@ export default function ProgramManagement({
           },
         },
         {
-          label: "Delete",
+          label: t("delete"),
           color: "red",
           hoverColor: "red",
           onClick: (row: Program) => {
@@ -336,8 +346,17 @@ export default function ProgramManagement({
         prev.filter((prog) => prog.id !== programToDelete.id)
       );
       showToast("Program deleted successfully", "success");
-    } catch {
-      showToast("Failed to delete program", "error");
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Failed to delete program: " + err.message, "error");
+      } else if (typeof err === "string") {
+        showToast("Failed to delete program: " + err, "error");
+      } else {
+        showToast(
+          "Failed to delete program: An unknown error occurred",
+          "error"
+        );
+      }
     } finally {
       setShowDeletePopup(false);
       setProgramToDelete(null);
@@ -350,25 +369,28 @@ export default function ProgramManagement({
   }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
 
   return (
-    <div className="mt-5 p-5">
+    <div className="p-5 md:p-8 min-h-screen">
       {loading && <LoadingOverlay />}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-extralight">{t("program management")}</h1>
-        {/* University Dropdown */}
-
+      <ToastElement /> {/* Place Toast element at the top level */}
+      {/* HEADER & ACTIONS */}
+      <div className="mb-6 flex justify-between items-center border-b pb-4">
+        <h1 className="text-3xl font-extrabold text-gray-800">
+          {t("program management")}
+        </h1>
+        {/* The AddButton component handles all program creation/upload */}
         <AddButton
           buttonText={t("create new program")}
           placeholderText={{
-            code: "Program Code",
-            nameEn: "Program Name (EN)",
-            nameTh: "Program Name (TH)",
-            abbrEn: "Program abbreviation (EN)",
-            abbrTh: "Program abbreviation (TH)",
-            year: "Year",
+            code: t("program code"),
+            nameEn: t("program name (en)"),
+            nameTh: t("program name (th)"),
+            abbrEn: t("program abbreviation (en)"),
+            abbrTh: t("program abbreviation (th)"),
+            year: t("year"),
           }}
           submitButtonText={{
-            insert: "Insert Program",
-            upload: "Upload Program (Excel)",
+            insert: t("insert program"),
+            upload: t("upload program (excel)"),
           }}
           onSubmit={handleAddProgram}
           onSubmitExcel={handleFileUpload}
@@ -383,54 +405,65 @@ export default function ProgramManagement({
           onYearChange={(e) => setSelectedYear(e.target.value)}
         />
       </div>
-      <hr className="my-3" />
-      {/* Table Component for Programs */}
-      <Table<Program> columns={programColumns} data={programs} />
-
-      {/* Edit Popup */}
+      {/* FILTERING CONTROLS */}
+      {/* DATA TABLE SECTION */}
+      <div className="bg-white p-4 rounded-lg shadow-xl">
+        <Table<Program> columns={programColumns} data={programs} />
+        {/* Pagination Controls */}
+        <div className="pt-4 flex justify-end">
+          <PaginationControlButton
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
+      </div>
+      {/* POPUPS (Keep these at the bottom, they will overlay the main content) */}
       {showEditPopup && selectedProgram && (
         <FormEditPopup
-          title="Edit Program"
+          title={t("Edit Program")}
           data={selectedProgram}
           fields={[
-            { label: "Program Code", key: "program_code", type: "text" },
+            // ... your fields ...
+            { label: t("Program Code"), key: "program_code", type: "text" },
             {
-              label: "Program Name (EN)",
+              label: t("Program Name (EN)"),
               key: "program_name_en",
               type: "text",
             },
             {
-              label: "Program Name (TH)",
+              label: t("Program Name (TH)"),
               key: "program_name_th",
               type: "text",
             },
             {
-              label: "Abbreviation (EN)",
+              label: t("Abbreviation (EN)"),
               key: "program_shortname_en",
               type: "text",
             },
             {
-              label: "Abbreviation (TH)",
+              label: t("Abbreviation (TH)"),
               key: "program_shortname_th",
               type: "text",
             },
-            { label: "Year", key: "program_year", type: "number" },
+            { label: t("Year"), key: "program_year", type: "number" },
           ]}
           onChange={(update) => {
             setSelectedProgram(update);
           }}
-          onClose={() => setShowEditPopup(false)}
+          onClose={() => {
+            setShowEditPopup(false);
+            setSelectedProgram(null);
+          }}
           onSave={saveEdit}
         />
       )}
-
-      {/* Delete Popup */}
       <AlertPopup
-        title="Confirm Deletion"
+        title={t("Confirm Deletion")}
         type="confirm"
-        message={`Are you sure you want to delete the program "${
+        message={`${t("Are you sure you want to delete the program")} "${
           programToDelete?.program_name_en || ""
-        }"? This action cannot be undone.`}
+        }"? ${t("This action cannot be undone.")}`}
         isOpen={showDeletePopup}
         onCancel={() => {
           setShowDeletePopup(false);
@@ -438,12 +471,6 @@ export default function ProgramManagement({
         }}
         onConfirm={confirmDelete}
       />
-      <PaginationControlButton
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
-      <ToastElement />
     </div>
   );
 }

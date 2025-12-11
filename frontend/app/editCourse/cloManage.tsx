@@ -6,23 +6,19 @@ import AddButton from "../../components/AddButton";
 
 // Ensure you have a get function for CLOs.
 // If it's named differently, update this import.
-import { addClo, getCLOsPaginate } from "../../utils/cloApi";
-import { getPrograms } from "../../utils/programApi";
-import { getUniversities } from "../../utils/universityApi";
-import { getFaculties } from "../../utils/facultyApi";
-import { getCourses } from "../../utils/courseApi";
+import { addClo, getCLOsPaginate, CLO } from "../../utils/cloApi";
+import { getPrograms, Program } from "../../utils/programApi";
+import { getUniversities, University } from "../../utils/universityApi";
+import { getFaculties, Faculty } from "../../utils/facultyApi";
+import { getCourses, Course } from "../../utils/courseApi";
 import { useToast } from "../../components/Toast";
 import { useAuth } from "../context/AuthContext";
 
-// --- Interfaces ---
+import AlertPopup from "../../components/AlertPopup";
+import FormEditPopup from "../../components/EditPopup";
+import { apiClient } from "../../utils/apiClient";
 
-interface CLO {
-  id: string;
-  code: string; // Added code based on your AddButton placeholders
-  name: string;
-  name_th?: string; // Optional Thai name
-  course_id: string;
-}
+// --- Interfaces ---
 
 interface ExcelCLORow {
   code?: string | number;
@@ -31,35 +27,6 @@ interface ExcelCLORow {
   clo_name?: string;
   clo_code?: string;
   [key: string]: unknown;
-}
-
-interface university {
-  id: string;
-  name: string;
-}
-
-interface faculty {
-  id: string;
-  name: string;
-  university_id: string;
-}
-
-interface program {
-  id: string;
-  program_name_en: string;
-  program_shortname_en: string;
-  program_year: number;
-  facultyId: string;
-}
-
-interface course {
-  id: string;
-  code: string;
-  name: string;
-  program_id: string;
-  year: number;
-  semester: number;
-  section: string;
 }
 
 interface CLOManagementProps {
@@ -124,7 +91,7 @@ export default function CLOManagement({
   >([]);
 
   // Store all rows that share the same Course Code (e.g., all rows for 305100)
-  const [courseVariants, setCourseVariants] = useState<course[]>([]);
+  const [courseVariants, setCourseVariants] = useState<Course[]>([]);
 
   // Store the final specific Database ID (e.g., 1, 7, 10)
   const [specificCourseId, setSpecificCourseId] = useState<string>("");
@@ -132,6 +99,11 @@ export default function CLOManagement({
   // Data
   const [clos, setClos] = useState<Array<CLO>>([]);
   const [, setLoading] = useState(false);
+
+  const [selectedCLO, setSelectedCLO] = useState<CLO | null>(null);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [cloToDelete, setCloToDelete] = useState<CLO | null>(null);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
 
   // --- Filter Logic (Universities, Faculties, Programs, etc.) ---
 
@@ -143,7 +115,7 @@ export default function CLOManagement({
         const data = await getUniversities(token);
         setUniversityOptions([
           { label: t("please select a university"), value: "" },
-          ...data.map((u: university) => ({
+          ...data.map((u: University) => ({
             label: u.name,
             value: String(u.id),
           })),
@@ -176,7 +148,7 @@ export default function CLOManagement({
       try {
         const data = await getFaculties(token, selectedUniversity);
         const filtered = data.filter(
-          (f: faculty) => String(f.university_id) === selectedUniversity
+          (f: Faculty) => String(f.university_id) === selectedUniversity
         );
 
         if (filtered.length === 0) {
@@ -188,7 +160,7 @@ export default function CLOManagement({
 
         setFacultyOptions([
           { label: t("please select a faculty"), value: "" },
-          ...filtered.map((f: faculty) => ({
+          ...filtered.map((f: Faculty) => ({
             label: f.name,
             value: String(f.id),
           })),
@@ -201,7 +173,7 @@ export default function CLOManagement({
   }, [isLoggedIn, token, t, selectedUniversity, showToast]);
 
   // 1. Add a state to store the raw API data
-  const [allPrograms, setAllPrograms] = useState<program[]>([]);
+  const [allPrograms, setAllPrograms] = useState<Program[]>([]);
 
   // -------------------------------------------------------
   // STEP 1: Fetch Data & Set Years (When Faculty Changes)
@@ -225,7 +197,7 @@ export default function CLOManagement({
 
         // A. Extract Unique Years
         const years = Array.from(
-          new Set<number>(data.map((p: program) => Number(p.program_year)))
+          new Set<number>(data.map((p: Program) => Number(p.program_year)))
         ).sort((a, b) => b - a);
 
         // B. Set Year Options
@@ -256,7 +228,7 @@ export default function CLOManagement({
 
     // Filter the stored data by the selected Year
     const filteredPrograms = allPrograms.filter(
-      (p: program) => String(p.program_year) === selectedYear
+      (p: Program) => String(p.program_year) === selectedYear
     );
 
     if (filteredPrograms.length === 0) {
@@ -264,7 +236,7 @@ export default function CLOManagement({
     } else {
       setProgramOptions([
         { label: t("please select a program"), value: "" },
-        ...filteredPrograms.map((p: program) => ({
+        ...filteredPrograms.map((p: Program) => ({
           label: p.program_shortname_en, // Or p.name_en
           value: String(p.id),
         })),
@@ -287,14 +259,14 @@ export default function CLOManagement({
 
     const fetchCourses = async () => {
       try {
-        const data = (await getCourses(token, selectedProgram)) as course[];
+        const data = (await getCourses(token, selectedProgram)) as Course[];
         const uniqueCourses = Array.from(
-          new Map(data.map((c: course) => [c.code, c])).values()
+          new Map(data.map((c: Course) => [c.code, c])).values()
         );
 
         setCourseOptions([
           { label: "please select a course", value: "" },
-          ...uniqueCourses.map((c: course) => ({
+          ...uniqueCourses.map((c: Course) => ({
             label: `${c.code} - ${c.name}`, // Improved label
             value: String(c.code), // NOTE: Assuming API filters by Course Code, not ID. If ID, change this.
           })),
@@ -324,7 +296,7 @@ export default function CLOManagement({
 
         // Filter to get only rows matching the selected CODE
         const courseData = data.filter(
-          (c: course) => String(c.code) === selectedCourse
+          (c: Course) => String(c.code) === selectedCourse
         );
 
         setCourseVariants(courseData);
@@ -348,7 +320,7 @@ export default function CLOManagement({
     }
 
     const semesters = Array.from(
-      new Set(courseVariants.map((c: course) => String(c.semester)))
+      new Set(courseVariants.map((c: Course) => String(c.semester)))
     ) as string[];
 
     // Sort numerically
@@ -373,7 +345,7 @@ export default function CLOManagement({
     );
 
     const sections = Array.from(
-      new Set(relevantRows.map((c: course) => String(c.section)))
+      new Set(relevantRows.map((c: Course) => String(c.section)))
     ) as string[];
 
     // Sort numerically
@@ -502,7 +474,6 @@ export default function CLOManagement({
   };
 
   // --- Table Columns ---
-
   const cloColumns: Column<CLO>[] = [
     {
       header: "Code",
@@ -516,7 +487,75 @@ export default function CLOManagement({
       header: "CLO Name (TH)",
       accessor: "name_th",
     },
+    {
+      header: "Actions",
+      accessor: "id",
+      actions: [
+        {
+          label: "Edit",
+          color: "blue",
+          hoverColor: "blue",
+          // onClick: (row: CLO) => openEditPopup(row), // Implement edit functionality
+          onClick: (row: CLO) => {
+            setSelectedCLO(row);
+            setShowEditPopup(true);
+          },
+        },
+        {
+          label: "Delete",
+          color: "red",
+          hoverColor: "red",
+          // onClick: (row: CLO) => openDeletePopup(row), // Implement delete functionality
+          onClick: (row: CLO) => {
+            setCloToDelete(row);
+            setShowDeletePopup(true);
+          },
+        },
+      ],
+    },
   ];
+
+  const saveEdit = async () => {
+    if (!selectedCLO) return;
+
+    try {
+      await apiClient.patch(
+        `/clo/${selectedCLO.id}`,
+        {
+          code: selectedCLO.code,
+          name: selectedCLO.name,
+          name_th: selectedCLO.name_th,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      fetchCLOs();
+      showToast("CLO updated successfully", "success");
+      setShowEditPopup(false);
+      setSelectedCLO(null);
+    } catch {
+      showToast("Failed to update CLO", "error");
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!cloToDelete) return;
+
+    try {
+      await apiClient.delete(`/clo/${cloToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchCLOs();
+      showToast("CLO deleted successfully", "success");
+    } catch {
+      showToast("Failed to delete CLO", "error");
+    } finally {
+      setShowDeletePopup(false);
+      setCloToDelete(null);
+    }
+  };
 
   const fetchCLOs = () => {
     if (!isLoggedIn || !token) return;
@@ -609,6 +648,38 @@ export default function CLOManagement({
       <hr className="my-3" />
 
       <Table<CLO> columns={cloColumns} data={clos} />
+
+      {selectedCLO && showEditPopup && (
+        <FormEditPopup
+          title="Edit CLO"
+          data={selectedCLO}
+          fields={[
+            { label: "CLO Code", key: "code", type: "text" },
+            { label: "CLO Name (EN)", key: "name", type: "text" },
+            { label: "CLO Name (TH)", key: "name_th", type: "text" },
+          ]}
+          onChange={(updated) => setSelectedCLO(updated)}
+          onSave={saveEdit}
+          onClose={() => {
+            setShowEditPopup(false);
+            setSelectedCLO(null);
+          }}
+        />
+      )}
+
+      <AlertPopup
+        isOpen={showDeletePopup}
+        type="confirm"
+        title="Delete CLO"
+        message="Are you sure you want to delete this CLO?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setCloToDelete(null);
+        }}
+      />
 
       <PaginationControlButton
         page={page}

@@ -21,49 +21,49 @@ export default function AboutData() {
       name_th: "บุณสิตา ปวงอาจ",
       name_eng: "(BOONSITA PUANGART)",
       role: "Designer",
-      image: "/images/boonsita.jpg",
+      image: "/images/profile/boonsita.jpg",
     },
     {
       id: 2,
       name_th: "ศิรชัช อรุณแจ้ง",
       name_eng: "(SIRACHAT ARUNJANG)",
       role: "Frontend Developer",
-      image: "/images/sirachat.jpg",
+      image: "/images/profile/sirachat.jpg",
     },
     {
       id: 3,
       name_th: "ศุภณัฐ แสงตุ๊",
       name_eng: "(SUPANAS SANGTU)",
       role: "Backend Developer",
-      image: "/images/supanas.jpg",
+      image: "/images/profile/supanas.jpg",
     },
     {
       id: 4,
       name_th: "เทพทัต แผนสันเที๊ยะ",
       name_eng: "(THEPTHAT PHAENSANTHIA)",
       role: "DevOps",
-      image: "/images/thepthat.png",
+      image: "/images/profile/thepthat.png",
     },
     {
       id: 5,
       name_th: "เบญญาภา แก้วพาปราบ",
       name_eng: "(BENYAPA KAEOPHAPRAP)",
       role: "UI/UX Designer",
-      image: "/images/benyapa.jpg",
+      image: "/images/profile/benyapa.jpg",
     },
     {
       id: 6,
       name_th: "ดร.สุรเดช จิตประไพกุลศาล",
       name_eng: "(DR. SURADET JITPRAPAIKULSARN)",
       role: "ADVISOR",
-      image: "/images/suradet.png",
+      image: "/images/profile/suradet.png",
     },
     {
       id: 7,
       name_th: "ผศ.ดร.สสิกรณณ์ เหลืองวิชชเจริญ",
       name_eng: "(ASST. PROF. DR. SASIKORN LEUNGVICHCHAROEN)",
       role: "ADVISOR",
-      image: "/images/sasikorn.png",
+      image: "/images/profile/sasikorn.png",
     },
     {
       id: 8,
@@ -95,7 +95,7 @@ export default function AboutData() {
   const advisors = cards.filter((c) => c.role === "ADVISOR");
 
   return (
-    <div className="max-w-[1100px] mx-auto py-10 px-6">
+    <div className="max-w-[1100px] h-full flex flex-col mx-auto">
       <motion.h1
         className="text-4xl font-light mb-8 text-center tracking-wide"
         initial={{ opacity: 0, y: -20 }}

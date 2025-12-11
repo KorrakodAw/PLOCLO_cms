@@ -139,7 +139,7 @@ export default function ManageAccount() {
 
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
-      <div className="p-5">
+      <div className="max-w-[1100px] h-full flex flex-col mx-auto">
         <h1 className="text-2xl font-extralight mb-4">Manage Account</h1>
 
         {/* TABLE */}

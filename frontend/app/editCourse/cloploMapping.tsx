@@ -378,15 +378,6 @@ export default function CloPloMapping() {
         <h1 className="text-2xl font-extralight text-gray-800">
           CLO-PLO Mapping
         </h1>
-        {specificCourseId && (
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="bg-green-600 text-white px-6 py-2.5 rounded shadow hover:bg-green-700 transition disabled:opacity-50 font-medium"
-          >
-            {loading ? "Saving..." : "Save Changes"}
-          </button>
-        )}
       </div>
 
       {/* --- FILTERS --- */}
@@ -445,7 +436,7 @@ export default function CloPloMapping() {
       </div>
 
       {/* --- MATRIX TABLE --- */}
-      <div className="bg-white p-4 shadow-md rounded-lg overflow-x-auto min-h-[300px] border border-gray-200">
+      <div className="bg-white p-4 shadow-md rounded-lg overflow-x-auto min-h-[300px] border border-gray-200 ">
         {!specificCourseId && (
           <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
             <p className="text-gray-400 font-medium">
@@ -453,108 +444,121 @@ export default function CloPloMapping() {
             </p>
           </div>
         )}
+        <div className="flex flex-col">
+          {specificCourseId && (
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="bg-green-600 text-white px-6 py-2.5 max-w-[300px] rounded shadow hover:bg-green-700 transition disabled:opacity-50 font-medium mb-2.5"
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
+          )}
+          {specificCourseId && clos.length > 0 && plos.length > 0 && (
+            <table className="w-full border-collapse border border-gray-300 text-sm">
+              {/* HEADERS: PLOs as Columns */}
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border p-0 sticky left-0 bg-gray-100 z-20 w-32 min-w-[70px] h-14">
+                    <div className="relative w-full h-full">
+                      {/* 1. The Diagonal Line (SVG) */}
+                      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                        {/* Draws a line from Top-Left to Bottom-Right */}
+                        <line
+                          x1="0"
+                          y1="0"
+                          x2="100%"
+                          y2="100%"
+                          stroke="#d1d5db"
+                          strokeWidth="1"
+                        />
+                      </svg>
 
-        {specificCourseId && clos.length > 0 && plos.length > 0 && (
-          <table className="w-full border-collapse border border-gray-300 text-sm">
-            {/* HEADERS: PLOs as Columns */}
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border p-0 sticky left-0 bg-gray-100 z-20 w-32 min-w-[70px] h-14">
-                  <div className="relative w-full h-full">
-                    {/* 1. The Diagonal Line (SVG) */}
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                      {/* Draws a line from Top-Left to Bottom-Right */}
-                      <line
-                        x1="0"
-                        y1="0"
-                        x2="100%"
-                        y2="100%"
-                        stroke="#d1d5db"
-                        strokeWidth="1"
-                      />
-                    </svg>
+                      {/* 2. Top-Right Text (Column Name: PLO) */}
+                      <div className="absolute top-2 right-3 text-xs font-bold text-gray-600">
+                        PLO
+                      </div>
 
-                    {/* 2. Top-Right Text (Column Name: PLO) */}
-                    <div className="absolute top-2 right-3 text-xs font-bold text-gray-600">
-                      PLO
-                    </div>
-
-                    {/* 3. Bottom-Left Text (Row Name: CLO) */}
-                    <div className="absolute bottom-2 left-3 text-xs font-bold text-gray-600">
-                      CLO
-                    </div>
-                  </div>
-                </th>
-
-                {plos.map((plo) => (
-                  <th
-                    key={plo.id}
-                    className="border p-2 min-w-[80px] text-center bg-gray-50"
-                    title={plo.name_en}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-bold text-blue-800">
-                        {plo.code}
-                      </span>
+                      {/* 3. Bottom-Left Text (Row Name: CLO) */}
+                      <div className="absolute bottom-2 left-3 text-xs font-bold text-gray-600">
+                        CLO
+                      </div>
                     </div>
                   </th>
-                ))}
-              </tr>
-            </thead>
 
-            {/* BODY: CLOs as Rows */}
-            <tbody>
-              {clos.map((clo) => (
-                <tr key={clo.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="border p-3 font-bold sticky left-0 bg-white z-10 shadow-sm ">
-                    {clo.code}
-                  </td>
-
-                  {plos.map((plo) => {
-                    const weight = mappingGrid[`${clo.id}_${plo.id}`] || "";
-                    const hasValue = Number(weight) > 0;
-                    return (
-                      <td
-                        key={plo.id}
-                        className={`border p-1 text-center ${
-                          hasValue ? "bg-blue-50/30" : ""
-                        }`}
-                      >
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                            hasValue
-                              ? "font-bold text-blue-700"
-                              : "text-gray-400"
-                          }`}
-                          placeholder="-"
-                          value={weight}
-                          onChange={(e) =>
-                            handleWeightChange(clo.id, plo.id, e.target.value)
-                          }
-                        />
-                      </td>
-                    );
-                  })}
+                  {plos.map((plo) => (
+                    <th
+                      key={plo.id}
+                      className="border p-2 min-w-[80px] text-center bg-gray-50"
+                      title={plo.name_en}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-bold text-blue-800">
+                          {plo.code}
+                        </span>
+                      </div>
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
 
-        {/* Empty States */}
-        {!loading && specificCourseId && clos.length === 0 && (
-          <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
-            No CLOs found for this course section.
-          </div>
-        )}
-        {!loading && specificCourseId && plos.length === 0 && (
-          <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
-            No PLOs found for this program.
-          </div>
-        )}
+              {/* BODY: CLOs as Rows */}
+              <tbody>
+                {clos.map((clo) => (
+                  <tr
+                    key={clo.id}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="border p-3 font-bold sticky left-0 bg-white z-10 shadow-sm ">
+                      {clo.code}
+                    </td>
+
+                    {plos.map((plo) => {
+                      const weight = mappingGrid[`${clo.id}_${plo.id}`] || "";
+                      const hasValue = Number(weight) > 0;
+                      return (
+                        <td
+                          key={plo.id}
+                          className={`border p-1 text-center ${
+                            hasValue ? "bg-blue-50/30" : ""
+                          }`}
+                        >
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                              hasValue
+                                ? "font-bold text-blue-700"
+                                : "text-gray-400"
+                            }`}
+                            placeholder="-"
+                            value={weight}
+                            onChange={(e) =>
+                              handleWeightChange(clo.id, plo.id, e.target.value)
+                            }
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {/* Empty States */}
+          {!loading && specificCourseId && clos.length === 0 && (
+            <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
+              No CLOs found for this course section.
+            </div>
+          )}
+          {!loading && specificCourseId && plos.length === 0 && (
+            <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
+              No PLOs found for this program.
+            </div>
+          )}
+        </div>
       </div>
 
       <ToastElement />

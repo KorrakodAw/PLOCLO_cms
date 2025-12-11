@@ -5,8 +5,8 @@ import enCommon from "./locales/en/common.json";
 import thCommon from "./locales/th/common.json";
 
 i18n.use(initReactI18next).init({
-  lng: "en",
-  fallbackLng: "en",
+  lng: "th",
+  fallbackLng: "th",
   debug: true,
   interpolation: { escapeValue: false },
   resources: {
