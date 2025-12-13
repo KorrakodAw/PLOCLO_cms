@@ -7,6 +7,7 @@ import {
   ExclamationCircleIcon,
   InformationCircleIcon,
 } from "@heroicons/react/20/solid";
+import { useTranslation } from "react-i18next";
 
 interface AlertPopupProps {
   isOpen: boolean;
@@ -23,12 +24,13 @@ export default function AlertPopup({
   isOpen,
   title,
   message,
-  confirmText = "OK",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   type = "info",
   onConfirm,
   onCancel,
 }: AlertPopupProps) {
+  const { t } = useTranslation("common");
   // --- Utility Functions for Dynamic Styling ---
   const getIcon = () => {
     switch (type) {
@@ -96,13 +98,13 @@ export default function AlertPopup({
             {/* Secondary/Cancel Button (Only for confirm type or if explicit cancel handler is given) */}
             {(type === "confirm" || onCancel) && (
               <button className={getButtonClasses(false)} onClick={onCancel}>
-                {cancelText}
+                {cancelText || t("cancel")}
               </button>
             )}
 
             {/* Primary/Confirm Button */}
             <button className={getButtonClasses(true)} onClick={onConfirm}>
-              {confirmText}
+              {confirmText || t("confirm")}
             </button>
           </div>
         </div>

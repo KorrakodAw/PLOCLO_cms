@@ -459,11 +459,11 @@ export default function ProgramManagement({
         />
       )}
       <AlertPopup
-        title={t("Confirm Deletion")}
+        title={t("confirm deletion")}
         type="confirm"
         message={`${t("Are you sure you want to delete the program")} "${
-          programToDelete?.program_name_en || ""
-        }"? ${t("This action cannot be undone.")}`}
+          programToDelete?.program_shortname_en || ""
+        }" ${t("This action cannot be undone.")}`}
         isOpen={showDeletePopup}
         onCancel={() => {
           setShowDeletePopup(false);

@@ -98,5 +98,10 @@
   "course clo management": "การจัดการ CLO ของหลักสูตร",
   "clo-plo mapping": "การจับคู่ CLO-PLO",
   "assignment mapping": "การจับคู่แบบฝึกหัด",
-  "course-clo mapping": "การจับคู่หลักสูตร-CLO"
+  "course-clo mapping": "การจับคู่หลักสูตร-CLO",
+  "confirm deletion": "ยืนยันการลบ",
+  "Are you sure you want to delete the program": "คุณแน่ใจหรือไม่ว่าต้องการลบแผนการเรียน",
+  "This action cannot be undone.": "การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+  "confirm": "ยืนยัน",
+  "cancel": "ยกเลิก"
 }

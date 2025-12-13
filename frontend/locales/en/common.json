@@ -97,5 +97,10 @@
   "course learning outcomes (CLO)": "Course Learning Outcomes (CLO)",
   "clo-plo mapping": "CLO-PLO Mapping",
   "assignment mapping": "Assignment Mapping",
-  "course-clo mapping": "Course-CLO Mapping"
+  "course-clo mapping": "Course-CLO Mapping",
+  "confirm deletion": "Confirm Deletion",
+  "Are you sure you want to delete the program": "Are you sure you want to delete the program",
+  "This action cannot be undone.": "This action cannot be undone.",
+  "cancel": "Cancel",
+  "confirm": "Confirm"
 }
