@@ -101,7 +101,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                   text-gray-600 
                   uppercase 
                   tracking-wider 
-                  sticky top-0 
+                   top-0 
                   bg-gray-50 
                   border-b-2 border-gray-200 
                   ${col.className ?? ""}
@@ -143,10 +143,10 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                         className="px-5 py-3 align-middle whitespace-nowrap"
                       >
                         {/* Wrapper for buttons: Cleaned up spacing */}
+
                         <div className="flex gap-3 items-center">
                           {col.actions.map((action, i) => {
-                            // Use Tailwind's text/hover color utilities for a cleaner link/outline look
-
+                            // These getColorClasses functions should be defined outside the return
                             const colorText = getColorClasses(
                               action.color,
                               "text"
@@ -162,13 +162,13 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                                 className={`
                                   ${colorText} ${hoverText} 
                                   font-medium 
-                                  text-[16px] 
+                                  text-sm 
+                                                      p-0.5 
                                   cursor-pointer 
                                   transition-colors duration-150
                                   hover:underline 
                                   whitespace-nowrap 
-                                  p-1
-                                `}
+                                  `}
                               >
                                 {action.label}
                               </button>

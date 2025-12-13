@@ -38,8 +38,8 @@ model program {
   program_year         Int
   courses              course[]
   plos                 plo[]
-  faculty              faculty   @relation(fields: [faculty_id], references: [id])
   student              student[]
+  faculty              faculty     @relation(fields: [faculty_id], references: [id], onDelete: Cascade)
 
   @@unique([program_code, program_year])
   @@map("program")
@@ -52,7 +52,7 @@ model faculty {
   name_th         String     @postgres.VarChar(100)
   abbreviation    String?    @postgres.VarChar(50)
   abbreviation_th String?    @postgres.VarChar(50)
-  university      university @relation(fields: [university_id], references: [id])
+  university       university  @relation(fields: [university_id], references: [id], onDelete: Cascade)
 
   programs        program[]
 
@@ -67,8 +67,9 @@ model course {
   program_id Int
   section    Int
   semester   Int     @default(1)
-  program    program @relation(fields: [program_id], references: [id])
-  clo       clo[]
+  program    program     @relation(fields: [program_id], references: [id], onDelete: Cascade) 
+  
+  clo        clo[]
   assignments Assignment[] 
 
   @@map("course")
@@ -81,7 +82,7 @@ model student {
   last_name         String    @postgres.VarChar(100)
   program_id        Int
   created_at        DateTime? @default(now()) @postgres.Timestamp(6)
-  program           program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction)
+  program           program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
 
   @@map("student")
 }
@@ -92,7 +93,7 @@ model plo {
   program_id Int
   name       String
   engname    String
-  program    program @relation(fields: [program_id], references: [id])
+  program    program @relation(fields: [program_id], references: [id], onDelete: Cascade)
   clo_plo_mappings clo_plo_mapping[]
 
   @@map("plo")

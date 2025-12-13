@@ -280,7 +280,7 @@ export default function ProgramManagement({
       render: (value: any) => (lang === "en" ? Number(value) - 543 : value),
     },
     {
-      header: "Actions",
+      header: t("actions"),
       accessor: "id",
       actions: [
         {

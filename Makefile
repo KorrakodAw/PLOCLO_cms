@@ -3,6 +3,7 @@ PM = npm
 # Using variables for Docker commands
 BUILD_CMD = docker compose up -d --build
 START_CMD = docker compose up -d
+DOWN_CMD = docker compose down
 
 # 2. Phony Targets
 .PHONY: dev build start backend frontend service clean
@@ -14,6 +15,8 @@ service:
 # service:
 # 	$(BUILD_CMD)
 
+down:
+	$(DOWN_CMD)
 
 # 4. Main Targets
 all: dev # 'make' defaults to 'dev'

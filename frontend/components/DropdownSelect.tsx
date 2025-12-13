@@ -52,7 +52,11 @@ const DropdownSelect: React.FC<DropdownSelectProps> = ({
       ease-in-out
       
       /* Disabled State */
-      ${disabled ? "opacity-60 bg-gray-100 cursor-not-allowed" : ""}
+      ${
+        disabled
+          ? "text-zinc-300 bg-gray-100 cursor-not-allowed border-gray-300 "
+          : ""
+      }
     `}
         disabled={disabled}
       >

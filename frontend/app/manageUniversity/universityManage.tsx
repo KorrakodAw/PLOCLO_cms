@@ -14,8 +14,13 @@ import { Table, Column } from "../../components/Table";
 import { apiClient } from "../../utils/apiClient";
 import FormEditPopup from "../../components/EditPopup";
 import AlertPopup from "../../components/AlertPopup";
+import { useRouter } from "next/navigation";
+import LoadingOverlay from "../../components/LoadingOverlay";
+
+import { useTranslation } from "next-i18next";
 
 export default function ManageUniversity() {
+  const router = useRouter();
   const { token, isLoggedIn } = useAuth();
   const { showToast, ToastElement } = useToast();
   const [universities, setUniversities] = useState<University[]>([]);
@@ -25,6 +30,8 @@ export default function ManageUniversity() {
   const [universityToDelete, setUniversityToDelete] =
     useState<University | null>(null);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const { t } = useTranslation("common");
+  const [loading, setLoading] = useState(false);
 
   // Function to refresh data safely
   const fetchUniversities = async () => {
@@ -108,27 +115,37 @@ export default function ManageUniversity() {
 
   const universityColumn: Column<University>[] = [
     {
-      header: "University Name",
+      header: t("university name (en)"),
       accessor: "name",
     },
     {
-      header: "University Name (TH)",
+      header: t("university name (th)"),
       accessor: "name_th",
     },
     {
-      header: "Abbreviation",
+      header: t("abbreviation (en)"),
       accessor: "abbreviation",
     },
     {
-      header: "Abbreviation (TH)",
+      header: t("abbreviation (th)"),
       accessor: "abbreviation_th",
     },
     {
-      header: "Actions",
+      header: t("actions"),
       accessor: "id",
       actions: [
         {
-          label: "Edit",
+          label: t("view details"), // Changed text slightly for clarity
+          color: "gray",
+          hoverColor: "gray",
+          onClick: (row: University) => {
+            // 💡 REDIRECT TO THE NEW DYNAMIC PAGE
+            router.push(`/manageUniversity/${row.id}`);
+            setLoading(true);
+          },
+        },
+        {
+          label: t("edit"), // Retaining a separate edit button for clarity
           color: "blue",
           hoverColor: "blue",
           onClick: (row: University) => {
@@ -137,11 +154,11 @@ export default function ManageUniversity() {
           },
         },
         {
-          label: "Delete",
+          label: t("delete"), // Retaining a separate edit button for clarity
           color: "red",
           hoverColor: "red",
           onClick: (row: University) => {
-            setUniversityToDelete(row);
+            setUniversityToDelete({ ...row });
             setShowDeletePopup(true);
           },
         },
@@ -150,21 +167,28 @@ export default function ManageUniversity() {
   ];
 
   return (
-    <div className="mt-5 p-5">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-extralight">{"Universities"}</h1>
+    // 1. Relative Container for Local Loading Overlay
+    <div className="mt-5 p-5 absolute min-h-[500px]">
+      {/* 2. Loading Overlay (Rendered conditionally on local component data fetch) */}
+      {loading && <LoadingOverlay />}
+
+      {/* Header and Actions Row */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-semibold text-gray-800 tracking-tight">
+          {t("university management")}
+        </h1>
 
         <AddButton
-          buttonText="create university"
+          buttonText={t("add university")} // Capitalized for better button text
           placeholderText={{
-            nameEn: "university name (en)",
-            nameTh: "university name (th)",
-            abbrEn: "abbreviation (en)",
-            abbrTh: "abbreviation (th)",
+            nameEn: t("university name (en)"),
+            nameTh: t("university name (th)"),
+            abbrEn: t("abbreviation (en)"),
+            abbrTh: t("abbreviation (th)"),
           }}
           submitButtonText={{
-            insert: "Create University",
-            upload: "Upload Universities Excel",
+            insert: t("create university"),
+            upload: t("upload universities excel"),
           }}
           requiredFields={["nameEn", "nameTh", "abbrEn", "abbrTh"]}
           onSubmit={handleUniversity}
@@ -172,7 +196,11 @@ export default function ManageUniversity() {
           showCodeInput={false}
         />
       </div>
-      <hr className="my-3" />
+
+      {/* Separator */}
+      <hr className="my-5 border-gray-200" />
+
+      {/* Main Data Table */}
       <Table<University> columns={universityColumn} data={universities} />
 
       {/* Edit Popup */}
@@ -181,15 +209,15 @@ export default function ManageUniversity() {
           title="Edit University"
           data={selectedUniversity}
           fields={[
-            { label: "University Name", key: "name", type: "text" },
-            { label: "University Name (TH)", key: "name_th", type: "text" },
+            { label: t("university name (en)"), key: "name", type: "text" }, // Added (EN) for clarity
+            { label: t("university name (th)"), key: "name_th", type: "text" },
             {
-              label: "Abbreviation",
+              label: t("abbreviation (en)"),
               key: "abbreviation",
               type: "text",
             },
             {
-              label: "Abbreviation (TH)",
+              label: t("abbreviation (th)"),
               key: "abbreviation_th",
               type: "text",
             },
@@ -204,9 +232,9 @@ export default function ManageUniversity() {
       <AlertPopup
         isOpen={showDeletePopup}
         type="confirm"
-        title="Delete User"
-        message="Are you sure you want to delete this university?"
-        confirmText="Delete"
+        title="Confirm Deletion" // More generic title
+        message="Are you sure you want to delete this university and ALL associated data (Faculties, Programs, Courses)? This action cannot be undone." // Emphasized CASCADE delete warning
+        confirmText="Yes, Delete"
         cancelText="Cancel"
         onConfirm={confirmDelete}
         onCancel={() => {

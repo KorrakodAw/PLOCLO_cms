@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 import TabButton from "../../components/TabButton";
 import ManageUniversity from "./universityManage";
-import ManageFaculty from "./facultyManage";
 import ProtectedRoute from "../../components/ProtectedRoute";
 
 export default function ManageUniversityPage() {
@@ -12,10 +11,7 @@ export default function ManageUniversityPage() {
     typeof window !== "undefined" ? window.location.pathname : ""
   }`;
 
-  const tabs = [
-    { id: "university", label: "Universities" },
-    { id: "faculty", label: "Faculties" },
-  ];
+  const tabs = [{ id: "university", label: "Universities" }];
 
   const [activeTab, setActiveTab] = useState<string>(() => {
     try {
@@ -48,11 +44,11 @@ export default function ManageUniversityPage() {
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
       <div className="max-w-[1100px] h-full flex flex-col mx-auto">
-        <h1 className="font-extralight text-2xl">
+        {/* <h1 className="font-extralight text-2xl">
           Manage Universities & Faculties
-        </h1>
+        </h1> */}
 
-        <div className="flex gap-3 mt-5 px-3 py-2 ">
+        {/* <div className="flex gap-3 mt-5 px-3 py-2 ">
           {tabs.map((tab) => (
             <TabButton
               key={tab.id}
@@ -64,10 +60,9 @@ export default function ManageUniversityPage() {
             />
           ))}
         </div>
-        <hr />
+        <hr /> */}
 
         {activeTab === "university" && <ManageUniversity />}
-        {activeTab === "faculty" && <ManageFaculty />}
       </div>
     </ProtectedRoute>
   );

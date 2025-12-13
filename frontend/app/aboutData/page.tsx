@@ -95,40 +95,65 @@ export default function AboutData() {
   const advisors = cards.filter((c) => c.role === "ADVISOR");
 
   return (
-    <div className="max-w-[1100px] h-full flex flex-col mx-auto">
+    <div className="max-w-6xl h-full flex flex-col mx-auto px-4 sm:px-6">
+      {/* Added horizontal padding for smaller screens */}
+      {/* 1. Header */}
       <motion.h1
-        className="text-4xl font-light mb-8 text-center tracking-wide"
+        className="text-3xl font-extrabold mb-8 text-center tracking-wide text-gray-800"
         initial={{ opacity: 0, y: -20 }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
         {t("about") || "About Our Team"}
       </motion.h1>
-
-      {/* 🔹 Team Section */}
-
-      <div className="flex flex-col gap-12 mt-6">
+      {/* 2. 🔹 Advisors Section (NOW AT THE TOP) */}
+      <SectionTitle title="Advisors" />
+      <motion.div
+        className="flex flex-wrap justify-center gap-6 md:gap-8 mt-4 mb-10"
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7 }}
+        viewport={{ once: true, amount: 0.1 }}
+      >
+        {advisors.map((advisor) => (
+          <AdvisorCard key={advisor.id} data={advisor} />
+        ))}
+      </motion.div>
+      <hr className="my-6 border-gray-200" /> {/* Added a separator */}
+      {/* 3. 🔹 Team Section (VERSIONS IN A ROW) */}
+      <SectionTitle title={t("team_members") || "Development Teams"} />
+      {/* Container for all versions - using Flexbox to keep them on one line */}
+      <div className="flex flex-col md:flex-row gap-6 mt-6 justify-between">
+        {/* Map through all versions and treat each as a 'block' column */}
         {[version1, version2, version3].map((version, index) => (
-          <div key={index} className="flex flex-col gap-4">
-            <SectionTitle title={`Version ${index + 1}`} />
+          // Outer block for each version group (e.g., Version 1)
+          <div
+            key={index}
+            className="flex flex-col gap-4 p-4 rounded-xl shadow-sm md:w-1/3"
+          >
+            {/* Title for the individual version block */}
+            <h3 className="text-xl font-bold text-gray-700 border-b pb-2 mb-2">
+              Version {index + 1}
+            </h3>
+
+            {/* Inner Container for PersonCards (maintains staggered animation) */}
             <motion.div
-              className="flex flex-wrap justify-center gap-8"
+              className="flex flex-col gap-6 items-center w-full" /* Changed to flex-col for clean list */
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true }}
+              viewport={{ once: true, amount: 0.2 }}
               variants={{
                 hidden: {},
-                visible: {
-                  transition: { staggerChildren: 0.15 },
-                },
+                visible: { transition: { staggerChildren: 0.15 } },
               }}
             >
               {version.map((person) => (
                 <motion.div
                   key={person.id}
+                  className="w-full justify-center flex" /* Center cards within the block */
                   variants={{
-                    hidden: { opacity: 0, y: 30 },
-                    visible: { opacity: 1, y: 0 },
+                    hidden: { opacity: 0, x: -20 }, // Changed y to x for horizontal effect within block
+                    visible: { opacity: 1, x: 0 },
                   }}
                 >
                   <PersonCard data={person} />
@@ -138,19 +163,6 @@ export default function AboutData() {
           </div>
         ))}
       </div>
-
-      {/* 🔹 Advisors Section */}
-      <SectionTitle title="Advisors" />
-      <motion.div
-        className="flex flex-wrap justify-center gap-8 mt-6"
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7 }}
-      >
-        {advisors.map((advisor) => (
-          <AdvisorCard key={advisor.id} data={advisor} />
-        ))}
-      </motion.div>
     </div>
   );
 }
@@ -158,9 +170,10 @@ export default function AboutData() {
 // 🧱 Helper: Section Header
 function SectionTitle({ title }: { title: string }) {
   return (
-    <div className="mt-10 mb-4 text-center">
-      <h2 className="text-2xl font-semibold text-gray-800">{title}</h2>
-      <div className="w-20 h-0.5 bg-blue-500 mx-auto mt-2 rounded-full"></div>
+    // Reduced size
+    <div className="mt-8 mb-3 text-center">
+      <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
+      <div className="w-16 h-0.5 bg-blue-500 mx-auto mt-2 rounded-full"></div>
     </div>
   );
 }
@@ -171,11 +184,13 @@ function PersonCard({ data }: { data: CardData }) {
     <motion.div
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.98 }}
-      className="w-72 h-96 bg-linear-to-br from-white/80 to-blue-50/50 
+      // Reduced card size
+      className="w-43 bg-linear-to-br from-white/80 to-blue-50/50 
                  backdrop-blur-md border border-blue-100 rounded-2xl 
-                 shadow-md hover:shadow-blue-200 transition-all duration-300 p-5 text-center"
+                 shadow-md hover:shadow-blue-200 transition-all duration-300 p-4 text-center"
     >
-      <div className="relative w-32 h-40 mx-auto rounded-xl overflow-hidden shadow-lg">
+      {/* Reduced image size */}
+      <div className="relative w-20 h-24 mx-auto rounded-xl overflow-hidden shadow-lg">
         <Image
           src={data.image || "/images/default-avatar.png"}
           alt={data.name_th}
@@ -184,11 +199,12 @@ function PersonCard({ data }: { data: CardData }) {
         />
       </div>
 
-      <h3 className="mt-4 text-lg font-semibold text-gray-800">
+      {/* Reduced text size */}
+      <h3 className="mt-3 text-base font-semibold text-gray-800">
         {data.name_th}
       </h3>
-      <p className="text-sm text-gray-500">{data.name_eng}</p>
-      <p className="mt-2 text-blue-600 font-medium text-sm">{data.role}</p>
+      <p className="text-xs text-gray-500">{data.name_eng}</p>
+      <p className="mt-2 text-blue-600 font-medium text-xs">{data.role}</p>
     </motion.div>
   );
 }
@@ -198,11 +214,13 @@ function AdvisorCard({ data }: { data: CardData }) {
   return (
     <motion.div
       whileHover={{ y: -6, scale: 1.05 }}
-      className="w-90 h-96 bg-linear-to-br from-blue-50 to-white/70 
+      // Reduced card size
+      className="w-80 h-80 bg-linear-to-br from-blue-50 to-white/70 
                  border border-blue-200 rounded-2xl shadow-md 
-                 p-5 text-center transition-all duration-300"
+                 p-4 text-center transition-all duration-300"
     >
-      <div className="relative w-32 h-40 mx-auto rounded-xl overflow-hidden shadow-lg ring-4 ring-blue-300/30">
+      {/* Reduced image size */}
+      <div className="relative w-28 h-36 mx-auto rounded-xl overflow-hidden shadow-lg ring-4 ring-blue-300/30">
         <Image
           src={data.image || "/images/default-avatar.png"}
           alt={data.name_th}
@@ -211,11 +229,12 @@ function AdvisorCard({ data }: { data: CardData }) {
         />
       </div>
 
-      <h3 className="mt-4 text-xl font-semibold text-blue-700">
+      {/* Reduced text size */}
+      <h3 className="mt-3 text-lg font-semibold text-blue-700">
         {data.name_th}
       </h3>
-      <p className="text-sm text-blue-500">{data.name_eng}</p>
-      <p className="mt-2 text-blue-400 font-medium text-sm">{data.role}</p>
+      <p className="text-xs text-blue-500">{data.name_eng}</p>
+      <p className="mt-2 text-blue-400 font-medium text-xs">{data.role}</p>
     </motion.div>
   );
 }

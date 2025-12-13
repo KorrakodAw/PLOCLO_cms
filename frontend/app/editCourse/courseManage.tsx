@@ -1,19 +1,21 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import AddButton from "../../components/AddButton";
-import { Table, Column } from "../../components/Table";
-import PaginationControlButton from "../../components/PaignateControlButton";
-import { getFaculties, Faculty } from "../../utils/facultyApi";
-import { getUniversities, University } from "../../utils/universityApi";
-import { useToast } from "../../components/Toast";
+import AddButton from "@/components/AddButton";
+import { Table, Column } from "@/components/Table";
+import PaginationControlButton from "@/components/PaignateControlButton";
+import { getFaculties, Faculty } from "@/utils/facultyApi";
+import { getUniversities, University } from "@/utils/universityApi";
+import { useToast } from "@/components/Toast";
 
-import { addCourse, getCoursePaginate, Course } from "../../utils/courseApi";
+import { addCourse, getCoursePaginate, Course } from "@/utils/courseApi";
 import { useAuth } from "../context/AuthContext";
-import { getPrograms, Program } from "../../utils/programApi";
+import { getPrograms, Program } from "@/utils/programApi";
 
-import FormEditPopup from "../../components/EditPopup";
-import AlertPopup from "../../components/AlertPopup";
-import { apiClient } from "../../utils/apiClient";
+import FormEditPopup from "@/components/EditPopup";
+import AlertPopup from "@/components/AlertPopup";
+import { apiClient } from "@/utils/apiClient";
+
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // interface ProgramOption {
 //   label: string;
@@ -66,7 +68,7 @@ export default function CourseManagement({
   const { token, isLoggedIn, initialized } = useAuth();
 
   const [courses, setCourses] = useState<Course[]>([]);
-  const [, setLoadingCourse] = useState(false);
+  const [loading, setLoadingCourse] = useState(false);
   const [page, setPage] = useState(1);
   const limit = 10;
   const [totalPages, setTotalPages] = useState(1);
@@ -488,6 +490,8 @@ export default function CourseManagement({
 
   return (
     <div className="mt-5 p-5">
+      {loading && <LoadingOverlay />}
+      <ToastElement />
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-extralight">{t("course management")}</h1>
         <AddButton
@@ -534,9 +538,17 @@ export default function CourseManagement({
         />
       </div>
 
-      <hr className="my-3" />
-
-      <Table<Course> columns={courseColumns} data={courses} />
+      <div className="bg-white p-4 rounded-lg shadow-xl">
+        <Table<Course> columns={courseColumns} data={courses} />
+        {/* Pagination Controls */}
+        <div className="pt-4 flex justify-end">
+          <PaginationControlButton
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
+      </div>
 
       {selectedCourse && showEditPopup && (
         <FormEditPopup
@@ -578,14 +590,6 @@ export default function CourseManagement({
         }}
         onConfirm={confirmDelete}
       />
-
-      <PaginationControlButton
-        page={page}
-        totalPages={totalPages} // ✅ FIXED
-        onPageChange={setPage}
-      />
-
-      <ToastElement />
     </div>
   );
 }

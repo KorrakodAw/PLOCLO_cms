@@ -2,31 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import DropdownSelect from "../../components/DropdownSelect";
-import { getUniversities } from "../../utils/universityApi";
-import { getFaculties } from "../../utils/facultyApi";
-import { getPrograms } from "../../utils/programApi";
+import { getUniversities, University } from "../../utils/universityApi";
+import { getFaculties, Faculty } from "../../utils/facultyApi";
+import { getPrograms, Program } from "../../utils/programApi";
 import TabButton from "../../components/TabButton";
 import ProgramManagement from "./ProgramManagement";
 import AddPlo from "./AddPlo";
 import AddStudent from "./AddStudent";
 import { useTranslation } from "react-i18next";
 import ProtectedRoute from "../../components/ProtectedRoute";
-
-interface University {
-  name: string;
-  id: string;
-}
-
-interface Faculty {
-  name: string;
-  id: string;
-}
-
-interface Program {
-  program_name_en: string;
-  program_code: string;
-  program_year: number;
-}
 
 export default function EditProgram() {
   const { t, i18n } = useTranslation("common");
@@ -35,6 +19,7 @@ export default function EditProgram() {
   const [faculty, setFaculty] = useState("");
   const [program, setProgram] = useState("");
   const [year, setYear] = useState("");
+
   // const ACTIVE_TAB_KEY = "editProgramActiveTab";
   const ACTIVE_TAB_KEY = `activeTab_${location.pathname}`;
 
@@ -114,7 +99,7 @@ export default function EditProgram() {
         setUniversityOptions([
           { label: t("all"), value: "" },
           ...data.map((u: University) => ({
-            label: u.name,
+            label: lang === "th" ? u.name_th : u.name, // ⬅️ FIX: Conditional label assignment
             value: String(u.id),
           })),
         ]);
@@ -144,7 +129,7 @@ export default function EditProgram() {
         setFacultyOptions([
           { label: t("all"), value: "" },
           ...data.map((f: Faculty) => ({
-            label: f.name,
+            label: lang === "th" ? f.name_th : f.name, // ⬅️ FIX: Conditional label assignment if needed
             value: String(f.id),
           })),
         ]);
@@ -177,7 +162,8 @@ export default function EditProgram() {
         setProgramOptions([
           { label: t("all"), value: "" },
           ...(uniquePrograms as Program[]).map((p) => ({
-            label: p.program_name_en,
+            label:
+              lang === "th" ? p.program_shortname_th : p.program_shortname_en, // ⬅️ FIX: Conditional label assignment if needed
             value: String(p.program_code),
           })),
         ]);

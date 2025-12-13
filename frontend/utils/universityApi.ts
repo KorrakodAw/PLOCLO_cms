@@ -42,3 +42,11 @@ export async function createUniversity(
 
   return res.data;
 }
+
+export async function getUniversityById(token: string, universityId: string) {
+  const res = await apiClient.get(`/university/${universityId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  return res.data;
+}

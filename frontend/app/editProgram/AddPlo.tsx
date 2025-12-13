@@ -398,7 +398,7 @@ export default function AddPlo({
       render: (value) => (lang === "en" ? Number(value) - 543 : value),
     },
     {
-      header: "Actions",
+      header: t("actions"),
       accessor: "id",
       actions: [
         {

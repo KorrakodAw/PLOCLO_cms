@@ -122,4 +122,32 @@ router.patch("/:id", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/:id", authenticateToken, async (req, res) => {
+  const universityId = parseInt(req.params.id, 10);
+
+  if (isNaN(universityId)) {
+    return res.status(400).json({ error: "Invalid university ID" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT id, name, name_th, abbreviation, abbreviation_th
+       FROM university
+       WHERE id = $1`,
+      [universityId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "University not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Database error:", err);
+    res
+      .status(500)
+      .json({ error: "Unable to retrieve university information" });
+  }
+});
+
 export default router;

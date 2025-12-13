@@ -18,9 +18,9 @@ export default function HomePage() {
       ) : (
         <>
           <h1 className="text-3xl font-bold mb-4">
-            Welcome, {user?.username || "User"} 👋
+            {t("welcome")}, {user?.username || "User"} 👋
           </h1>
-          <p className="text-gray-600">You are logged in</p>
+          <p className="text-gray-600">{t("you are logged in")}</p>
         </>
       )}
     </div>

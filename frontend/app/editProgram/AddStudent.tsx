@@ -292,7 +292,7 @@ export default function AddStudent({
       accessor: "id",
       actions: [
         {
-          label: t("Edit"),
+          label: t("edit"),
           color: "blue",
           hoverColor: "blue",
           onClick: (row: Student) => {
@@ -301,7 +301,7 @@ export default function AddStudent({
           },
         },
         {
-          label: t("Delete"),
+          label: t("delete"),
           color: "red",
           hoverColor: "red",
           onClick: (row: Student) => {

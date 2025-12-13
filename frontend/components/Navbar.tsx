@@ -14,12 +14,17 @@ import Image from "next/image";
 interface NavbarProps {
   children?: ReactNode;
   isLoggedIn: boolean;
+  setLoading: (isLoading: boolean) => void; // 💡 ADDED
 }
 
 const LOGOUT_ICON_DEFAULT = "/images/icons/logout_black.png";
 const LOGOUT_ICON_HOVER = "/images/icons/logout.png";
 
-export default function Navbar({ children, isLoggedIn }: NavbarProps) {
+export default function Navbar({
+  children,
+  isLoggedIn,
+  setLoading,
+}: NavbarProps) {
   const pathname = usePathname();
   const isActive = pathname === "/";
   const [isHovered, setIsHovered] = useState(false);
@@ -29,10 +34,16 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
   const { logout, user } = useAuth();
   // สมมติ user = { id: 1, role: "admin" }
 
+  const handleNavClick = () => {
+    setLoading(true);
+  };
+
   return (
     <aside className="w-52 min-h-screen p-6 shadow-2xl fixed top-0 left-0 z-10">
+      {/* {loading && <LoadingOverlay />} */}
       <Link
         href="/"
+        onClick={handleNavClick}
         className={`block text-[40px] font-extrabold mb-8 transition-colors duration-300
           ${isActive ? "text-orange-500" : "text-black hover:text-orange-500"}`}
       >
@@ -43,18 +54,26 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
         <ul>
           {isLoggedIn && (
             <>
-              <NavLink href="/viewChart">{t("analytics")}</NavLink>
+              <NavLink href="/viewChart" onClick={handleNavClick}>
+                {t("analytics")}
+              </NavLink>
               {["admin", "instructor"].includes(user?.role || "") && (
                 <>
-                  <NavLink href="/editProgram">{t("programs")}</NavLink>
-                  <NavLink href="/editCourse">{t("courses")}</NavLink>
+                  <NavLink href="/editProgram" onClick={handleNavClick}>
+                    {t("programs")}
+                  </NavLink>
+                  <NavLink href="/editCourse" onClick={handleNavClick}>
+                    {t("courses")}
+                  </NavLink>
                 </>
               )}
               {/* ✅ เฉพาะ Admin */}
               {["admin"].includes(user?.role || "") && (
                 <>
-                  <NavLink href="/manageAccount">{t("accounts")}</NavLink>
-                  <NavLink href="/manageUniversity">
+                  <NavLink href="/manageAccount" onClick={handleNavClick}>
+                    {t("accounts")}
+                  </NavLink>
+                  <NavLink href="/manageUniversity" onClick={handleNavClick}>
                     {t("universities")}
                   </NavLink>
                 </>
@@ -64,7 +83,9 @@ export default function Navbar({ children, isLoggedIn }: NavbarProps) {
             </>
           )}
 
-          <NavLink href="/aboutData">{t("about")}</NavLink>
+          <NavLink href="/aboutData" onClick={handleNavClick}>
+            {t("about")}
+          </NavLink>
 
           <div className="fixed bottom-0 center flex flex-col justify-between items-center p-4 z-40">
             <LanguageSwitcher />

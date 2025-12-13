@@ -11,26 +11,11 @@ import { useTranslation } from "react-i18next";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import TabButton from "../../components/TabButton";
 
-import { getUniversities } from "../../utils/universityApi";
-import { getFaculties } from "../../utils/facultyApi";
-import { getPrograms } from "../../utils/programApi";
+import { getUniversities, University } from "../../utils/universityApi";
+import { getFaculties, Faculty } from "../../utils/facultyApi";
+import { getPrograms, Program } from "../../utils/programApi";
 import { Course } from "../../utils/courseApi";
-
-interface University {
-  name: string;
-  id: string;
-}
-
-interface Faculty {
-  name: string;
-  id: string;
-}
-
-interface Program {
-  program_name_en: string;
-  program_code: string;
-  program_year: number;
-}
+import { apiClient } from "@/utils/apiClient";
 
 export default function EditCourse() {
   const { t, i18n } = useTranslation("common");
@@ -69,16 +54,14 @@ export default function EditCourse() {
     { label: "2", value: "2" },
     { label: "3", value: "3" },
   ]);
-  const [courseOptions, setCourseOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
+  const [, setCourseOptions] = useState<{ label: string; value: string }[]>([]);
 
   const tabs = [
     { id: "general", label: t("general information") },
-    { id: "clo", label: "course learning outcomes (CLO)" },
-    { id: "clo-plo-mapping", label: "CLO-PLO mapping" },
-    { id: "assignment", label: "Assignment mapping" },
-    { id: "course-clo-mapping", label: "Course-CLO mapping" },
+    { id: "clo", label: t("course learning outcomes (CLO)") },
+    { id: "clo-plo-mapping", label: t("clo-plo mapping") },
+    { id: "assignment", label: t("assignment mapping") },
+    { id: "course-clo-mapping", label: t("course-clo mapping") },
   ];
 
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -114,7 +97,7 @@ export default function EditCourse() {
         setUniversityOptions([
           { label: t("all"), value: "" },
           ...data.map((u: University) => ({
-            label: u.name,
+            label: lang === "th" ? u.name_th : u.name, // ⬅️ FIX: Conditional label assignment
             value: String(u.id),
           })),
         ]);
@@ -155,13 +138,13 @@ export default function EditCourse() {
         setFacultyOptions([
           { label: t("all"), value: "" },
           ...data.map((f: Faculty) => ({
-            label: f.name,
+            label: lang === "th" ? f.name_th : f.name, // ⬅️ FIX: Conditional label assignment if needed
             value: String(f.id),
           })),
         ]);
       })
       .catch(() => setFacultyOptions([{ label: t("all"), value: "" }]));
-  }, [university, t]);
+  }, [university, t, lang]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -184,7 +167,8 @@ export default function EditCourse() {
         setProgramOptions([
           { label: t("all"), value: "" },
           ...(uniquePrograms as Program[]).map((p) => ({
-            label: p.program_name_en,
+            label:
+              lang === "th" ? p.program_shortname_th : p.program_shortname_en, // ⬅️ FIX: Conditional label assignment if needed
             value: String(p.program_code),
           })),
         ]);
@@ -246,20 +230,13 @@ export default function EditCourse() {
     // Fetch courses based on selected filters
     const fetchCourses = async () => {
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/course/paginate?facultyId=${faculty}&programCode=${program}&year=${year}&limit=10`,
+        const data = await apiClient.get(
+          `/courses?facultyId=${faculty}&programCode=${program}&year=${year}`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
 
-        if (!res.ok) {
-          throw new Error("Failed to fetch courses");
-        }
-
-        const data = await res.json();
         setCourseOptions([
           { label: t("all"), value: "" },
           ...data.data.map((course: Course) => ({
@@ -353,7 +330,7 @@ export default function EditCourse() {
             disabled={!year}
           />
           <DropdownSelect
-            label={"section"}
+            label={t("section")}
             value={section}
             onChange={(e) => setSection(e.target.value)}
             options={sectionOptions}
