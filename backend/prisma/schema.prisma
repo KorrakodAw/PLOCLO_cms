@@ -67,8 +67,9 @@ model course {
   program_id Int
   section    Int
   semester   Int     @default(1)
-  program    program     @relation(fields: [program_id], references: [id], onDelete: Cascade) 
-  
+  program    program     @relation(fields: [program_id], references: [id], onDelete: Cascade)
+
+  students       StudentOnCourse[]
   clo        clo[]
   assignments Assignment[] 
 
@@ -76,13 +77,15 @@ model course {
 }
 
 model student {
-  id                Int       @id @default(autoincrement())
-  student_id        String    @unique @postgres.VarChar(20)
-  first_name        String    @postgres.VarChar(100)
-  last_name         String    @postgres.VarChar(100)
-  program_id        Int
-  created_at        DateTime? @default(now()) @postgres.Timestamp(6)
-  program           program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+  id             Int       @id @default(autoincrement())
+  student_id     String    @unique @postgres.VarChar(20)
+  first_name     String    @postgres.VarChar(100)
+  last_name      String    @postgres.VarChar(100)
+  program_id     Int
+  created_at     DateTime? @default(now()) @postgres.Timestamp(6)
+  program        program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+
+  courses        StudentOnCourse[] 
 
   @@map("student")
 }
@@ -94,6 +97,7 @@ model plo {
   name       String
   engname    String
   program    program @relation(fields: [program_id], references: [id], onDelete: Cascade)
+
   clo_plo_mappings clo_plo_mapping[]
 
   @@map("plo")
@@ -106,6 +110,7 @@ model clo {
   name_th   String  @postgres.VarChar(255)
   course_id Int
   course    course  @relation(fields: [course_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+
   clo_plo_mappings clo_plo_mapping[]
 
   @@map("clo")
@@ -140,3 +145,14 @@ model Assignment {
   @@map("assignment") // Ensures the table name is lowercase 'assignment' in Postgres
 }
 
+model StudentOnCourse {
+  student_id Int
+  course_id  Int
+  assignedAt DateTime @default(now())
+
+  student    student  @relation(fields: [student_id], references: [id])
+  course     course   @relation(fields: [course_id], references: [id])
+
+  @@id([student_id, course_id])
+  @@map("student_on_course")
+}

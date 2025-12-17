@@ -139,54 +139,56 @@ export default function ManageAccount() {
 
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
-      <div className="max-w-[1100px] h-full flex flex-col mx-auto">
-        <h1 className="text-2xl font-extralight mb-4">Manage Account</h1>
+      <div className="max-w-[1400px] h-full flex flex-col mx-auto">
+        <div className="p-5 md:p-8 min-h-screen">
+          <h1 className="text-2xl font-extralight mb-4">Manage Account</h1>
 
-        {/* TABLE */}
-        <Table columns={manageAccoutColumns} data={users} />
+          {/* TABLE */}
+          <Table columns={manageAccoutColumns} data={users} />
 
-        {/* ============================
+          {/* ============================
           EDIT POPUP
         ============================ */}
 
-        {showEditPopup && selectedUser && (
-          <FormEditPopup
-            title="Edit User"
-            data={selectedUser}
-            fields={[
-              { label: "Username", key: "username", type: "text" },
-              { label: "Email", key: "email", type: "email" },
-              {
-                label: "Role",
-                key: "role",
-                type: "select",
-                options: ["admin", "instructor", "student"],
-              },
-            ]}
-            onChange={(updated) => setSelectedUser(updated)}
-            onSave={saveEdit}
-            onClose={() => setShowEditPopup(false)}
-          />
-        )}
+          {showEditPopup && selectedUser && (
+            <FormEditPopup
+              title="Edit User"
+              data={selectedUser}
+              fields={[
+                { label: "Username", key: "username", type: "text" },
+                { label: "Email", key: "email", type: "email" },
+                {
+                  label: "Role",
+                  key: "role",
+                  type: "select",
+                  options: ["admin", "instructor", "student"],
+                },
+              ]}
+              onChange={(updated) => setSelectedUser(updated)}
+              onSave={saveEdit}
+              onClose={() => setShowEditPopup(false)}
+            />
+          )}
 
-        {/* ============================
+          {/* ============================
           DELETE CONFIRM POPUP
         ============================ */}
-        <AlertPopup
-          isOpen={showDeletePopup}
-          type="confirm"
-          title="Delete User"
-          message="Are you sure you want to delete this user?"
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={confirmDelete}
-          onCancel={() => {
-            setShowDeletePopup(false);
-            setUserToDelete(null);
-          }}
-        />
+          <AlertPopup
+            isOpen={showDeletePopup}
+            type="confirm"
+            title="Delete User"
+            message="Are you sure you want to delete this user?"
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={confirmDelete}
+            onCancel={() => {
+              setShowDeletePopup(false);
+              setUserToDelete(null);
+            }}
+          />
 
-        <ToastElement />
+          <ToastElement />
+        </div>
       </div>
     </ProtectedRoute>
   );

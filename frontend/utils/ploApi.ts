@@ -1,5 +1,29 @@
 import { apiClient } from "./apiClient";
 
+export interface PLO {
+  id: string;
+  code: string;
+  name: string;
+  engname: string;
+  program_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PLOInputExcel {
+  code: string;
+  Code: string;
+  PLO_code: string;
+  nameTh: string;
+  name: string;
+  PLO_name: string;
+  ชื่อไทย: string;
+  nameEn: string;
+  engname: string;
+  PLO_engname: string;
+  ชื่ออังกฤษ: string;
+}
+
 export async function addPlo(
   {
     code,

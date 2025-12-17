@@ -7,7 +7,7 @@ export default function LoadingOverlay() {
     // FIX: Change 'fixed' to 'absolute' to contain it within the 'relative' parent
     // and use 'h-full w-full' to cover that parent completely.
     <div
-      className="absolute inset-0 z-[9999] h-full w-full flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm transition-opacity duration-300"
+      className="fixed inset-0 z-[9999] h-full w-full flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm transition-opacity duration-300"
       // Changed bg opacity slightly to ensure coverage of background
     >
       {/* Spinner and text content remain the same */}

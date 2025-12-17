@@ -3,10 +3,17 @@
 import { useAuth } from "./context/AuthContext";
 import LoginForm from "../components/LoginForm";
 import { useTranslation } from "react-i18next";
+import LoadingOverlay from "../components/LoadingOverlay";
+import { useState } from "react";
 
 export default function HomePage() {
   const { isLoggedIn, user } = useAuth();
   const { t } = useTranslation("common");
+  const [loading, setLoading] = useState(false);
+
+  if (loading) {
+    return <LoadingOverlay />;
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-center">

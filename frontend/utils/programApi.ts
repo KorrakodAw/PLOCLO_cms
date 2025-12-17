@@ -31,6 +31,7 @@ export async function getPrograms(token: string, facultyId?: string) {
   return res.data;
 }
 
+// Corrected getProgramsPaginated utility
 export async function getProgramsPaginated(
   token: string,
   page = 1,
@@ -38,17 +39,33 @@ export async function getProgramsPaginated(
   filters?: {
     universityId?: string;
     facultyId?: string;
-    programId?: string;
+    programId?: string; // This filter is likely for *Program ID* (the database ID)
     year?: string;
+    program_code_filter?: string; // 💡 NEW: Use a clear name for the code filter
   }
 ) {
+  // Build a clean map of query parameters to send to the backend
+  const paramsToSend: Record<string, any> = {
+    page,
+    limit,
+  };
+
+  if (filters) {
+    if (filters.universityId) paramsToSend.universityId = filters.universityId;
+    if (filters.facultyId) paramsToSend.facultyId = filters.facultyId;
+    if (filters.programId) paramsToSend.programId = filters.programId;
+    if (filters.year) paramsToSend.year = filters.year;
+
+    // 💡 CRITICAL FIX: If you pass the program code for filtering the list,
+    // it must use the backend's expected parameter name, which was programId in your backend logic.
+    // If you are using program_code_filter as the input, map it here:
+    if (filters.program_code_filter)
+      paramsToSend.programId = filters.program_code_filter;
+  }
+
   const res = await apiClient.get("/program/paginate", {
     headers: { Authorization: `Bearer ${token}` },
-    params: {
-      page,
-      limit,
-      ...filters,
-    },
+    params: paramsToSend,
   });
   return res.data;
 }

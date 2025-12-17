@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import React, { ReactNode } from "react";
 import NavLink from "../components/NavLink";
@@ -33,6 +33,12 @@ export default function Navbar({
   // 👇 ดึง role มาจาก context
   const { logout, user } = useAuth();
   // สมมติ user = { id: 1, role: "admin" }
+ 
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsHovered(false);
+    }
+  }, [isLoggedIn]);
 
   const handleNavClick = () => {
     setLoading(true);

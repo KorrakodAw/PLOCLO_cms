@@ -207,74 +207,6 @@ export default function AddStudent({
       .finally(() => setLoadingStudent(false));
   };
 
-  // 🧩 Add from Excel
-  const handleAddStudentExcel = async (rows: Student[]) => {
-    if (!initialized) return alert("Auth not initialized.");
-    if (!isLoggedIn || !token) return alert("Please log in again.");
-    if (!selectedProgram) return alert("Please select a program first.");
-
-    let successCount = 0;
-    let failCount = 0;
-    const errorDetails: string[] = [];
-
-    // Inject selectedProgram as program_id for every row
-    const rowsWithProgram = rows.map((row) => ({
-      ...row,
-      program_id: selectedProgram,
-      year_of_admission: Number(row.year_of_admission ?? row.year),
-    }));
-
-    for (const [i, row] of rowsWithProgram.entries()) {
-      const student_id = row.student_id;
-      const first_name = row.first_name;
-      const last_name = row.last_name;
-      const program_id = row.program_id;
-
-      // ✅ Validate
-      if (!student_id || !first_name || !last_name || !program_id) {
-        failCount++;
-        errorDetails.push(`Row ${i + 1}: missing required fields`);
-        continue;
-      }
-
-      const payload = {
-        student_id: String(student_id),
-        first_name: String(first_name),
-        last_name: String(last_name),
-        program_id,
-      };
-
-      try {
-        await addStudent(payload, token);
-        successCount++;
-        fetchStudents();
-        setPage(1); // Reset to first page to see new entries
-      } catch (err) {
-        failCount++;
-        if (err instanceof Error) {
-          errorDetails.push(`Row ${i + 1}: ${err.message}`);
-        } else if (typeof err === "string") {
-          // Handle cases where a string might be thrown
-          errorDetails.push(`Row ${i + 1}: ${err}`);
-        } else {
-          // Fallback for non-Error, non-string throws
-          errorDetails.push(`Row ${i + 1}: An unknown error occurred`);
-        }
-      }
-    }
-
-    showToast(
-      `Excel upload completed: ${successCount} succeeded, ${failCount} failed.`,
-      failCount > 0 ? "error" : "success"
-    );
-    if (failCount > 0) {
-      showToast(
-        `Some rows failed to add:\n${errorDetails.join("\n")}`,
-        "error"
-      );
-    }
-  };
-
   const studentColumns: Column<Student>[] = [
     { header: t("student id"), accessor: "student_id" },
     {
@@ -370,6 +302,13 @@ export default function AddStudent({
     }
   };
 
+  const resetSelection = () => {
+    setSelectedUniversity("");
+    setSelectedFaculty("");
+    setSelectedProgram("");
+    setSelectedYear("");
+  };
+
   // 🧩 Add single student manually
   const handleAddStudent = async (data: Record<string, unknown>) => {
     if (!initialized) return;
@@ -387,6 +326,7 @@ export default function AddStudent({
 
     try {
       await addStudent(payload, token);
+      resetSelection();
       fetchStudents();
       showToast("Student added successfully!", "success");
       setPage(1); // Reset to first page to see new entries
@@ -398,6 +338,75 @@ export default function AddStudent({
       } else {
         showToast("Failed to add student: An unknown error occurred", "error");
       }
+    }
+  };
+
+  // 🧩 Add from Excel
+  const handleAddStudentExcel = async (rows: Student[]) => {
+    if (!initialized) return alert("Auth not initialized.");
+    if (!isLoggedIn || !token) return alert("Please log in again.");
+    if (!selectedProgram) return alert("Please select a program first.");
+
+    let successCount = 0;
+    let failCount = 0;
+    const errorDetails: string[] = [];
+
+    // Inject selectedProgram as program_id for every row
+    const rowsWithProgram = rows.map((row) => ({
+      ...row,
+      program_id: selectedProgram,
+      year_of_admission: Number(row.year_of_admission ?? row.year),
+    }));
+
+    for (const [i, row] of rowsWithProgram.entries()) {
+      const student_id = row.student_id;
+      const first_name = row.first_name;
+      const last_name = row.last_name;
+      const program_id = row.program_id;
+
+      // ✅ Validate
+      if (!student_id || !first_name || !last_name || !program_id) {
+        failCount++;
+        errorDetails.push(`Row ${i + 1}: missing required fields`);
+        continue;
+      }
+
+      const payload = {
+        student_id: String(student_id),
+        first_name: String(first_name),
+        last_name: String(last_name),
+        program_id,
+      };
+
+      try {
+        await addStudent(payload, token);
+        successCount++;
+        resetSelection();
+        fetchStudents();
+        setPage(1); // Reset to first page to see new entries
+      } catch (err) {
+        failCount++;
+        if (err instanceof Error) {
+          errorDetails.push(`Row ${i + 1}: ${err.message}`);
+        } else if (typeof err === "string") {
+          // Handle cases where a string might be thrown
+          errorDetails.push(`Row ${i + 1}: ${err}`);
+        } else {
+          // Fallback for non-Error, non-string throws
+          errorDetails.push(`Row ${i + 1}: An unknown error occurred`);
+        }
+      }
+    }
+
+    showToast(
+      `Excel upload completed: ${successCount} succeeded, ${failCount} failed.`,
+      failCount > 0 ? "error" : "success"
+    );
+    if (failCount > 0) {
+      showToast(
+        `Some rows failed to add:\n${errorDetails.join("\n")}`,
+        "error"
+      );
     }
   };
 

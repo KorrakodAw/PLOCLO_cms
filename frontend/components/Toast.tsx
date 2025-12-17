@@ -71,7 +71,7 @@ export function Toast({
         </div>
 
         {/* 2. Message Content */}
-        <div className="flex-1 text-sm font-medium leading-relaxed">
+        <div className="flex-1 mt-0.5 text-sm font-medium leading-relaxed">
           {message}
         </div>
 

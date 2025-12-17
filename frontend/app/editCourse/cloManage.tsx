@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 import AlertPopup from "../../components/AlertPopup";
 import FormEditPopup from "../../components/EditPopup";
 import { apiClient } from "../../utils/apiClient";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 // --- Interfaces ---
 
@@ -98,7 +99,7 @@ export default function CLOManagement({
 
   // Data
   const [clos, setClos] = useState<Array<CLO>>([]);
-  const [, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [selectedCLO, setSelectedCLO] = useState<CLO | null>(null);
   const [showEditPopup, setShowEditPopup] = useState(false);
@@ -602,6 +603,7 @@ export default function CLOManagement({
 
   return (
     <div className="mt-5 p-5">
+      {loading && <LoadingOverlay />}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-extralight">{"clo manage"}</h1>
         <AddButton

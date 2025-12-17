@@ -208,6 +208,13 @@ export default function AddPlo({
       .finally(() => setLoadingPlos(false));
   };
 
+  const resetSelection = () => {
+    setSelectedUniversity("");
+    setSelectedFaculty("");
+    setSelectedProgram("");
+    setSelectedYear("");
+  };
+
   // ฟังก์ชันสำหรับเพิ่ม PLO จาก Excel
   const handleAddPloExcel = async (rows: any[]) => {
     if (!initialized) {
@@ -274,6 +281,7 @@ export default function AddPlo({
     showToast(summary, failCount > 0 ? "error" : "success");
     // รีเฟรชรายการ PLO หลังเพิ่ม
     try {
+      resetSelection();
       fetchPlos();
       setPage(1);
     } catch {
@@ -323,6 +331,7 @@ export default function AddPlo({
         },
         token
       );
+      resetSelection();
       fetchPlos();
       showToast(t("PLO added successfully!"), "success");
       setPage(1);

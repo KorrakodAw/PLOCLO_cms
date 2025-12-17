@@ -23,10 +23,12 @@ import FormEditPopup from "../../components/EditPopup";
 import AlertPopup from "../../components/AlertPopup";
 import { apiClient } from "../../utils/apiClient";
 
+import { useRouter } from "next/navigation";
+
 interface ProgramManagementProps {
   universityId?: string;
   facultyId?: string;
-  programId?: string; // Now this will be program_code instead of id
+  programId?: string;
   year?: string;
 }
 
@@ -39,6 +41,7 @@ export default function ProgramManagement({
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn } = useAuth();
+  const router = useRouter();
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [universityOptions, setUniversityOptions] = useState<
@@ -145,6 +148,7 @@ export default function ProgramManagement({
 
   const fetchPrograms = async () => {
     if (!isLoggedIn || !token) return;
+    setLoading(true);
 
     try {
       const data = await getProgramsPaginated(token, page, limit, {
@@ -153,9 +157,30 @@ export default function ProgramManagement({
         programId,
         year,
       });
-      setPrograms(data.data || data); // Handle both response types
-      const total = data.total || (Array.isArray(data) ? data.length : 1);
-      setTotalPages(Math.ceil(total / limit));
+
+      const programData = data.data || data;
+      let uniquePrograms = programData;
+
+      if (Array.isArray(programData)) {
+        const uniqueProgramsMap = new Map();
+
+        programData.forEach((program: Program) => {
+          if (!uniqueProgramsMap.has(program.program_code)) {
+            uniqueProgramsMap.set(program.program_code, program);
+          }
+        });
+
+        uniquePrograms = Array.from(uniqueProgramsMap.values());
+
+        setPrograms(uniquePrograms);
+
+        const currentUniqueCount = uniquePrograms.length;
+
+        setTotalPages(Math.ceil(currentUniqueCount / limit));
+      } else {
+        setPrograms([]);
+        setTotalPages(1);
+      }
     } catch (err) {
       if (err instanceof Error) {
         showToast("Error fetching programs: " + err.message, "error");
@@ -167,10 +192,14 @@ export default function ProgramManagement({
     }
   };
 
+  const resetSelection = () => {
+    setSelectedFaculty("");
+    setSelectedUniversity("");
+    setSelectedYear("");
+  };
+
   // Add single program
   const handleAddProgram = async (data: Record<string, unknown>) => {
-    // Prefer faculty from the submitted payload (modal), then parent's
-    // selectedFaculty state, then the facultyId prop.
     const facultyToUse =
       (data && (data as any).faculty_id) || selectedFaculty || facultyId;
     const universityToUse =
@@ -194,6 +223,7 @@ export default function ProgramManagement({
       };
       if (universityToUse) payload.university_id = universityToUse;
       await addProgram(payload as any, token!);
+      resetSelection();
       fetchPrograms();
       showToast(t("Program added successfully!"), "success");
       setPage(1);
@@ -248,6 +278,7 @@ export default function ProgramManagement({
       console.log("Sending to API:", formattedRows);
 
       await bulkUploadPrograms(formattedRows, token!);
+      resetSelection();
       fetchPrograms();
       showToast("Programs uploaded successfully!", "success");
       setPage(1);
@@ -274,33 +305,42 @@ export default function ProgramManagement({
     lang === "en"
       ? { header: "Abbrev.", accessor: "program_shortname_en" }
       : { header: "ชื่อย่อ", accessor: "program_shortname_th" },
-    {
-      header: t("year"),
-      accessor: "program_year",
-      render: (value: any) => (lang === "en" ? Number(value) - 543 : value),
-    },
+    // {
+    //   header: t("year"),
+    //   accessor: "program_year",
+    //   render: (value: any) => (lang === "en" ? Number(value) - 543 : value),
+    // },
     {
       header: t("actions"),
-      accessor: "id",
+      accessor: "program_code",
       actions: [
         {
-          label: t("edit"),
+          label: t("view details"),
           color: "blue",
           hoverColor: "blue",
           onClick: (row: Program) => {
-            setSelectedProgram(row);
-            setShowEditPopup(true);
+            router.push(`editProgram/${row.program_code}`);
+            setLoading(true);
           },
         },
-        {
-          label: t("delete"),
-          color: "red",
-          hoverColor: "red",
-          onClick: (row: Program) => {
-            setProgramToDelete(row);
-            setShowDeletePopup(true);
-          },
-        },
+        // {
+        //   label: t("edit"),
+        //   color: "blue",
+        //   hoverColor: "blue",
+        //   onClick: (row: Program) => {
+        //     setSelectedProgram(row);
+        //     setShowEditPopup(true);
+        //   },
+        // },
+        // {
+        //   label: t("delete"),
+        //   color: "red",
+        //   hoverColor: "red",
+        //   onClick: (row: Program) => {
+        //     setProgramToDelete(row);
+        //     setShowDeletePopup(true);
+        //   },
+        // },
       ],
     },
   ];

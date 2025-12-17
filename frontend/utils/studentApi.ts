@@ -1,12 +1,21 @@
 import { apiClient } from "../utils/apiClient";
 
+export interface Student {
+  id: string;
+  student_id: string;
+  program_id: string;
+  first_name: string;
+  last_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface StudentInput {
   student_id: string;
   program_id: number | string;
   first_name: string;
   last_name: string;
 }
-
 
 /**
  * ✅ Get paginated students

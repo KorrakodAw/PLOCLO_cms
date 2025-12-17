@@ -168,7 +168,7 @@ export default function ManageUniversity() {
 
   return (
     // 1. Relative Container for Local Loading Overlay
-    <div className="mt-5 p-5 absolute min-h-[500px]">
+    <div className="p-5 md:p-8 min-h-screen">
       {/* 2. Loading Overlay (Rendered conditionally on local component data fetch) */}
       {loading && <LoadingOverlay />}
 

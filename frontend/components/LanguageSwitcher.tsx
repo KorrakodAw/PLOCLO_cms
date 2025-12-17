@@ -1,19 +1,20 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image"; // Import Next.js Image component
 
 const LANGUAGES = [
   { code: "th", labelKey: "ไทย", flag: "/images/flags/thailand.png" },
   { code: "en", labelKey: "English", flag: "/images/flags/united-states.png" },
-  { code: "jp", labelKey: "日本語", flag: "/images/flags/japan.png" },
-  { code: "zh", labelKey: "中文", flag: "/images/flags/china.png" },
+  // { code: "jp", labelKey: "日本語", flag: "/images/flags/japan.png" },
+  // { code: "zh", labelKey: "中文", flag: "/images/flags/china.png" },
 ];
 
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false); // State to manage dropdown visibility
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentLang =
     LANGUAGES.find((lang) => lang.code === i18n.language) || LANGUAGES[0];
@@ -23,8 +24,23 @@ export default function LanguageSwitcher() {
     setIsOpen(false); // Close dropdown after selection
   };
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div className="relative inline-block text-left z-50">
+    <div className="relative inline-block text-left z-50" ref={dropdownRef}>
       {/* --- 1. Display Button (Now at the bottom of its parent using mt-auto) --- */}
       <button
         type="button"
