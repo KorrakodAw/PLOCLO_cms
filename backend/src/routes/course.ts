@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
+import { sqltag } from "@prisma/client/runtime/library";
 
 const router = Router();
 
@@ -50,99 +51,84 @@ router.get("/paginate", authenticateToken, async (req, res) => {
     const year = req.query.year as string | undefined;
     const semester = req.query.semester as string | undefined;
     const section = req.query.section as string | undefined;
-    const course = req.query.course as string | undefined;
+    const courseCode = req.query.courseCode as string | undefined;
+
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
 
-    let query = `
-      SELECT 
-        course.id, course.code, course.name, course.name_th, course.program_id, course.section, course.semester
+    // 1. Corrected baseQuery: Removed hardcoded WHERE 1=1 to avoid double WHERE keywords
+    let baseQuery = `
       FROM course
       JOIN program ON course.program_id = program.id
       JOIN faculty ON program.faculty_id = faculty.id
       JOIN university ON faculty.university_id = university.id
-      WHERE 1=1    
     `;
+
     const params: any[] = [];
+    const conditions: string[] = [];
 
-    if (universityId) {
-      params.push(universityId);
-      query += ` AND university.id = $${params.length}`;
-    }
-    if (facultyId) {
-      params.push(facultyId);
-      query += ` AND faculty.id = $${params.length}`;
-    }
-    if (year) {
-      params.push(year);
-      query += ` AND program.program_year = $${params.length}`;
-    }
-    if (programId) {
-      params.push(programId);
-      query += ` AND program.program_code = $${params.length}`;
-    }
+    // Helper to add conditions with correct SQL parameter numbering
+    const addCondition = (column: string, value: any) => {
+      params.push(value);
+      conditions.push(`${column} = $${params.length}`);
+    };
 
-    if (semester) {
-      params.push(semester);
-      query += ` AND course.semester = $${params.length}`;
-    }
-    if (section) {
-      params.push(section);
-      query += ` AND course.section = $${params.length}`;
-    }
-    query += ` ORDER BY course.id ASC LIMIT $${params.length + 1} OFFSET $${
-      params.length + 2
-    }`;
-    params.push(limit, offset);
+    // 2. Corrected Aliases: Using actual table names since no short aliases were defined in JOINs
+    if (universityId) addCondition("university.id", universityId);
+    if (facultyId) addCondition("faculty.id", facultyId);
+    if (year) addCondition("program.program_year", year);
+    if (programId) addCondition("program.program_code", programId); // Assuming program_code is the column name
+    if (semester) addCondition("course.semester", semester);
+    if (section) addCondition("course.section", section);
+    if (courseCode) addCondition("course.code", courseCode);
 
-    const result = await pool.query(query, params);
+    // Build the final WHERE clause dynamically
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    let countQuery = `
+    // 3. Final Data Query: Combined parts and ensured course.program_id is unique
+    const dataQuery = `
+      SELECT 
+        course.id,
+        course.code,
+        course.name,
+        course.name_th,
+        course.program_id,
+        course.section,
+        course.semester
+      ${baseQuery}
+      ${whereClause}
+      ORDER BY course.id DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    const countQuery = `
       SELECT COUNT(*) AS total
-      FROM course
-      JOIN program ON course.program_id = program.id
-      JOIN faculty ON program.faculty_id = faculty.id
-      JOIN university ON faculty.university_id = university.id
-      WHERE 1=1
-   `;
-    const countParams: any[] = [];
-    if (universityId) {
-      countParams.push(universityId);
-      countQuery += ` AND university.id = $${countParams.length}`;
-    }
-    if (facultyId) {
-      countParams.push(facultyId);
-      countQuery += ` AND faculty.id = $${countParams.length}`;
-    }
-    if (year) {
-      countParams.push(year);
-      countQuery += ` AND program.program_year = $${countParams.length}`;
-    }
-    if (programId) {
-      countParams.push(programId);
-      countQuery += ` AND program.program_code = $${countParams.length}`;
-    }
+      ${baseQuery}
+      ${whereClause}
+    `;
 
-    if (semester) {
-      countParams.push(semester);
-      countQuery += ` AND course.semester = $${countParams.length}`;
-    }
-    if (section) {
-      countParams.push(section);
-      countQuery += ` AND course.section = $${countParams.length}`;
-    }
+    // 4. Parallel Execution: Better performance
+    const [dataResult, countResult] = await Promise.all([
+      pool.query(dataQuery, [...params, limit, offset]),
+      pool.query(countQuery, params),
+    ]);
 
-    const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0].total, 10);
+    const totalPages = Math.ceil(total / limit);
 
     res.json({
-      data: result.rows,
-      total,
-      page,
-      limit,
+      data: dataResult.rows,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+      },
     });
-  } catch (err: any) {
+  } catch (err) {
+    console.error("Pagination Error:", err);
     res.status(500).json({
       error: "Unable to retrieve paginated course information",
     });

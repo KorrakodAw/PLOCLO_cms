@@ -1,46 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// import { useEffect, useState } from "react";
 
-import TabButton from "../../components/TabButton";
+// import TabButton from "../../components/TabButton";
 import ManageUniversity from "./universityManage";
 import ProtectedRoute from "../../components/ProtectedRoute";
 
 export default function ManageUniversityPage() {
-  const ACTIVE_TAB_KEY = `activeTab_${
-    typeof window !== "undefined" ? window.location.pathname : ""
-  }`;
+  // const ACTIVE_TAB_KEY = `activeTab_${
+  //   typeof window !== "undefined" ? window.location.pathname : ""
+  // }`;
 
-  const tabs = [{ id: "university", label: "Universities" }];
+  // const tabs = [{ id: "university", label: "Universities" }];
 
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const hash = window.location.hash
-          ? window.location.hash.replace(/^#/, "")
-          : "";
-        const valid = ["university", "faculty"];
-        if (hash && valid.includes(hash)) return hash;
-        const stored = localStorage.getItem(ACTIVE_TAB_KEY);
-        if (stored && valid.includes(stored)) return stored;
-      }
-    } catch {
-      // ignore
-    }
-    return "university";
-  });
+  // const [activeTab, setActiveTab] = useState<string>(() => {
+  //   try {
+  //     if (typeof window !== "undefined") {
+  //       const hash = window.location.hash
+  //         ? window.location.hash.replace(/^#/, "")
+  //         : "";
+  //       const valid = ["university", "faculty"];
+  //       if (hash && valid.includes(hash)) return hash;
+  //       const stored = localStorage.getItem(ACTIVE_TAB_KEY);
+  //       if (stored && valid.includes(stored)) return stored;
+  //     }
+  //   } catch {
+  //     // ignore
+  //   }
+  //   return "university";
+  // });
 
-  useEffect(() => {
-    try {
-      // update hash without adding history entry
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", `#${activeTab}`);
-      }
-      localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
-    } catch {
-      // ignore localStorage/window errors
-    }
-  }, [ACTIVE_TAB_KEY, activeTab]);
+  // useEffect(() => {
+  //   try {
+  //     // update hash without adding history entry
+  //     if (typeof window !== "undefined") {
+  //       window.history.replaceState(null, "", `#${activeTab}`);
+  //     }
+  //     localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
+  //   } catch {
+  //     // ignore localStorage/window errors
+  //   }
+  // }, [ACTIVE_TAB_KEY, activeTab]);
+
   return (
     <ProtectedRoute roles={["admin", "instructor"]}>
       <div className="max-w-[1400px] h-full flex flex-col mx-auto">
@@ -61,8 +62,8 @@ export default function ManageUniversityPage() {
           ))}
         </div>
         <hr /> */}
-
-        {activeTab === "university" && <ManageUniversity />}
+        <ManageUniversity />
+        {/* {activeTab === "university" && <ManageUniversity />} */}
       </div>
     </ProtectedRoute>
   );

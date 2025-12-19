@@ -389,6 +389,7 @@ export default function EditProgramClient({
     try {
       await addStudent(payload, token);
       fetchStudentsbyProgram(formData.id);
+      setLoading(true);
       showToast("Student added successfully!", "success");
     } catch (err) {
       if (err instanceof Error) {
@@ -407,23 +408,21 @@ export default function EditProgramClient({
     if (!isLoggedIn || !token) return alert("Please log in again.");
     if (!formData) return;
 
+    // 💡 1. เริ่มแสดง Loading ตั้งแต่ก่อนเข้า Loop
+    setLoading(true);
+
     let successCount = 0;
     let failCount = 0;
     const errorDetails: string[] = [];
 
-    // Inject selectedProgram as program_id for every row
     const rowsWithProgram = rows.map((row) => ({
       ...row,
       program_id: formData.id,
     }));
 
     for (const [i, row] of rowsWithProgram.entries()) {
-      const student_id = row.student_id;
-      const first_name = row.first_name;
-      const last_name = row.last_name;
-      const program_id = row.program_id;
+      const { student_id, first_name, last_name, program_id } = row;
 
-      // ✅ Validate
       if (!student_id || !first_name || !last_name || !program_id) {
         failCount++;
         errorDetails.push(`Row ${i + 1}: missing required fields`);
@@ -440,26 +439,30 @@ export default function EditProgramClient({
       try {
         await addStudent(payload, token);
         successCount++;
-
-        fetchStudentsbyProgram(formData.id);
-      } catch (err) {
+        // 💡 2. เอา fetchStudentsbyProgram ออกจากที่นี่ เพื่อกันการดึงข้อมูลซ้ำซ้อน
+      } catch (err: unknown) {
         failCount++;
         if (err instanceof Error) {
           errorDetails.push(`Row ${i + 1}: ${err.message}`);
-        } else if (typeof err === "string") {
-          // Handle cases where a string might be thrown
-          errorDetails.push(`Row ${i + 1}: ${err}`);
         } else {
-          // Fallback for non-Error, non-string throws
           errorDetails.push(`Row ${i + 1}: An unknown error occurred`);
         }
       }
     }
 
+    // 💡 3. เรียกข้อมูลใหม่เพียงครั้งเดียวหลังจาก Loop เสร็จสิ้น
+    if (successCount > 0) {
+      await fetchStudentsbyProgram(formData.id);
+    }
+
+    // 💡 4. ปิด Loading เมื่อทำงานเสร็จทั้งหมด
+    setLoading(false);
+
     showToast(
       `Excel upload completed: ${successCount} succeeded, ${failCount} failed.`,
       failCount > 0 ? "error" : "success"
     );
+
     if (failCount > 0) {
       showToast(
         `Some rows failed to add:\n${errorDetails.join("\n")}`,
@@ -546,6 +549,7 @@ export default function EditProgramClient({
                   setSelectedProgramId(e.target.value);
                   fetchPLobyProgram(e.target.value);
                   setShowPloTable(true);
+                  setShowStudentTable(false);
                 }}
                 disabled={duplicatePrograms.length === 0}
               />

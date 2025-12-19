@@ -509,7 +509,7 @@ export default function CloPloMapping() {
               {/* HEADERS: PLOs as Columns + NEW TOTAL COLUMN */}
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="border p-0 left-0 bg-gray-100 z-30 w-[120px] min-w-[120px] h-14 shadow-md">
+                  <th className="border p-0 left-0 bg-gray-100 z-30 w-[100px] min-w-[70px] h-14 shadow-md">
                     {/* Diagonal Box */}
                     <div className="relative w-full h-full">
                       <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -546,7 +546,7 @@ export default function CloPloMapping() {
                   ))}
 
                   {/* 💡 NEW: Total Column Header */}
-                  <th className="border p-2 min-w-[90px] text-center bg-gray-200 font-extrabold text-gray-800 sticky right-0 z-20 shadow-inner">
+                  <th className="border p-2 min-w-[90px] text-center bg-gray-200 font-extrabold text-gray-800  right-0 z-20 shadow-inner">
                     {t("Total (%)")}
                   </th>
                 </tr>

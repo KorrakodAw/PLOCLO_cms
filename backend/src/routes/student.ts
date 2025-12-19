@@ -9,18 +9,28 @@ const router = Router();
  */
 router.get("/", authenticateToken, async (_req, res) => {
   try {
+    const programId = parseInt(_req.query.programId as string);
+
+    if (!programId) {
+      return res.status(400).json({ error: "Program ID is required" });
+    }
+
     const result = await pool.query(
       `SELECT 
         student.id,
         student.student_id,
         student.first_name,
         student.last_name,
-        p.id AS program_id,
+        student.program_id,
+        p.program_shortname_en,
+        p.program_shortname_th,
         p.program_name_en,
         p.program_name_th
-      FROM student student
+      FROM student 
       JOIN program p ON student.program_id = p.id
-      ORDER BY student.id DESC`
+      WHERE student.program_id = $1
+      ORDER BY student.id DESC`,
+      [programId]
     );
     res.json(result.rows);
   } catch (err) {

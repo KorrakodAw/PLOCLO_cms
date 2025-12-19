@@ -31,7 +31,7 @@ export default function ManageUniversity() {
     useState<University | null>(null);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const { t } = useTranslation("common");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Function to refresh data safely
   const fetchUniversities = async () => {
@@ -39,6 +39,7 @@ export default function ManageUniversity() {
     try {
       const data = await getUniversities(token);
       setUniversities(data);
+      setLoading(false);
     } catch (e) {
       console.error(e);
     }
@@ -55,6 +56,7 @@ export default function ManageUniversity() {
       };
       await createUniversity(token!, payload as CreateUniversityPayload);
       showToast("University created successfully", "success");
+      setLoading(true);
       fetchUniversities(); // Refresh instead of reload
     } catch {
       showToast("Failed to create university", "error");

@@ -84,8 +84,8 @@ export default function UniversityDetailPage({
       const data = await apiClient.get("/faculty", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       setFaculties(data.data);
+      setLoading(false);
     } catch (e) {
       console.error(e);
     }
@@ -103,6 +103,7 @@ export default function UniversityDetailPage({
         abbreviation_th: String(data.abbrTh || ""),
       };
       await createFaculty(token!, payload as CreateFacultyPayload);
+      setLoading(true);
       fetchFaculties();
       showToast("Faculty created successfully", "success");
     } catch {

@@ -16,6 +16,7 @@ import AlertPopup from "@/components/AlertPopup";
 import { apiClient } from "@/utils/apiClient";
 
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { useRouter } from "next/navigation";
 
 // interface ProgramOption {
 //   label: string;
@@ -66,6 +67,7 @@ export default function CourseManagement({
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn, initialized } = useAuth();
+  const router = useRouter();
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoadingCourse] = useState(false);
@@ -385,56 +387,82 @@ export default function CourseManagement({
     lang === "en"
       ? { header: "Name", accessor: "name" }
       : { header: "ชื่อหลักสูตร", accessor: "name_th" },
-    { header: "section", accessor: "section" },
     {
       header: "Actions",
-      accessor: "id",
+      accessor: "code",
       actions: [
         {
-          label: t("edit"),
-          color: "blue",
-          hoverColor: "blue",
+          label: t("view details"),
+          color: "green",
+          hoverColor: "green",
           onClick: (row: Course) => {
-            setSelectedCourse(row);
-            setShowEditPopup(true);
+            router.push(`/editCourse/${row.code}`);
           },
         },
-        {
-          label: t("delete"),
-          color: "red",
-          hoverColor: "red",
-          onClick: (row: Course) => {
-            setCourseToDelete(row);
-            setShowDeletePopup(true);
-          },
-        },
+        // {
+        //   label: t("edit"),
+        //   color: "blue",
+        //   hoverColor: "blue",
+        //   onClick: (row: Course) => {
+        //     setSelectedCourse(row);
+        //     setShowEditPopup(true);
+        //   },
+        // },
+        // {
+        //   label: t("delete"),
+        //   color: "red",
+        //   hoverColor: "red",
+        //   onClick: (row: Course) => {
+        //     setCourseToDelete(row);
+        //     setShowDeletePopup(true);
+        //   },
+        // },
       ],
     },
   ];
+
   const fetchCourses = async () => {
     if (!isLoggedIn || !token) return;
     setLoadingCourse(true);
-    const filters: Record<string, string> = {};
-
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
-    if (semester) filters.semester = semester;
-    if (section) filters.section = section;
 
     try {
-      const res = await getCoursePaginate(token, page, 10, filters);
-      const data = Array.isArray(res) ? res : res.data || [];
-      const total = res.total || 1;
-      setCourses(data);
-      setTotalPages(Math.ceil(total / limit));
-    } catch (err: unknown) {
-      showToast(
-        "API course error: " +
-          (err instanceof Error ? err.message : String(err)),
-        "error"
-      );
+      const data = await getCoursePaginate(token, page, limit, {
+        universityId,
+        facultyId,
+        programId,
+        year,
+        semester,
+        section,
+      });
+
+      const courseData = data.data || data;
+      let uniqueCourses = courseData;
+
+      if (Array.isArray(courseData)) {
+        const uniqueCoursesMap = new Map();
+
+        courseData.forEach((course: Course) => {
+          if (!uniqueCoursesMap.has(course.code)) {
+            uniqueCoursesMap.set(course.code, course);
+          }
+        });
+
+        uniqueCourses = Array.from(uniqueCoursesMap.values());
+
+        setCourses(uniqueCourses);
+
+        const currentUniqueCount = uniqueCourses.length || 1;
+        setTotalPages(Math.ceil(currentUniqueCount / limit));
+      } else {
+        setCourses([]);
+        setTotalPages(1);
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Error fetching programs: " + err.message, "error");
+      } else {
+        showToast("Error fetching programs", "error");
+      }
     } finally {
       setLoadingCourse(false);
     }

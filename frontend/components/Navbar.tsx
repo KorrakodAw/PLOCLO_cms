@@ -33,14 +33,18 @@ export default function Navbar({
   // 👇 ดึง role มาจาก context
   const { logout, user } = useAuth();
   // สมมติ user = { id: 1, role: "admin" }
- 
+
   useEffect(() => {
     if (!isLoggedIn) {
       setIsHovered(false);
     }
   }, [isLoggedIn]);
 
-  const handleNavClick = () => {
+  const handleNavClick = (href: string) => {
+    // If the user clicks the link they are already on, don't trigger loading
+    if (pathname === href) {
+      return;
+    }
     setLoading(true);
   };
 
@@ -49,7 +53,7 @@ export default function Navbar({
       {/* {loading && <LoadingOverlay />} */}
       <Link
         href="/"
-        onClick={handleNavClick}
+        onClick={() => handleNavClick("/")}
         className={`block text-[40px] font-extrabold mb-8 transition-colors duration-300
           ${isActive ? "text-orange-500" : "text-black hover:text-orange-500"}`}
       >
@@ -60,15 +64,24 @@ export default function Navbar({
         <ul>
           {isLoggedIn && (
             <>
-              <NavLink href="/viewChart" onClick={handleNavClick}>
+              <NavLink
+                href="/viewChart"
+                onClick={() => handleNavClick("/viewChart")}
+              >
                 {t("analytics")}
               </NavLink>
               {["admin", "instructor"].includes(user?.role || "") && (
                 <>
-                  <NavLink href="/editProgram" onClick={handleNavClick}>
+                  <NavLink
+                    href="/editProgram"
+                    onClick={() => handleNavClick("/editProgram")}
+                  >
                     {t("programs")}
                   </NavLink>
-                  <NavLink href="/editCourse" onClick={handleNavClick}>
+                  <NavLink
+                    href="/editCourse"
+                    onClick={() => handleNavClick("/editCourse")}
+                  >
                     {t("courses")}
                   </NavLink>
                 </>
@@ -76,10 +89,16 @@ export default function Navbar({
               {/* ✅ เฉพาะ Admin */}
               {["admin"].includes(user?.role || "") && (
                 <>
-                  <NavLink href="/manageAccount" onClick={handleNavClick}>
+                  <NavLink
+                    href="/manageAccount"
+                    onClick={() => handleNavClick("/manageAccount")}
+                  >
                     {t("accounts")}
                   </NavLink>
-                  <NavLink href="/manageUniversity" onClick={handleNavClick}>
+                  <NavLink
+                    href="/manageUniversity"
+                    onClick={() => handleNavClick("/manageUniversity")}
+                  >
                     {t("universities")}
                   </NavLink>
                 </>
@@ -89,7 +108,10 @@ export default function Navbar({
             </>
           )}
 
-          <NavLink href="/aboutData" onClick={handleNavClick}>
+          <NavLink
+            href="/aboutData"
+            onClick={() => handleNavClick("/aboutData")}
+          >
             {t("about")}
           </NavLink>
 

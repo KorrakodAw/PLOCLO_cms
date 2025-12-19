@@ -28,7 +28,7 @@ export async function getCoursePaginate(
     year?: string;
     semester?: string;
     section?: string;
-    course?: string;
+    courseCode?: string;
   }
 ) {
   const res = await apiClient.get("/course/paginate", {

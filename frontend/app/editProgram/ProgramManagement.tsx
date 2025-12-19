@@ -174,7 +174,7 @@ export default function ProgramManagement({
 
         setPrograms(uniquePrograms);
 
-        const currentUniqueCount = uniquePrograms.length;
+        const currentUniqueCount = uniquePrograms.length || 1;
 
         setTotalPages(Math.ceil(currentUniqueCount / limit));
       } else {
@@ -405,6 +405,7 @@ export default function ProgramManagement({
 
   useEffect(() => {
     fetchPrograms();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
 

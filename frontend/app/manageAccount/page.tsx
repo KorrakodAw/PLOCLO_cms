@@ -8,6 +8,7 @@ import { useToast } from "../../components/Toast";
 import AlertPopup from "../../components/AlertPopup";
 import Table, { Column } from "../../components/Table";
 import FormEditPopup from "../../components/EditPopup";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 interface User {
   id: number;
@@ -104,7 +105,7 @@ export default function ManageAccount() {
   };
 
   if (!isLoggedIn) return <p>Please login first.</p>;
-  if (loading) return <p>Loading users...</p>;
+  if (loading) return <LoadingOverlay />;
 
   const manageAccoutColumns: Column<User>[] = [
     { header: "ID", accessor: "id" },
