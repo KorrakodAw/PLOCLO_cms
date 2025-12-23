@@ -5,11 +5,6 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiClient } from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
-import DropdownSelect from "../../components/DropdownSelect";
-import { University, getUniversities } from "../../utils/universityApi";
-import { getFaculties, Faculty } from "../../utils/facultyApi";
-import { getPrograms, Program } from "../../utils/programApi";
-import { getCourses } from "../../utils/courseApi";
 import { useTranslation } from "next-i18next";
 
 // --- Types ---
@@ -26,50 +21,19 @@ interface CLO {
   name_en: string;
 }
 
-interface Option {
-  label: string;
-  value: string;
-}
-
-interface CourseVariant {
-  id: string;
-  code: string;
-  name: string;
-  program_id: string;
-  year: number;
-  semester: number;
-  section: string;
-}
-
-export default function CloPloMapping() {
-  const { token, isLoggedIn } = useAuth();
+export default function CloPloMapping({
+  courseId,
+  programId,
+}: {
+  courseId: string;
+  programId: string;
+}) {
+  const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
 
   // --- SELECTION STATES ---
-  const [selectedUniversity, setSelectedUniversity] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("");
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
-  const [selectedCourseCode, setSelectedCourseCode] = useState("");
-  const [selectedSemester, setSelectedSemester] = useState("");
-  const [selectedSection, setSelectedSection] = useState("");
-
-  const [specificCourseId, setSpecificCourseId] = useState<string>("");
-
-  // --- OPTION STATES ---
-  const [uniOptions, setUniOptions] = useState<Option[]>([]);
-  const [facOptions, setFacOptions] = useState<Option[]>([]);
-  const [progOptions, setProgOptions] = useState<Option[]>([]);
-  const [yearOptions, setYearOptions] = useState<Option[]>([]);
-  const [courseOptions, setCourseOptions] = useState<Option[]>([]);
-  const [semesterOptions, setSemesterOptions] = useState<Option[]>([]);
-  const [sectionOptions, setSectionOptions] = useState<Option[]>([]);
-
-  // --- DATA STATES ---
-  const [allPrograms, setAllPrograms] = useState<Program[]>([]);
-  const [courseVariants, setCourseVariants] = useState<CourseVariant[]>([]);
 
   const [plos, setPlos] = useState<PLO[]>([]);
   const [clos, setClos] = useState<CLO[]>([]);
@@ -80,200 +44,18 @@ export default function CloPloMapping() {
   // 1. DROPDOWN LOADING LOGIC
   // --------------------------------------------------------
 
-  // A. Load Universities (Added Thai names based on previous request)
-  useEffect(() => {
-    if (!isLoggedIn || !token) return;
-
-    // Reset dependents upon University change (simplified cascade reset)
-    if (!selectedUniversity) {
-      setSelectedFaculty("");
-      setSelectedProgram("");
-      setSelectedYear("");
-      setSelectedCourseCode("");
-      setSelectedSemester("");
-      setSelectedSection("");
-    }
-
-    getUniversities(token)
-      .then((data) => {
-        setUniOptions([
-          { label: t("please select a university"), value: "" },
-          ...data.map((u: University) => ({
-            label: lang === "th" ? u.name_th : u.name, // Use Thai name if lang is 'th'
-            value: String(u.id),
-          })),
-        ]);
-      })
-      .catch(() => showToast(t("API university error"), "error"));
-  }, [isLoggedIn, token, t, showToast, selectedUniversity, lang]);
-
-  // B. Load Faculties
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedUniversity) {
-      setFacOptions([{ label: t("please select a faculty"), value: "" }]);
-      setSelectedFaculty("");
-      return;
-    }
-    getFaculties(token, selectedUniversity)
-      .then((data) => {
-        setFacOptions([
-          { label: t("please select a faculty"), value: "" },
-          ...data.map((f: Faculty) => ({
-            label: lang === "th" ? f.name_th : f.name, // Use Thai name if lang is 'th'
-            value: String(f.id),
-          })),
-        ]);
-      })
-      .catch(() => showToast(t("API faculty error"), "error"));
-  }, [isLoggedIn, token, selectedUniversity, t, showToast, lang]);
-
-  // C. Load Programs & Years
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedFaculty) {
-      setAllPrograms([]);
-      setYearOptions([{ label: t("please select a year"), value: "" }]);
-      setProgOptions([{ label: t("please select a program"), value: "" }]);
-      return;
-    }
-    getPrograms(token, selectedFaculty)
-      .then((data) => {
-        setAllPrograms(data);
-        const years = Array.from(
-          new Set(data.map((p: Program) => Number(p.program_year)))
-        ).sort((a, b) => Number(b) - Number(a));
-        setYearOptions([
-          { label: t("please select a year"), value: "" },
-          ...years.map((y) => ({
-            // Convert Thai year to Western year for English
-            label: lang === "en" ? String(Number(y) - 543) : String(y),
-            value: String(y),
-          })),
-        ]);
-      })
-      .catch((err) =>
-        showToast(t("API program error") + ": " + err.message, "error")
-      );
-  }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
-
-  // D. Filter Programs by Year
-  useEffect(() => {
-    if (!selectedYear || allPrograms.length === 0) {
-      setProgOptions([{ label: t("please select a program"), value: "" }]);
-      return;
-    }
-    const filtered = allPrograms.filter(
-      (p) => String(p.program_year) === selectedYear
-    );
-    setProgOptions([
-      { label: t("please select a program"), value: "" },
-      ...filtered.map((p) => ({
-        label: lang === "th" ? p.program_shortname_th : p.program_shortname_en, // Use shortname based on lang
-        value: String(p.id),
-      })),
-    ]);
-  }, [selectedYear, allPrograms, t, lang]);
-
-  // E. Load Courses (Unique Codes)
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedProgram) {
-      setCourseOptions([{ label: t("please select a course"), value: "" }]);
-      setSelectedCourseCode("");
-      return;
-    }
-
-    getCourses(token, selectedProgram)
-      .then((data: any) => {
-        // Unique by code
-        const unique = Array.from(
-          new Map(data.map((c: any) => [c.code, c])).values()
-        );
-        setCourseOptions([
-          { label: t("please select a course"), value: "" },
-          ...unique.map((c: any) => ({
-            label: `${c.code} - ${lang === "th" ? c.name_th : c.name}`, // Use name_th if lang is 'th'
-            value: String(c.code),
-          })),
-        ]);
-      })
-      .catch(() => showToast(t("API course error"), "error"));
-  }, [isLoggedIn, token, selectedProgram, t, showToast, lang]);
-
-  // F. Load Variants (Semesters/Sections) based on Course Code
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedCourseCode || !selectedProgram) {
-      setCourseVariants([]);
-      setSemesterOptions([{ label: t("please select a semester"), value: "" }]);
-      setSectionOptions([{ label: t("please select a section"), value: "" }]);
-      setSpecificCourseId("");
-      setSelectedSection("");
-      setSelectedSemester("");
-      return;
-    }
-    getCourses(token, selectedProgram).then((data: any) => {
-      const variants = data.filter(
-        (c: any) => String(c.code) === selectedCourseCode
-      );
-      setCourseVariants(variants);
-    });
-  }, [isLoggedIn, token, selectedCourseCode, selectedProgram, t]);
-
-  // G. Filter Semesters
-  useEffect(() => {
-    if (courseVariants.length === 0) {
-      setSemesterOptions([{ label: t("please select a semester"), value: "" }]);
-      return;
-    }
-    const semesters = Array.from(
-      new Set(courseVariants.map((c) => String(c.semester)))
-    ).sort();
-    setSemesterOptions([
-      { label: t("please select a semester"), value: "" },
-      ...semesters.map((s) => ({ label: `${t("semester")} ${s}`, value: s })),
-    ]);
-  }, [courseVariants, t]);
-
-  // H. Filter Sections
-  useEffect(() => {
-    if (!selectedSemester) {
-      setSectionOptions([{ label: t("please select a section"), value: "" }]);
-      return;
-    }
-    const sections = courseVariants
-      .filter((c) => String(c.semester) === selectedSemester)
-      .map((c) => String(c.section))
-      .sort();
-    setSectionOptions([
-      { label: t("please select a section"), value: "" },
-      ...sections.map((s) => ({ label: `${t("section")} ${s}`, value: s })),
-    ]);
-  }, [selectedSemester, courseVariants, t]);
-
-  // I. Determine Specific Course ID
-  useEffect(() => {
-    if (selectedSemester && selectedSection && courseVariants.length > 0) {
-      const found = courseVariants.find(
-        (c) =>
-          String(c.semester) === selectedSemester &&
-          String(c.section) === selectedSection
-      );
-      setSpecificCourseId(found ? found.id : "");
-    } else {
-      setSpecificCourseId("");
-    }
-  }, [selectedSemester, selectedSection, courseVariants]);
-
   // --------------------------------------------------------
   // 2. MATRIX DATA FETCHING
   // --------------------------------------------------------
 
   // A. Fetch PLOs
   useEffect(() => {
-    if (!selectedProgram || !token) {
+    if (!programId || !token) {
       setPlos([]);
       return;
     }
     apiClient
-      .get(`/plo?programId=${selectedProgram}`, {
+      .get(`/plo?programId=${programId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -283,11 +65,11 @@ export default function CloPloMapping() {
         console.error(err);
         showToast(t("Failed to load PLOs"), "error");
       });
-  }, [selectedProgram, token, showToast, t]);
+  }, [programId, token, showToast, t]);
 
   // B. Fetch CLOs AND Existing Mappings
   useEffect(() => {
-    if (!specificCourseId || !token || !selectedCourseCode) {
+    if (!courseId || !token) {
       setClos([]);
       setMappingGrid({}); // Reset grid
       return;
@@ -298,11 +80,11 @@ export default function CloPloMapping() {
     // Fetch both endpoints in parallel
     Promise.all([
       // 1. Get CLOs
-      apiClient.get(`/clo?courseId=${specificCourseId}`, {
+      apiClient.get(`/clo?courseId=${courseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
       // 2. Get Saved Weights
-      apiClient.get(`/mapping/clo-plo/${specificCourseId}`, {
+      apiClient.get(`/mapping/clo-plo/${courseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
     ])
@@ -326,7 +108,7 @@ export default function CloPloMapping() {
       .finally(() => {
         setLoading(false);
       });
-  }, [specificCourseId, token, selectedCourseCode, showToast, t]);
+  }, [courseId, token, showToast, t]);
 
   // --------------------------------------------------------
   // 3. VALIDATION & HANDLERS
@@ -423,72 +205,11 @@ export default function CloPloMapping() {
   // --------------------------------------------------------
   return (
     <div className="mt-5 p-5">
-      <div className="flex justify-between items-end mb-6">
-        <h1 className="text-2xl font-extralight text-gray-800">
-          {t("CLO-PLO Mapping")}
-        </h1>
-      </div>
-
-      {/* --- FILTERS --- */}
-      <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <DropdownSelect
-            label={t("university")}
-            value={selectedUniversity}
-            options={uniOptions}
-            onChange={(e) => setSelectedUniversity(e.target.value)}
-          />
-          <DropdownSelect
-            label={t("faculty")}
-            value={selectedFaculty}
-            options={facOptions}
-            onChange={(e) => setSelectedFaculty(e.target.value)}
-            disabled={!selectedUniversity}
-          />
-          <DropdownSelect
-            label={t("year")}
-            value={selectedYear}
-            options={yearOptions}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            disabled={!selectedFaculty}
-          />
-          <DropdownSelect
-            label={t("program")}
-            value={selectedProgram}
-            options={progOptions}
-            onChange={(e) => setSelectedProgram(e.target.value)}
-            disabled={!selectedYear}
-          />
-
-          <DropdownSelect
-            label={t("course")}
-            value={selectedCourseCode}
-            options={courseOptions}
-            onChange={(e) => setSelectedCourseCode(e.target.value)}
-            disabled={!selectedProgram}
-          />
-          <DropdownSelect
-            label={t("semester")}
-            value={selectedSemester}
-            options={semesterOptions}
-            onChange={(e) => setSelectedSemester(e.target.value)}
-            disabled={!selectedCourseCode}
-          />
-          <DropdownSelect
-            label={t("section")}
-            value={selectedSection}
-            options={sectionOptions}
-            onChange={(e) => setSelectedSection(e.target.value)}
-            disabled={!selectedSemester}
-          />
-        </div>
-      </div>
-
       {/* --- MATRIX TABLE --- */}
       <div className="bg-white p-4 shadow-md rounded-lg overflow-x-auto min-h-[300px] border border-gray-200 ">
         <div className="flex flex-col">
           {/* Save Button */}
-          {specificCourseId && clos.length > 0 && plos.length > 0 && (
+          {courseId && clos.length > 0 && plos.length > 0 && (
             <button
               onClick={handleSave}
               disabled={loading || !isValidationSuccess} // 💡 DISABLE ON VALIDATION FAIL
@@ -504,7 +225,7 @@ export default function CloPloMapping() {
           )}
 
           {/* Matrix Content */}
-          {specificCourseId && clos.length > 0 && plos.length > 0 && (
+          {courseId && clos.length > 0 && plos.length > 0 && (
             <table className="w-full border-collapse border border-gray-300 text-sm">
               {/* HEADERS: PLOs as Columns + NEW TOTAL COLUMN */}
               <thead className="bg-gray-100">
@@ -645,19 +366,19 @@ export default function CloPloMapping() {
           )}
 
           {/* Empty States */}
-          {!loading && specificCourseId && clos.length === 0 && (
+          {!loading && courseId && clos.length === 0 && (
             <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
               {t("no_clos_found")}
             </div>
           )}
-          {!loading && specificCourseId && plos.length === 0 && (
+          {!loading && courseId && plos.length === 0 && (
             <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
               {t("no_plos_found")}
             </div>
           )}
 
           {/* Default State */}
-          {!specificCourseId && (
+          {!courseId && (
             <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
               <p className="text-gray-400 font-medium">
                 {t("select_course_section")}

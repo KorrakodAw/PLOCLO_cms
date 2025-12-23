@@ -5,7 +5,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/components/Toast";
 import { useTranslation } from "react-i18next";
 import { Course, getCoursePaginate } from "@/utils/courseApi";
-import { CLO } from "@/utils/cloApi";
+import { addClo, CLO, CLOInputExcel } from "@/utils/cloApi";
 import { Student } from "@/utils/studentApi";
 // Assuming you have CLO utils similar to PLO
 import { apiClient } from "@/utils/apiClient";
@@ -14,6 +14,8 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import DropdownSelect from "@/components/DropdownSelect";
 import FormEditPopup from "@/components/EditPopup";
 import AddButton from "@/components/AddButton";
+import CloPloMapping from "../cloploMapping";
+import AssignmentMapping from "../assignmentMapping";
 
 interface PaginatedResponse {
   data: Course[];
@@ -50,7 +52,7 @@ export default function EditCourseClient({
 }: {
   courseCode: string;
 }) {
-  const { isLoggedIn, token } = useAuth();
+  const { isLoggedIn, token, initialized } = useAuth();
   const { showToast, ToastElement } = useToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
@@ -64,6 +66,8 @@ export default function EditCourseClient({
 
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [showStudentTable, setShowStudentTable] = useState(false);
+  const [showCloPloMappingTable, setShowCloPloMappingTable] = useState(false);
+  const [showAssignmentTable, setShowAssignmentTable] = useState(false);
   const [showCloTable, setShowCloTable] = useState(true);
 
   const [students, setStudents] = useState<Student[]>([]);
@@ -75,7 +79,7 @@ export default function EditCourseClient({
     return [...duplicateCourses]
       .sort((b, a) => Number(b.section) - Number(a.section))
       .map((c) => ({
-        label: `Section ${c.section}`,
+        label: `${t("Section")} ${c.section}`,
         value: String(c.id),
       }));
   }, [duplicateCourses]);
@@ -119,6 +123,7 @@ export default function EditCourseClient({
         params: { courseId },
       });
       setClos(res.data);
+      setLoading(false);
     } catch {
       showToast(t("Failed to load CLO data."), "error");
     }
@@ -126,7 +131,7 @@ export default function EditCourseClient({
 
   const fetchStudentsByCourse = async (courseId: string) => {
     try {
-      const res = await apiClient.get("/student", {
+      const res = await apiClient.get("/studentOnCourse", {
         headers: { Authorization: `Bearer ${token}` },
         params: { courseId },
       });
@@ -134,6 +139,103 @@ export default function EditCourseClient({
     } catch {
       showToast(t("Failed to load student data."), "error");
     }
+  };
+
+  const handleAddClo = async (data: Record<string, CLO>) => {
+    if (!initialized) return;
+    if (!isLoggedIn || !token) {
+      showToast(t("You must be logged in to perform this action."), "error");
+      return;
+    }
+
+    if (!data.code || !data.name || !data.name_th) {
+      showToast(t("Please fill in all required fields."), "error");
+      return;
+    }
+
+    if (!formData) {
+      showToast(t("Course data is not loaded."), "error");
+      return;
+    }
+
+    try {
+      await addClo(
+        {
+          code: String(data.code),
+          name: String(data.name),
+          name_th: String(data.name_th),
+          course_id: formData.id,
+        },
+        token
+      );
+      showToast(t("CLO added successfully."), "success");
+      setLoading(true);
+      fetchClosByCourse(String(formData.id));
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast(t("Failed to add CLO: ") + err.message, "error");
+      } else {
+        showToast(t("Failed to add CLO."), "error");
+      }
+    }
+  };
+
+  const handleAddCloExcel = async (rows: CLOInputExcel[]) => {
+    if (!initialized) return;
+
+    if (!isLoggedIn || !token) {
+      showToast(t("You must be logged in to perform this action."), "error");
+      return;
+    }
+
+    if (!formData) {
+      showToast(t("Course data is not loaded."), "error");
+      return;
+    }
+
+    let successCount = 0;
+    let failureCount = 0;
+    const errorDetails = [];
+
+    for (const [i, row] of rows.entries()) {
+      const missingFields = [];
+      const code = String(row.code || row.CLO_code || "").trim();
+      const name = String(row.nameEn || row.CLO_engname || "").trim();
+      const name_th = String(row.nameTh || row.CLO_name || "").trim();
+
+      if (!code) missingFields.push("code");
+      if (!name) missingFields.push("nameTh");
+      if (!name_th) missingFields.push("nameEn");
+      if (missingFields.length > 0) {
+        failureCount++;
+        errorDetails.push(`Row ${i + 1}: missing ${missingFields.join(", ")}`);
+        continue;
+      }
+
+      try {
+        await addClo(
+          {
+            code,
+            name,
+            name_th,
+            course_id: formData.id,
+          },
+          token
+        );
+        setLoading(true);
+        successCount++;
+      } catch {
+        failureCount++;
+        errorDetails.push(`Row ${i + 1}: missing ${missingFields.join(", ")}`);
+      }
+    }
+
+    let summary = `เพิ่มข้อมูลจาก Excel สำเร็จ: ${successCount} รายการ\nล้มเหลว: ${failureCount} รายการ`;
+    if (errorDetails.length > 0) {
+      summary += `\n\nรายละเอียดข้อผิดพลาด:\n` + errorDetails.join("\n");
+    }
+    showToast(summary, failureCount > 0 ? "error" : "success");
+    fetchClosByCourse(String(formData.id));
   };
 
   useEffect(() => {
@@ -145,8 +247,23 @@ export default function EditCourseClient({
         fetchStudentsByCourse(String(formData.id)).finally(() =>
           setLoading(false)
         );
+      if (showCloPloMappingTable) {
+        // Fetch CLO-PLO mapping data here if needed
+        setLoading(false);
+      }
+
+      if (showAssignmentTable) {
+        // Fetch Assignment data here if needed
+        setLoading(false);
+      }
     }
-  }, [formData, showCloTable, showStudentTable]);
+  }, [
+    formData,
+    showCloTable,
+    showStudentTable,
+    showCloPloMappingTable,
+    showAssignmentTable,
+  ]);
 
   // --- Table Columns ---
   const CLOColumn: Column<CLO>[] = [
@@ -230,16 +347,19 @@ export default function EditCourseClient({
             </div>
 
             <div className="flex items-center gap-4 mt-6">
-              <div className="inline-flex bg-gray-100 p-1 rounded-xl w-full md:w-auto">
+              <div className="inline-flex flex-wrap bg-gray-100 p-1 rounded-xl w-full md:w-auto">
+                {/* CLO BUTTON */}
                 <button
                   onClick={() => {
                     setShowStudentTable(false);
+                    setShowCloPloMappingTable(false);
+                    setShowAssignmentTable(false);
                     setShowCloTable(true);
                   }}
                   className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
                     showCloTable
                       ? "bg-white text-orange-600 shadow-md"
-                      : "text-gray-500"
+                      : "text-gray-500 hover:bg-gray-200"
                   }`}
                 >
                   <span
@@ -249,15 +369,19 @@ export default function EditCourseClient({
                   />
                   {t("CLO")}
                 </button>
+
+                {/* STUDENT BUTTON */}
                 <button
                   onClick={() => {
                     setShowCloTable(false);
+                    setShowCloPloMappingTable(false);
+                    setShowAssignmentTable(false);
                     setShowStudentTable(true);
                   }}
                   className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
                     showStudentTable
                       ? "bg-white text-amber-600 shadow-md"
-                      : "text-gray-500"
+                      : "text-gray-500 hover:bg-gray-200"
                   }`}
                 >
                   <span
@@ -266,6 +390,50 @@ export default function EditCourseClient({
                     }`}
                   />
                   {t("student")}
+                </button>
+
+                {/* CLO-PLO MAPPING BUTTON */}
+                <button
+                  onClick={() => {
+                    setShowCloTable(false);
+                    setShowStudentTable(false);
+                    setShowAssignmentTable(false);
+                    setShowCloPloMappingTable(true);
+                  }}
+                  className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
+                    showCloPloMappingTable
+                      ? "bg-white text-amber-700 shadow-md"
+                      : "text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      showCloPloMappingTable ? "bg-amber-700" : "bg-transparent"
+                    }`}
+                  />
+                  {t("clo-plo mapping")}
+                </button>
+
+                {/* ASSIGNMENT BUTTON */}
+                <button
+                  onClick={() => {
+                    setShowCloTable(false);
+                    setShowStudentTable(false);
+                    setShowCloPloMappingTable(false);
+                    setShowAssignmentTable(true);
+                  }}
+                  className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
+                    showAssignmentTable
+                      ? "bg-white text-amber-800 shadow-md"
+                      : "text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      showAssignmentTable ? "bg-amber-800" : "bg-transparent"
+                    }`}
+                  />
+                  {t("assignment mapping")}
                 </button>
               </div>
             </div>
@@ -282,7 +450,14 @@ export default function EditCourseClient({
             </h3>
             <AddButton
               buttonText={t("create new clo")}
-              onSubmit={() => {}}
+              placeholderText={{
+                code: "clo code",
+                nameEn: "clo name (en)",
+                nameTh: "clo name (th)",
+              }}
+              showAbbreviationInputs={false}
+              onSubmit={handleAddClo}
+              onSubmitExcel={handleAddCloExcel}
               selectedProgram={formData.id}
             />
           </div>
@@ -295,12 +470,33 @@ export default function EditCourseClient({
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{t("Student List")}</h3>
             <AddButton
-              buttonText={t("add student")}
+              buttonText={t("Add Student")}
               onSubmit={() => {}}
               selectedProgram={formData.id}
             />
           </div>
           <Table columns={StudentColumn} data={students} />
+        </div>
+      )}
+
+      {showCloPloMappingTable && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">{t("CLO-PLO Mapping")}</h3>
+          </div>
+          <CloPloMapping
+            courseId={formData ? formData.id : ""}
+            programId={formData ? formData.program_id : ""}
+          />
+        </div>
+      )}
+
+      {showAssignmentTable && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">{t("Assignment Mapping")}</h3>
+          </div>
+          <AssignmentMapping courseId={formData ? formData.id : ""} />
         </div>
       )}
 

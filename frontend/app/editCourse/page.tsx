@@ -3,19 +3,15 @@
 import { useState, useEffect } from "react";
 import DropdownSelect from "../../components/DropdownSelect";
 import CourseManagement from "./courseManage";
-import AssignmentMapping from "./assignmentMapping";
-import CLOManagement from "./cloManage";
-import CLOPLOMapping from "./cloploMapping";
-import CourseCLOMapping from "./courseCloMapping";
-import { useTranslation } from "react-i18next";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import TabButton from "../../components/TabButton";
 
 import { getUniversities, University } from "../../utils/universityApi";
 import { getFaculties, Faculty } from "../../utils/facultyApi";
 import { getPrograms, Program } from "../../utils/programApi";
 import { Course } from "../../utils/courseApi";
 import { apiClient } from "@/utils/apiClient";
+
+import { useTranslation } from "react-i18next";
 
 export default function EditCourse() {
   const { t, i18n } = useTranslation("common");
@@ -28,7 +24,7 @@ export default function EditCourse() {
   const [section, setSection] = useState("");
   const [course, setCourse] = useState("");
   // const ACTIVE_TAB_KEY = "editCourseActiveTab";
-  const ACTIVE_TAB_KEY = `activeTab_${location.pathname}`;
+  // const ACTIVE_TAB_KEY = `activeTab_${location.pathname}`;
 
   const [universityOptions, setUniversityOptions] = useState<
     { label: string; value: string }[]
@@ -43,7 +39,7 @@ export default function EditCourse() {
     { label: string; value: string }[]
   >([]);
   const [semesterOptions] = useState([
-    { label: "all", value: "" },
+    { label: t("all"), value: "" },
     { label: "1", value: "1" },
     { label: "2", value: "2" },
     { label: "summer", value: "3" },
@@ -58,34 +54,34 @@ export default function EditCourse() {
 
   const tabs = [
     { id: "general", label: t("general information") },
-    { id: "clo", label: t("course learning outcomes (CLO)") },
-    { id: "clo-plo-mapping", label: t("clo-plo mapping") },
-    { id: "assignment", label: t("assignment mapping") },
-    { id: "course-clo-mapping", label: t("course-clo mapping") },
+    // { id: "clo", label: t("course learning outcomes (CLO)") },
+    // { id: "clo-plo-mapping", label: t("clo-plo mapping") },
+    // { id: "assignment", label: t("assignment mapping") },
+    // { id: "course-clo-mapping", label: t("course-clo mapping") },
   ];
 
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const hash = window.location.hash
-          ? window.location.hash.replace(/^#/, "")
-          : "";
-        const valid = [
-          "general",
-          "clo",
-          "clo-plo-mapping",
-          "assignment",
-          "course-clo-mapping",
-        ];
-        if (hash && valid.includes(hash)) return hash;
-        const stored = localStorage.getItem(ACTIVE_TAB_KEY);
-        if (stored && valid.includes(stored)) return stored;
-      }
-    } catch {
-      // ignore
-    }
-    return "general";
-  });
+  // const [activeTab, setActiveTab] = useState<string>(() => {
+  //   try {
+  //     if (typeof window !== "undefined") {
+  //       const hash = window.location.hash
+  //         ? window.location.hash.replace(/^#/, "")
+  //         : "";
+  //       const valid = [
+  //         "general",
+  //         "clo",
+  //         "clo-plo-mapping",
+  //         "assignment",
+  //         "course-clo-mapping",
+  //       ];
+  //       if (hash && valid.includes(hash)) return hash;
+  //       const stored = localStorage.getItem(ACTIVE_TAB_KEY);
+  //       if (stored && valid.includes(stored)) return stored;
+  //     }
+  //   } catch {
+  //     // ignore
+  //   }
+  //   return "general";
+  // });
 
   // Fetch university options
   useEffect(() => {
@@ -253,17 +249,17 @@ export default function EditCourse() {
     fetchCourses();
   }, [faculty, program, year, t, lang]);
 
-  useEffect(() => {
-    try {
-      // update hash without adding history entry
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", `#${activeTab}`);
-      }
-      localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
-    } catch {
-      // ignore localStorage/window errors
-    }
-  }, [ACTIVE_TAB_KEY, activeTab]);
+  // useEffect(() => {
+  //   try {
+  //     // update hash without adding history entry
+  //     if (typeof window !== "undefined") {
+  //       window.history.replaceState(null, "", `#${activeTab}`);
+  //     }
+  //     localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
+  //   } catch {
+  //     // ignore localStorage/window errors
+  //   }
+  // }, [ACTIVE_TAB_KEY, activeTab]);
 
   const clearFilters = () => {
     setUniversity("");
@@ -280,7 +276,7 @@ export default function EditCourse() {
         <p className="font-extralight text-2xl">{t("course information")}</p>
 
         <div className="flex gap-3 mt-5 px-3 py-2 ">
-          {tabs.map((tab) => (
+          {/* {tabs.map((tab) => (
             <TabButton
               key={tab.id}
               label={tab.label}
@@ -290,7 +286,7 @@ export default function EditCourse() {
                 clearFilters();
               }}
             />
-          ))}
+          ))} */}
         </div>
         <hr />
 
@@ -350,7 +346,15 @@ export default function EditCourse() {
             {t("clear")}
           </button>
         </div>
-        {activeTab === "general" && (
+        <CourseManagement
+          facultyId={faculty}
+          universityId={university}
+          programId={program}
+          year={year}
+          semester={semester}
+          section={section}
+        />
+        {/* {activeTab === "general" && (
           <CourseManagement
             facultyId={faculty}
             universityId={university}
@@ -370,10 +374,10 @@ export default function EditCourse() {
             semester={semester}
             section={section}
           />
-        )}
-        {activeTab === "clo-plo-mapping" && <CLOPLOMapping />}
-        {activeTab === "assignment" && <AssignmentMapping />}
-        {activeTab === "course-clo-mapping" && <CourseCLOMapping />}
+        )} */}
+        {/* {activeTab === "clo-plo-mapping" && <CLOPLOMapping />} */}
+        {/* {activeTab === "assignment" && <AssignmentMapping />} */}
+        {/* {activeTab === "course-clo-mapping" && <CourseCLOMapping />} */}
       </div>
     </ProtectedRoute>
   );

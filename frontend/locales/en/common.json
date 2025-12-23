@@ -123,5 +123,10 @@
   "Could not load program data.": "Could not load program data.",
   "Failed to load PLO data.": "Failed to load PLO data.",
   "Failed to load student data.": "Failed to load student data.",
-  "Selected program variant for editing: ID ": "Selected variant: ID "
+  "Selected program variant for editing: ID ": "Selected variant: ID ",
+  "Select Section": "Select Section",
+  "Manage Course Variants & Data": "Manage Course Variants & Data",
+  "Section": "Section",
+  "Student List": "Student List",
+  "Add Student": "Add Student"
 }

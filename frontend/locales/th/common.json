@@ -124,5 +124,10 @@
   "Could not load program data.": "ไม่สามารถดึงข้อมูลหลักสูตรได้",
   "Failed to load PLO data.": "โหลดข้อมูล PLO ล้มเหลว",
   "Failed to load student data.": "โหลดข้อมูลนักศึกษาล้มเหลว",
-  "Selected program variant for editing: ID ": "เลือกรูปแบบหลักสูตรรหัส: "
+  "Selected program variant for editing: ID ": "เลือกรูปแบบหลักสูตรรหัส: ",
+  "Select Section": "เลือกกลุ่มเรียน",
+  "Manage Course Variants & Data": "จัดการรูปแบบหลักสูตรและข้อมูล",
+  "Section": "กลุ่มเรียนที่",
+  "Student List": "รายชื่อนักศึกษา",
+  "Add Student": "เพิ่มนักศึกษา"
 }

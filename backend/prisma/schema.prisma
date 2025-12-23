@@ -68,7 +68,6 @@ model course {
   section    Int
   semester   Int     @default(1)
   program    program     @relation(fields: [program_id], references: [id], onDelete: Cascade)
-
   students       StudentOnCourse[]
   clo        clo[]
   assignments Assignment[] 
@@ -76,19 +75,7 @@ model course {
   @@map("course")
 }
 
-model student {
-  id             Int       @id @default(autoincrement())
-  student_id     String    @unique @postgres.VarChar(20)
-  first_name     String    @postgres.VarChar(100)
-  last_name      String    @postgres.VarChar(100)
-  program_id     Int
-  created_at     DateTime? @default(now()) @postgres.Timestamp(6)
-  program        program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
 
-  courses        StudentOnCourse[] 
-
-  @@map("student")
-}
 
 model plo {
   id         Int     @id @default(autoincrement())
@@ -142,7 +129,21 @@ model Assignment {
 
   course      course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@map("assignment") // Ensures the table name is lowercase 'assignment' in Postgres
+  @@map("assignment") 
+}
+
+model student {
+  id             Int       @id @default(autoincrement())
+  student_id     String    @unique @postgres.VarChar(20)
+  first_name     String    @postgres.VarChar(100)
+  last_name      String    @postgres.VarChar(100)
+  program_id     Int
+  created_at     DateTime? @default(now()) @postgres.Timestamp(6)
+  program        program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+
+  courses        StudentOnCourse[] 
+
+  @@map("student")
 }
 
 model StudentOnCourse {

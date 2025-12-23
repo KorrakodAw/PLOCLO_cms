@@ -12,7 +12,7 @@ import cloRoutes from "./routes/clo";
 import studentRoutes from "./routes/student";
 import { seedAdminUser } from "./routes/seed";
 import mappingRoutes from "./routes/mapping";
-import assignmentRoutes from "./routes/ assignment";
+import assignmentRoutes from "./routes/assignment";
 import studentOnCoureseRoutes from "./routes/studentOnCourse";
 
 const app = express();
@@ -37,7 +37,7 @@ app.use("/api/clo", cloRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/mapping", mappingRoutes);
 app.use("/api/assignments", assignmentRoutes);
-app.use("/api/student-on-course", studentOnCoureseRoutes);
+app.use("/api/studentOnCourse", studentOnCoureseRoutes);
 
 app.listen(3001, async () => {
   await seedAdminUser();

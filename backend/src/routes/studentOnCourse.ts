@@ -6,22 +6,39 @@ const router = Router();
 
 router.get("/", authenticateToken, async (_req, res) => {
   try {
+    const { courseId } = _req.query;
+
+    if (!courseId) {
+      return res.status(400).json({ error: "courseId is required" });
+    }
+
     const result = await pool.query(
-      `SELECT 
-        sic.id,
-        sic.student_id,
-        sic.course_id,
-        c.course_name,
-        c.course_code,
-        c.credits
-      FROM student_on_course sic
-      JOIN course c ON sic.course_id = c.id
-      ORDER BY sic.id DESC`
+      `
+      SELECT 
+        soc.student_id,
+        soc.course_id,
+        soc."assignedAt", 
+        c.name AS course_name,
+        c.code AS course_code,
+        s.student_id AS student_code,
+        s.first_name,
+        s.last_name
+      FROM student_on_course soc
+      JOIN course c ON soc.course_id = c.id
+      JOIN student s ON soc.student_id = s.id
+      WHERE soc.course_id = $1
+      ORDER BY s.student_id ASC
+      `,
+      [courseId]
     );
+
     res.json(result.rows);
-  } catch (err) {
-    console.error("Error fetching student in course records:", err);
-    res.status(500).json({ error: "Failed to fetch records" });
+  } catch (err: any) {
+    console.error("DATABASE ERROR:", err);
+    res.status(500).json({
+      error: "Failed to fetch records",
+      details: err.message,
+    });
   }
 });
 

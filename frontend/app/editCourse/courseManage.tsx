@@ -393,8 +393,8 @@ export default function CourseManagement({
       actions: [
         {
           label: t("view details"),
-          color: "green",
-          hoverColor: "green",
+          color: "blue",
+          hoverColor: "blue",
           onClick: (row: Course) => {
             router.push(`/editCourse/${row.code}`);
           },

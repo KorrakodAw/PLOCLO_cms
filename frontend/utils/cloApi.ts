@@ -20,6 +20,17 @@ export interface CLOFilters {
   courseId?: string;
   courseCode?: string;
 }
+export interface CLOInputExcel {
+  code?: string | number;
+  CLO_code?: string | number;
+  CLO_name?: string;
+  CLO_engname?: string;
+  nameEn?: string;
+  nameTh?: string;
+  clo_name?: string;
+  clo_code?: string;
+  [key: string]: unknown;
+}
 
 export interface ExcelCLORow {
   [key: string]: string | number | undefined;
