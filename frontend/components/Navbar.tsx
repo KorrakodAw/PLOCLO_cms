@@ -70,7 +70,7 @@ export default function Navbar({
               >
                 {t("analytics")}
               </NavLink>
-              {["admin", "instructor"].includes(user?.role || "") && (
+              {["system_admin", "instructor"].includes(user?.role || "") && (
                 <>
                   <NavLink
                     href="/editProgram"
@@ -87,7 +87,7 @@ export default function Navbar({
                 </>
               )}
               {/* ✅ เฉพาะ Admin */}
-              {["admin"].includes(user?.role || "") && (
+              {["system_admin"].includes(user?.role || "") && (
                 <>
                   <NavLink
                     href="/manageAccount"

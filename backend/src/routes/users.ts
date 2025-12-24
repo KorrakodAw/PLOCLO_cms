@@ -4,10 +4,52 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { authenticateToken, AuthRequest } from "../middleware/authMiddleware";
 import { authorizeRoles } from "../middleware/roleMiddleware";
+import { OAuth2Client } from "google-auth-library";
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
+
+router.post("/auth/google/verify", async (req, res) => {
+  const { token } = req.body;
+  try {
+    // 1. ตรวจสอบ Token กับ Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email)
+      return res.status(400).json({ error: "Invalid Google Token" });
+
+    // 2. ใช้ Logic เดียวกับ Passport (Pool) เพื่อหาหรือสร้าง User
+    const email = payload.email;
+    let result = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    let user = result.rows[0];
+
+    if (!user) {
+      const newUser = await pool.query(
+        "INSERT INTO users (username, email, role) VALUES ($1, $2, $3) RETURNING *",
+        [payload.name, email, "student"]
+      );
+      user = newUser.rows[0];
+    }
+
+    // 3. สร้าง JWT ของระบบเราส่งกลับไป
+    const jwtToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1d" }
+    );
+
+    res.json({ token: jwtToken });
+  } catch (err) {
+    res.status(500).json({ error: "Google verification failed" });
+  }
+});
 
 // ===== REGISTER =====
 router.post("/register", async (req, res) => {
@@ -85,34 +127,6 @@ router.get("/", authenticateToken, async (_req, res) => {
   res.json(result.rows);
 });
 
-// PATCH /api/users/:id/role
-router.patch("/:id/role", authenticateToken, async (req: AuthRequest, res) => {
-  const requester = req.user; // จาก middleware
-  const { id } = req.params;
-  const { role } = req.body;
-
-  // ตรวจสอบว่า requester เป็น admin
-  if (requester?.role !== "admin") {
-    return res
-      .status(403)
-      .json({ error: "Forbidden: only admin can change roles" });
-  }
-
-  try {
-    const result = await pool.query(
-      "UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, email, role",
-      [role, id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    res.json({ message: "Role updated successfully", user: result.rows[0] });
-  } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
-  }
-});
-
 // Get user by ID
 router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.params.id;
@@ -126,29 +140,51 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Update user by ID
+// ยุบรวม PATCH /:id และเพิ่มการรองรับ Google User (password เป็น null)
 router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
-  const userId = req.params.id;
-  const { username, email, password, role } = req.body;
+  const { id } = req.params;
+  const { username, email, role, password } = req.body;
+  const requester = req.user;
 
-  const user = await pool.query("SELECT * FROM users WHERE id=$1", [userId]);
-  if (user.rows.length === 0)
-    return res.status(404).json({ error: "User not found" });
+  try {
+    // 🔒 1. สิทธิ์การเปลี่ยน Role (เฉพาะ Admin)
+    if (role && requester?.role !== "admin") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: only admin can change roles" });
+    }
 
-  const hashedPassword = password
-    ? await bcrypt.hash(password, 10)
-    : user.rows[0].password_hash;
+    // 🔍 2. ค้นหา User เดิม
+    const userQuery = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+    if (userQuery.rows.length === 0)
+      return res.status(404).json({ error: "User not found" });
+    const current = userQuery.rows[0];
 
-  const result = await pool.query(
-    "UPDATE users SET username=$1,email=$2,password_hash=$3,role=$4 WHERE id=$5 RETURNING id, username, email, role, created_at",
-    [
-      username || user.rows[0].username,
-      email || user.rows[0].email,
-      hashedPassword,
-      role || user.rows[0].role,
-      userId,
-    ]
-  );
-  res.json(result.rows[0]);
+    // 🔐 3. จัดการรหัสผ่าน (ข้ามถ้าเป็น Google User หรือไม่ได้ส่ง pass มา)
+    let hashedPassword = current.password_hash;
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    // ✅ 4. อัปเดตข้อมูลแบบ Dynamic
+    const result = await pool.query(
+      `UPDATE users 
+       SET username=$1, email=$2, password_hash=$3, role=$4 
+       WHERE id=$5 
+       RETURNING id, username, email, role, created_at`,
+      [
+        username || current.username,
+        email || current.email,
+        hashedPassword, // จะเป็นค่าเดิม, ค่าใหม่ หรือ null (กรณี Google User)
+        role || current.role,
+        id,
+      ]
+    );
+
+    res.json({ message: "User updated successfully", user: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 // instructor และ admin ใช้ได้

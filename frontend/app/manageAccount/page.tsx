@@ -139,7 +139,7 @@ export default function ManageAccount() {
   ];
 
   return (
-    <ProtectedRoute roles={["admin", "instructor"]}>
+    <ProtectedRoute roles={["system_admin", "instructor"]}>
       <div className="max-w-[1400px] h-full flex flex-col mx-auto">
         <div className="p-5 md:p-8 min-h-screen">
           <h1 className="text-2xl font-extralight mb-4">Manage Account</h1>
@@ -162,7 +162,13 @@ export default function ManageAccount() {
                   label: "Role",
                   key: "role",
                   type: "select",
-                  options: ["admin", "instructor", "student"],
+                  options: [
+                    "system_admin",
+                    "course_admin",
+                    "instructor",
+                    "student",
+                    "guest",
+                  ],
                 },
               ]}
               onChange={(updated) => setSelectedUser(updated)}

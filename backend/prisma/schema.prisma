@@ -11,8 +11,8 @@ model users {
   id            Int      @id @default(autoincrement())
   username      String   @unique @postgres.VarChar(50)
   email         String   @unique @postgres.VarChar(100)
-  password_hash String
-  role          String?  @default("user") @postgres.VarChar(20)
+  password_hash String?
+  role          String?  @default("student")
   created_at    DateTime @default(now()) @postgres.Timestamp(0)
 }
 

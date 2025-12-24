@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { ChevronDown } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/components/Toast";
 import { useTranslation } from "react-i18next";
@@ -16,6 +17,7 @@ import FormEditPopup from "@/components/EditPopup";
 import AddButton from "@/components/AddButton";
 import CloPloMapping from "../cloploMapping";
 import AssignmentMapping from "../assignmentMapping";
+import AddStudentCourse from "../addStudentCourse";
 
 interface PaginatedResponse {
   data: Course[];
@@ -281,6 +283,46 @@ export default function EditCourseClient({
     { header: t("Last Name"), accessor: "last_name" },
   ];
 
+  const TABS = [
+    {
+      id: "clo",
+      label: "CLO",
+      color: "text-orange-600",
+      dot: "bg-orange-500",
+      state: showCloTable,
+    },
+    {
+      id: "student",
+      label: "student",
+      color: "text-amber-600",
+      dot: "bg-amber-500",
+      state: showStudentTable,
+    },
+    {
+      id: "mapping",
+      label: "clo-plo mapping",
+      color: "text-amber-700",
+      dot: "bg-amber-700",
+      state: showCloPloMappingTable,
+    },
+    {
+      id: "assignment",
+      label: "assignment mapping",
+      color: "text-amber-800",
+      dot: "bg-amber-800",
+      state: showAssignmentTable,
+    },
+  ];
+
+  const activeTabObj = TABS.find((t) => t.state) || TABS[0];
+
+  const handleTabChange = (tabId: string) => {
+    setShowCloTable(tabId === "clo");
+    setShowStudentTable(tabId === "student");
+    setShowCloPloMappingTable(tabId === "mapping");
+    setShowAssignmentTable(tabId === "assignment");
+  };
+
   // --- Handlers ---
 
   if (loading && !formData) return <LoadingOverlay />;
@@ -333,8 +375,9 @@ export default function EditCourseClient({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:flex md:items-center md:justify-between gap-6 pt-4 border-t border-gray-50">
-            <div className="w-full md:w-64">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 pt-6 border-t border-gray-100">
+            {/* Left Side: Section Dropdown */}
+            <div className="w-full lg:w-72">
               <DropdownSelect
                 label={t("Select Section")}
                 value={selectedCourseId}
@@ -346,95 +389,62 @@ export default function EditCourseClient({
               />
             </div>
 
-            <div className="flex items-center gap-4 mt-6">
-              <div className="inline-flex flex-wrap bg-gray-100 p-1 rounded-xl w-full md:w-auto">
-                {/* CLO BUTTON */}
-                <button
-                  onClick={() => {
-                    setShowStudentTable(false);
-                    setShowCloPloMappingTable(false);
-                    setShowAssignmentTable(false);
-                    setShowCloTable(true);
-                  }}
-                  className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
-                    showCloTable
-                      ? "bg-white text-orange-600 shadow-md"
-                      : "text-gray-500 hover:bg-gray-200"
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      showCloTable ? "bg-orange-500" : "bg-transparent"
-                    }`}
-                  />
-                  {t("CLO")}
-                </button>
+            {/* Right Side: Navigation Tabs */}
+            <div className="flex justify-start lg:justify-end">
+              {/* MOBILE DROPDOWN (xl:hidden) */}
+              <div className="xl:hidden relative w-full max-w-sm">
+                <div className="bg-gray-100 p-1 rounded-2xl border border-gray-200 shadow-inner">
+                  <div className="relative">
+                    <button className="w-full flex items-center justify-between px-5 py-3 bg-white rounded-xl shadow-sm transition-active">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full ${activeTabObj.dot} shadow-[0_0_5px_currentColor]`}
+                        />
+                        <span className={`font-bold ${activeTabObj.color}`}>
+                          {t(activeTabObj.label)}
+                        </span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    </button>
+                    <select
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      value={activeTabObj.id}
+                      onChange={(e) => handleTabChange(e.target.value)}
+                    >
+                      {TABS.map((tab) => (
+                        <option key={tab.id} value={tab.id}>
+                          {t(tab.label)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
 
-                {/* STUDENT BUTTON */}
-                <button
-                  onClick={() => {
-                    setShowCloTable(false);
-                    setShowCloPloMappingTable(false);
-                    setShowAssignmentTable(false);
-                    setShowStudentTable(true);
-                  }}
-                  className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
-                    showStudentTable
-                      ? "bg-white text-amber-600 shadow-md"
-                      : "text-gray-500 hover:bg-gray-200"
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      showStudentTable ? "bg-amber-500" : "bg-transparent"
-                    }`}
-                  />
-                  {t("student")}
-                </button>
-
-                {/* CLO-PLO MAPPING BUTTON */}
-                <button
-                  onClick={() => {
-                    setShowCloTable(false);
-                    setShowStudentTable(false);
-                    setShowAssignmentTable(false);
-                    setShowCloPloMappingTable(true);
-                  }}
-                  className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
-                    showCloPloMappingTable
-                      ? "bg-white text-amber-700 shadow-md"
-                      : "text-gray-500 hover:bg-gray-200"
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      showCloPloMappingTable ? "bg-amber-700" : "bg-transparent"
-                    }`}
-                  />
-                  {t("clo-plo mapping")}
-                </button>
-
-                {/* ASSIGNMENT BUTTON */}
-                <button
-                  onClick={() => {
-                    setShowCloTable(false);
-                    setShowStudentTable(false);
-                    setShowCloPloMappingTable(false);
-                    setShowAssignmentTable(true);
-                  }}
-                  className={`px-8 py-2.5 rounded-lg transition-all duration-200 text-sm font-bold flex items-center cursor-pointer gap-2 ${
-                    showAssignmentTable
-                      ? "bg-white text-amber-800 shadow-md"
-                      : "text-gray-500 hover:bg-gray-200"
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      showAssignmentTable ? "bg-amber-800" : "bg-transparent"
-                    }`}
-                  />
-                  {t("assignment mapping")}
-                </button>
+              {/* DESKTOP TABS (xl:flex) */}
+              <div className="hidden xl:flex bg-gray-100/80 backdrop-blur-sm p-1.5 rounded-2xl border border-gray-200/50 shadow-inner items-center gap-1">
+                {TABS.map((tab) => {
+                  const isActive = tab.state;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`px-6 py-2.5 rounded-xl transition-all duration-300 text-sm font-bold flex items-center gap-2.5 cursor-pointer whitespace-nowrap
+              ${
+                isActive
+                  ? `bg-white ${tab.color} shadow-[0_4px_12px_rgba(0,0,0,0.08)] scale-[1.02]`
+                  : "text-gray-500 hover:bg-gray-200/60 hover:text-gray-700"
+              }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 transition-all ${
+                          isActive ? tab.dot : "bg-gray-300"
+                        }`}
+                      />
+                      {t(tab.label)}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -469,13 +479,17 @@ export default function EditCourseClient({
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{t("Student List")}</h3>
-            <AddButton
+            {/* <AddButton
               buttonText={t("Add Student")}
               onSubmit={() => {}}
               selectedProgram={formData.id}
-            />
+            /> */}
           </div>
-          <Table columns={StudentColumn} data={students} />
+          {/* <Table columns={StudentColumn} data={students} /> */}
+          <AddStudentCourse
+            courseId={formData.id}
+            programId={formData.program_id}
+          />
         </div>
       )}
 

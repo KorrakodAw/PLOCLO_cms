@@ -1,4 +1,8 @@
 // server.ts (หรือ index.ts ของ express)
+
+import dotenv from "dotenv";
+dotenv.config(); // ต้องอยู่บรรทัดบนสุด
+
 import express from "express";
 import morgan from "morgan";
 import cors from "cors";
@@ -14,6 +18,10 @@ import { seedAdminUser } from "./routes/seed";
 import mappingRoutes from "./routes/mapping";
 import assignmentRoutes from "./routes/assignment";
 import studentOnCoureseRoutes from "./routes/studentOnCourse";
+import authRoutes from "./routes/auth";
+
+import passport from "passport";
+import "./config/passport"; // Import ไฟล์ตั้งค่าที่เราสร้างไว้
 
 const app = express();
 app.use(morgan("dev"));
@@ -27,6 +35,8 @@ app.use(
   })
 );
 
+app.use(passport.initialize());
+
 app.use("/api/users", usersRouter);
 app.use("/api/program", programRoutes);
 app.use("/api/faculty", facultyRoutes);
@@ -38,6 +48,7 @@ app.use("/api/student", studentRoutes);
 app.use("/api/mapping", mappingRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/studentOnCourse", studentOnCoureseRoutes);
+app.use("/api/auth", authRoutes);
 
 app.listen(3001, async () => {
   await seedAdminUser();

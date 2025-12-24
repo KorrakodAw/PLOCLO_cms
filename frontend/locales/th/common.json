@@ -129,5 +129,7 @@
   "Manage Course Variants & Data": "จัดการรูปแบบหลักสูตรและข้อมูล",
   "Section": "กลุ่มเรียนที่",
   "Student List": "รายชื่อนักศึกษา",
-  "Add Student": "เพิ่มนักศึกษา"
+  "Add Student": "เพิ่มนักศึกษา",
+  "Enroll Students": "ลงทะเบียนนักศึกษา",
+  "Students in this Course": "นักศึกษาในหลักสูตรนี้"
 }

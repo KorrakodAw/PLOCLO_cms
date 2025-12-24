@@ -4,6 +4,7 @@ import { authenticateToken } from "../middleware/authMiddleware";
 
 const router = Router();
 
+// --- GET: Fetch students for a specific course ---
 router.get("/", authenticateToken, async (_req, res) => {
   try {
     const { courseId } = _req.query;
@@ -35,94 +36,102 @@ router.get("/", authenticateToken, async (_req, res) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error("DATABASE ERROR:", err);
-    res.status(500).json({
-      error: "Failed to fetch records",
-      details: err.message,
+    res
+      .status(500)
+      .json({ error: "Failed to fetch records", details: err.message });
+  }
+});
+
+// --- POST: Bulk insert students into a course ---
+router.post("/bulk", authenticateToken, async (req, res) => {
+  const { courseId, studentIds } = req.body;
+
+  if (!courseId) return res.status(400).json({ error: "courseId is required" });
+  if (!studentIds || !Array.isArray(studentIds)) {
+    return res.status(400).json({ error: "studentIds must be a valid list" });
+  }
+
+  try {
+    // 1. Get the course_code for the provided courseId
+    const courseInfo = await pool.query(
+      "SELECT code FROM course WHERE id = $1",
+      [courseId]
+    );
+
+    if (courseInfo.rowCount === 0) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    const courseCode = courseInfo.rows[0].code;
+
+    // 2. Identify students already enrolled in ANY course with this same code
+    const existingEnrollments = await pool.query(
+      `SELECT student_id 
+       FROM student_on_course soc
+       JOIN course c ON soc.course_id = c.id
+       WHERE c.code = $1 AND soc.student_id = ANY($2)`,
+      [courseCode, studentIds]
+    );
+
+    const alreadyEnrolledIds = existingEnrollments.rows.map(
+      (row) => row.student_id
+    );
+
+    // 3. Filter the list to only include students NOT already in this course code
+    const studentsToAdd = studentIds.filter(
+      (id) => !alreadyEnrolledIds.includes(id)
+    );
+
+    if (studentsToAdd.length === 0) {
+      return res.status(400).json({
+        error:
+          "All selected students are already enrolled in a section of this course code.",
+      });
+    }
+
+    // 4. Perform the bulk insert for valid students
+    const queries = studentsToAdd.map((sId: number) =>
+      pool.query(
+        "INSERT INTO student_on_course (student_id, course_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [sId, courseId]
+      )
+    );
+
+    await Promise.all(queries);
+
+    res.json({
+      message: `Successfully assigned ${studentsToAdd.length} students.`,
+      skippedCount: alreadyEnrolledIds.length,
     });
-  }
-});
-
-router.post("/", authenticateToken, async (req, res) => {
-  const { student_id, course_id } = req.body;
-
-  if (!student_id || !course_id) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
-  try {
-    const result = await pool.query(
-      `INSERT INTO student_on_course  
-        (student_id, course_id)
-       VALUES ($1, $2)
-       RETURNING *`,
-      [student_id, course_id]
-    );
-
-    res.status(201).json(result.rows[0]);
   } catch (err: any) {
-    console.error("Error creating student on course record:", err);
-
-    // Check for duplicate or constraint errors
-    if (err.code === "23505") {
-      res.status(400).json({ error: "Record already exists" });
-    } else if (err.code === "23503") {
-      res
-        .status(400)
-        .json({ error: "Invalid student ID or course ID provided" });
-    } else {
-      res.status(500).json({ error: "Failed to create record" });
-    }
+    console.error("Bulk insert error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to assign students", details: err.message });
   }
 });
 
-router.delete("/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
+// --- DELETE: Remove a student from a course ---
+// FIX: Use both studentId and courseId because there is no single "id" column
+router.delete("/:courseId/:studentId", authenticateToken, async (req, res) => {
+  const { courseId, studentId } = req.params;
 
   try {
     const result = await pool.query(
-      `DELETE FROM student_on_course WHERE id = $1 RETURNING *`,
-      [id]
+      `DELETE FROM student_on_course 
+       WHERE course_id = $1 AND student_id = $2 
+       RETURNING *`,
+      [courseId, studentId]
     );
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Record not found" });
     }
 
-    res.json({ message: "Record deleted successfully" });
+    res.json({ message: "Student removed from course successfully" });
   } catch (err) {
-    console.error("Error deleting student on course record:", err);
+    console.error("Error deleting record:", err);
     res.status(500).json({ error: "Failed to delete record" });
-  }
-});
-
-router.patch("/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const { student_id, course_id } = req.body;
-
-  try {
-    const result = await pool.query(
-      `UPDATE student_on_course 
-       SET student_id = $1, course_id = $2
-       WHERE id = $3
-       RETURNING *`,
-      [student_id, course_id, id]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Record not found" });
-    }
-
-    res.json(result.rows[0]);
-  } catch (err: any) {
-    console.error("Error updating student on course record:", err);
-
-    if (err.code === "23503") {
-      res
-        .status(400)
-        .json({ error: "Invalid student ID or course ID provided" });
-    } else {
-      res.status(500).json({ error: "Failed to update record" });
-    }
   }
 });
 
