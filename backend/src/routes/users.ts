@@ -33,7 +33,7 @@ router.post("/auth/google/verify", async (req, res) => {
     if (!user) {
       const newUser = await pool.query(
         "INSERT INTO users (username, email, role) VALUES ($1, $2, $3) RETURNING *",
-        [payload.name, email, "student"]
+        [payload.name, email, "guest"]
       );
       user = newUser.rows[0];
     }
@@ -42,7 +42,7 @@ router.post("/auth/google/verify", async (req, res) => {
     const jwtToken = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: "1d" }
+      { expiresIn: "1hr" }
     );
 
     res.json({ token: jwtToken });
@@ -51,18 +51,59 @@ router.post("/auth/google/verify", async (req, res) => {
   }
 });
 
-// ===== REGISTER =====
+// ===== REGISTER (Fixed for consistency with Google Verify) =====
 router.post("/register", async (req, res) => {
   const { username, email, password, role } = req.body;
+
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      "INSERT INTO users (username,email,password_hash,role) VALUES ($1,$2,$3,$4) RETURNING id, username, email, role, created_at",
-      [username, email, hashedPassword, role || "student"]
+    // 1. ตรวจสอบข้อมูลบังคับ (Username และ Email ห้ามว่าง)
+    if (!email || !username) {
+      return res.status(400).json({ error: "Username and email are required" });
+    }
+
+    // 2. จัดการรหัสผ่าน: ถ้าเป็น null หรือไม่มีค่ามา จะบันทึกเป็น null
+    let hashedPassword = null;
+    if (password !== null && password !== undefined && password !== "") {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    // 3. ใช้ SQL Upsert เพื่อเพิ่มหรืออัปเดตข้อมูลผู้ใช้
+    // หมายเหตุ: Schema ของคุณกำหนด username เป็น @unique ดังนั้นถ้า username ซ้ำจะเกิด conflict เช่นกัน
+    const query = `
+      INSERT INTO users (username, email, password_hash, role)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (email) 
+      DO UPDATE SET 
+        username = EXCLUDED.username, 
+        role = EXCLUDED.role,
+        password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash)
+      RETURNING id, username, email, role, created_at;
+    `;
+
+    const result = await pool.query(query, [
+      username,
+      email,
+      hashedPassword, // ส่งค่า null ได้เพราะ Prisma Schema ของคุณเป็น String?
+      role || "guest", // ใช้ค่าเริ่มต้นจาก Schema คือ "guest" หากไม่ได้ส่งมา
+    ]);
+
+    const user = result.rows[0];
+
+    // 4. สร้าง JWT Token
+    const jwtToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1hr" }
     );
-    res.status(201).json(result.rows[0]);
+
+    res.status(201).json({
+      token: jwtToken,
+      user: user,
+    });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    // กรณี Error 500 ส่วนใหญ่มักเกิดจาก Username ซ้ำ (เนื่องจากตั้งเป็น @unique)
+    console.error("REGISTER ERROR:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -148,7 +189,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
 
   try {
     // 🔒 1. สิทธิ์การเปลี่ยน Role (เฉพาะ Admin)
-    if (role && requester?.role !== "admin") {
+    if (role && requester?.role !== "system_admin") {
       return res
         .status(403)
         .json({ error: "Forbidden: only admin can change roles" });

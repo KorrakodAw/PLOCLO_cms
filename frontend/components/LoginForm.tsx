@@ -55,7 +55,7 @@ export default function LoginForm() {
   }, [isLoggedIn, router]);
 
   return (
-    <div className="w-full flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="w-full flex flex-col items-center justify-center min-h-screen  p-4">
       <form
         className="w-full max-w-sm p-8 bg-white rounded-3xl shadow-xl border border-gray-100"
         onSubmit={(e) => {

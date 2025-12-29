@@ -40,7 +40,7 @@
   "student management": "การจัดการนักศึกษา",
   "university": "มหาวิทยาลัย",
   "view chart": "ดูแผนภูมิ",
-  "welcome": "ยินดีตอนรับ",
+  "welcome": "ยินดีต้อนรับ",
   "year": "ปีการศึกษา",
   "you are logged in": "คุณเข้าสู่ระบบแล้ว",
   "next": "ถัดไป",
@@ -131,5 +131,8 @@
   "Student List": "รายชื่อนักศึกษา",
   "Add Student": "เพิ่มนักศึกษา",
   "Enroll Students": "ลงทะเบียนนักศึกษา",
-  "Students in this Course": "นักศึกษาในหลักสูตรนี้"
+  "Students in this Course": "นักศึกษาในหลักสูตรนี้",
+  "upload universities excel": "อัปโหลดมหาวิทยาลัย (Excel)",
+  "or": "หรือ",
+  "Are you sure you want to delete the section": "คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่มเรียนที่"
 }

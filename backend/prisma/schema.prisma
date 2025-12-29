@@ -12,7 +12,7 @@ model users {
   username      String   @unique @postgres.VarChar(50)
   email         String   @unique @postgres.VarChar(100)
   password_hash String?
-  role          String?  @default("student")
+  role          String?  @default("guest")
   created_at    DateTime @default(now()) @postgres.Timestamp(0)
 }
 
@@ -151,8 +151,8 @@ model StudentOnCourse {
   course_id  Int
   assignedAt DateTime @default(now())
 
-  student    student  @relation(fields: [student_id], references: [id])
-  course     course   @relation(fields: [course_id], references: [id])
+  student    student  @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  course     course   @relation(fields: [course_id], references: [id], onDelete: Cascade)
 
   @@id([student_id, course_id])
   @@map("student_on_course")

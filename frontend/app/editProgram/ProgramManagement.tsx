@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   addProgram,
@@ -70,32 +70,25 @@ export default function ProgramManagement({
   useEffect(() => {
     if (!isLoggedIn || !token) return;
 
-    const fetchUniversities = async () => {
+    const loadUniversities = async () => {
       try {
         const data = await getUniversities(token);
-
-        // Check if no universities were returned
         if (data.length === 0) {
+          setUniversityOptions([{ label: t("No data available"), value: "" }]);
+        } else {
           setUniversityOptions([
-            // Display "No data available" if the list is empty
-            { label: t("No data available"), value: "" },
+            { label: t("please select a university"), value: "" },
+            ...data.map((u: University) => ({
+              label: u.name,
+              value: String(u.id),
+            })),
           ]);
-          return;
         }
-
-        // If data exists, map it and prepend the default option
-        setUniversityOptions([
-          { label: t("please select a university"), value: "" },
-          ...data.map((u: University) => ({
-            label: u.name,
-            value: String(u.id),
-          })),
-        ]);
       } catch {
         showToast("API university error", "error");
       }
     };
-    fetchUniversities();
+    loadUniversities();
   }, [isLoggedIn, token, t, showToast]);
 
   // // Fetch faculties for selected university (use parent universityId)
@@ -146,10 +139,10 @@ export default function ProgramManagement({
     setYearOptions(years);
   }, [t]);
 
-  const fetchPrograms = async () => {
+  const fetchPrograms = useCallback(async () => {
     if (!isLoggedIn || !token) return;
-    setLoading(true);
 
+    setLoading(true);
     try {
       const data = await getProgramsPaginated(token, page, limit, {
         universityId,
@@ -159,38 +152,39 @@ export default function ProgramManagement({
       });
 
       const programData = data.data || data;
-      let uniquePrograms = programData;
-
       if (Array.isArray(programData)) {
+        // ใช้ Map เพื่อกรองโปรแกรมที่ซ้ำกัน
         const uniqueProgramsMap = new Map();
-
-        programData.forEach((program: Program) => {
-          if (!uniqueProgramsMap.has(program.program_code)) {
-            uniqueProgramsMap.set(program.program_code, program);
+        programData.forEach((p: Program) => {
+          if (!uniqueProgramsMap.has(p.program_code)) {
+            uniqueProgramsMap.set(p.program_code, p);
           }
         });
 
-        uniquePrograms = Array.from(uniqueProgramsMap.values());
-
-        setPrograms(uniquePrograms);
-
-        const currentUniqueCount = uniquePrograms.length || 1;
-
-        setTotalPages(Math.ceil(currentUniqueCount / limit));
+        const uniqueList = Array.from(uniqueProgramsMap.values());
+        setPrograms(uniqueList);
+        setTotalPages(Math.ceil(uniqueList.length / limit) || 1);
       } else {
         setPrograms([]);
         setTotalPages(1);
       }
     } catch (err) {
-      if (err instanceof Error) {
-        showToast("Error fetching programs: " + err.message, "error");
-      } else {
-        showToast("Error fetching programs", "error");
-      }
+      console.error("Fetch error:", err);
+      showToast(t("Error fetching programs"), "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    isLoggedIn,
+    token,
+    page,
+    universityId,
+    facultyId,
+    programId,
+    year,
+    t,
+    showToast,
+  ]);
 
   const resetSelection = () => {
     setSelectedFaculty("");
@@ -405,9 +399,7 @@ export default function ProgramManagement({
 
   useEffect(() => {
     fetchPrograms();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
+  }, [fetchPrograms]);
 
   return (
     <div className="p-5 md:p-8 min-h-screen">

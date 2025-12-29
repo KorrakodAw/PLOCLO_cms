@@ -18,6 +18,7 @@ import AddButton from "@/components/AddButton";
 import CloPloMapping from "../cloploMapping";
 import AssignmentMapping from "../assignmentMapping";
 import AddStudentCourse from "../addStudentCourse";
+import AlertPopup from "@/components/AlertPopup";
 
 interface PaginatedResponse {
   data: Course[];
@@ -74,6 +75,9 @@ export default function EditCourseClient({
 
   const [students, setStudents] = useState<Student[]>([]);
   const [clos, setClos] = useState<CLO[]>([]); // Replace 'any' with your CLO type
+
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
 
   // --- Dropdown Options (Year + Section) ---
   const courseOptions: Option[] = useMemo(() => {
@@ -273,16 +277,6 @@ export default function EditCourseClient({
     { header: t("CLO Name"), accessor: lang === "th" ? "name_th" : "name" },
   ];
 
-  const StudentColumn: Column<Student>[] = [
-    {
-      header: t("Student ID"),
-      accessor: "student_id",
-      className: "font-semibold",
-    },
-    { header: t("First Name"), accessor: "first_name" },
-    { header: t("Last Name"), accessor: "last_name" },
-  ];
-
   const TABS = [
     {
       id: "clo",
@@ -329,6 +323,83 @@ export default function EditCourseClient({
   if (error || !formData)
     return <div className="p-8 text-red-500">{error || "Error"}</div>;
 
+  // 1. Add this function inside your EditCourseClient component
+  const handleDuplicateSection = async () => {
+    if (!formData || !token) return;
+
+    // Find the highest section number currently available
+    const maxSection = Math.max(
+      ...duplicateCourses.map((c) => Number(c.section)),
+      0
+    );
+    const nextSection = String(maxSection + 1).padStart(3, "0"); // e.g., "002"
+
+    setLoading(true);
+    try {
+      // We send the current formData but override the section and remove the ID
+      const { ...payload } = formData;
+
+      const res = await apiClient.post(
+        "/course",
+        {
+          ...payload,
+          section: nextSection,
+          // You might want to clarify if you want to copy CLOs as well.
+          // Usually, backends handle deep copying, but if not,
+          // this creates a fresh section with the same metadata.
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      showToast(`${t("Created Section")} ${nextSection}`, "success");
+
+      // Refresh the list of variants to include the new one
+      const updatedResponse = await fetchMatchingCourses(token, courseCode);
+      setDuplicateCourses(updatedResponse.data);
+      setSelectedCourseId(String(res.data.id)); // Switch to the new section automatically
+    } catch (err) {
+      showToast(t("Failed to duplicate section"), "error");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteCourseVariant = async () => {
+    if (!formData || !token) return;
+
+    setLoading(true);
+    try {
+      await apiClient.delete(`/course/${formData.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      fetchMatchingCourses(token, courseCode).then((response) => {
+        const matching = response.data || [];
+        setDuplicateCourses(matching);
+        if (matching.length > 0) {
+          const latest = matching.sort(
+            (b, a) => Number(b.section) - Number(a.section)
+          )[0];
+          setSelectedCourseId(String(latest.id));
+        } else {
+          setFormData(null);
+          setError(t("No more course variants available."));
+        }
+      });
+      setCourseToDelete(null);
+      setShowDeletePopup(false);
+      showToast(t("Course variant deleted successfully"), "success");
+    } catch (err) {
+      showToast(t("Failed to delete course variant"), "error");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-5 md:p-8 min-h-screen">
       {loading && <LoadingOverlay />}
@@ -348,14 +419,21 @@ export default function EditCourseClient({
 
       {/* --- MANAGE BOX --- */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
-        <div className="flex flex-col space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">
-              {t("Manage Course Variants & Data")}
-            </h2>
+        <div className="flex flex-col space-y-8">
+          {/* --- TOP ROW: Title & Primary Actions --- */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800 tracking-tight">
+                {t("Manage Course Variants & Data")}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {t("Configure sections, CLOs, and student mappings")}
+              </p>
+            </div>
+
             <button
               onClick={() => setShowEditPopup(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition-all active:scale-95"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-orange-600 bg-orange-50 rounded-xl hover:bg-orange-100 transition-all active:scale-95 border border-orange-100 shadow-sm whitespace-nowrap"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -371,34 +449,81 @@ export default function EditCourseClient({
                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                 />
               </svg>
-              {t("edit")}
+              {t("Edit Metadata")}
             </button>
           </div>
 
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 pt-6 border-t border-gray-100">
-            {/* Left Side: Section Dropdown */}
-            <div className="w-full lg:w-72">
-              <DropdownSelect
-                label={t("Select Section")}
-                value={selectedCourseId}
-                options={courseOptions}
-                onChange={(e) => {
-                  setLoading(true);
-                  setSelectedCourseId(e.target.value);
-                }}
-              />
+          {/* --- BOTTOM ROW: Selection & Navigation --- */}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pt-8 border-t border-gray-100">
+            {/* Left Side: Section Controls */}
+            <div className="flex flex-col sm:flex-row items-end gap-3 w-full lg:w-auto">
+              <div className="w-full sm:w-64">
+                <DropdownSelect
+                  label={t("Current Section")}
+                  value={selectedCourseId}
+                  options={courseOptions}
+                  onChange={(e) => {
+                    setLoading(true);
+                    setSelectedCourseId(e.target.value);
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={handleDuplicateSection}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-blue-700 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all active:scale-95 border border-blue-100 shadow-sm whitespace-nowrap"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  {t("Add Section")}
+                </button>
+
+                <button
+                  onClick={() => setShowDeletePopup(true)}
+                  className="flex items-center justify-center p-2.5 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all active:scale-95 border border-red-100 shadow-sm"
+                  title={t("Delete Section")}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
 
-            {/* Right Side: Navigation Tabs */}
-            <div className="flex justify-start lg:justify-end">
-              {/* MOBILE DROPDOWN (xl:hidden) */}
-              <div className="xl:hidden relative w-full max-w-sm">
-                <div className="bg-gray-100 p-1 rounded-2xl border border-gray-200 shadow-inner">
+            {/* Right Side: Tab Navigation */}
+            <div className="w-full lg:w-auto">
+              {/* MOBILE TABS */}
+              <div className="xl:hidden relative">
+                <div className="bg-gray-50 p-1 rounded-2xl border border-gray-200 shadow-inner">
                   <div className="relative">
-                    <button className="w-full flex items-center justify-between px-5 py-3 bg-white rounded-xl shadow-sm transition-active">
+                    <button className="w-full flex items-center justify-between px-5 py-3 bg-white rounded-xl shadow-sm">
                       <div className="flex items-center gap-3">
                         <span
-                          className={`w-2.5 h-2.5 rounded-full ${activeTabObj.dot} shadow-[0_0_5px_currentColor]`}
+                          className={`w-2.5 h-2.5 rounded-full ${activeTabObj.dot}`}
                         />
                         <span className={`font-bold ${activeTabObj.color}`}>
                           {t(activeTabObj.label)}
@@ -421,24 +546,25 @@ export default function EditCourseClient({
                 </div>
               </div>
 
-              {/* DESKTOP TABS (xl:flex) */}
-              <div className="hidden xl:flex bg-gray-100/80 backdrop-blur-sm p-1.5 rounded-2xl border border-gray-200/50 shadow-inner items-center gap-1">
+              {/* DESKTOP TABS */}
+              <div className="hidden xl:flex bg-gray-50 p-1.5 rounded-2xl border border-gray-200 shadow-inner items-center gap-1">
                 {TABS.map((tab) => {
                   const isActive = tab.state;
                   return (
                     <button
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
-                      className={`px-6 py-2.5 rounded-xl transition-all duration-300 text-sm font-bold flex items-center gap-2.5 cursor-pointer whitespace-nowrap
-              ${
-                isActive
-                  ? `bg-white ${tab.color} shadow-[0_4px_12px_rgba(0,0,0,0.08)] scale-[1.02]`
-                  : "text-gray-500 hover:bg-gray-200/60 hover:text-gray-700"
-              }`}
+                      className={`px-5 py-2 rounded-xl transition-all duration-200 text-sm font-bold flex items-center gap-2
+                  ${
+                    isActive
+                      ? `bg-white ${tab.color} shadow-sm scale-[1.02]`
+                      : "text-gray-400 hover:text-gray-600"
+                  }
+                `}
                     >
                       <span
-                        className={`w-2 h-2 rounded-full shrink-0 transition-all ${
-                          isActive ? tab.dot : "bg-gray-300"
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isActive ? tab.dot : "bg-transparent"
                         }`}
                       />
                       {t(tab.label)}
@@ -536,6 +662,19 @@ export default function EditCourseClient({
           onClose={() => setShowEditPopup(false)}
         />
       )}
+      <AlertPopup
+        title={t("confirm deletion")}
+        type="confirm"
+        message={`${t("Are you sure you want to delete the section")} ${
+          formData?.section || ""
+        } ${t("This action cannot be undone.")}`}
+        isOpen={showDeletePopup}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setCourseToDelete(null);
+        }}
+        onConfirm={deleteCourseVariant}
+      />
     </div>
   );
 }

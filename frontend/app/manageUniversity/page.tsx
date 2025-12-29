@@ -43,7 +43,7 @@ export default function ManageUniversityPage() {
   // }, [ACTIVE_TAB_KEY, activeTab]);
 
   return (
-    <ProtectedRoute roles={["admin", "instructor"]}>
+    <ProtectedRoute roles={["system_admin", "instructor"]}>
       <div className="max-w-[1400px] h-full flex flex-col mx-auto">
         {/* <h1 className="font-extralight text-2xl">
           Manage Universities & Faculties

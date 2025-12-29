@@ -271,7 +271,7 @@ export default function EditCourse() {
   };
 
   return (
-    <ProtectedRoute roles={["admin", "instructor"]}>
+    <ProtectedRoute roles={["system_admin", "instructor"]}>
       <div className="max-w-[1400px] h-full flex flex-col mx-auto">
         <p className="font-extralight text-2xl">{t("course information")}</p>
 

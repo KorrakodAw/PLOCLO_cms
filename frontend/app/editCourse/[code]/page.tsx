@@ -8,7 +8,7 @@ export default function courseManageClient({
 }) {
   const courseCode = params.code;
   return (
-    <ProtectedRoute roles={["admin", "instructor"]}>
+    <ProtectedRoute roles={["system_admin", "instructor"]}>
       <div className="max-w-[1400px] h-full flex flex-col mx-auto">
         <EditCourseClient courseCode={courseCode} />
       </div>

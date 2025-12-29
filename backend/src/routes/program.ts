@@ -129,7 +129,7 @@ router.get("/paginate", authenticateToken, async (req, res) => {
 router.post(
   "/bulk",
   authenticateToken,
-  authorizeRoles("admin", "instructor"),
+  authorizeRoles("system_admin", "instructor"),
   async (req, res) => {
     // IMPORTANT: Frontend sends array directly, OR { programs: [] }.
     // This logic handles direct array. If your frontend sends { programs: [...] }, change this line.
