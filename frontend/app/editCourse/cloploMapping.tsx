@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { apiClient } from "../../utils/apiClient";
 import { useToast } from "../../components/Toast";
 import { useTranslation } from "next-i18next";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // --- Types ---
 interface PLO {
@@ -32,13 +33,13 @@ export default function CloPloMapping({
   const { showToast, ToastElement } = useToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
+  const [loading, setLoading] = useState(false);
 
   // --- SELECTION STATES ---
 
   const [plos, setPlos] = useState<PLO[]>([]);
   const [clos, setClos] = useState<CLO[]>([]);
   const [mappingGrid, setMappingGrid] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(false);
 
   // --------------------------------------------------------
   // 1. DROPDOWN LOADING LOGIC
@@ -54,14 +55,17 @@ export default function CloPloMapping({
       setPlos([]);
       return;
     }
+    setLoading(true);
     apiClient
       .get(`/plo?programId=${programId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
         setPlos(res.data);
+        setLoading(false);
       })
       .catch((err) => {
+        setLoading(false);
         console.error(err);
         showToast(t("Failed to load PLOs"), "error");
       });
@@ -205,6 +209,7 @@ export default function CloPloMapping({
   // --------------------------------------------------------
   return (
     <div className="mt-5 p-5">
+      {loading && <LoadingOverlay />}
       {/* --- MATRIX TABLE --- */}
       <div className="bg-white p-4 shadow-md rounded-lg overflow-x-auto min-h-[300px] border border-gray-200 ">
         <div className="flex flex-col">

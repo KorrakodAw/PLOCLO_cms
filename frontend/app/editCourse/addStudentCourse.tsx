@@ -38,6 +38,7 @@ export default function AddStudentCourse({
   const { t } = useTranslation("common");
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const programRes = await apiClient.get(`/student?programId=${programId}`);
       const enrolledRes = await apiClient.get(
@@ -45,8 +46,10 @@ export default function AddStudentCourse({
       );
       setAllProgramStudents(programRes.data);
       setEnrolledStudents(enrolledRes.data);
+      setLoading(false);
     } catch (err) {
       console.error("Failed to fetch data", err);
+      setLoading(false);
     }
   };
 

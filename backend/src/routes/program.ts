@@ -233,7 +233,7 @@ router.post(
 router.post(
   "/",
   authenticateToken,
-  authorizeRoles("admin", "instructor"),
+  authorizeRoles("system_admin", "instructor"),
   async (req, res) => {
     const {
       faculty_id,

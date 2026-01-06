@@ -39,7 +39,7 @@ model program {
   courses              course[]
   plos                 plo[]
   student              student[]
-  faculty              faculty     @relation(fields: [faculty_id], references: [id], onDelete: Cascade)
+  faculty              faculty   @relation(fields: [faculty_id], references: [id], onDelete: Cascade)
 
   @@unique([program_code, program_year])
   @@map("program")
@@ -52,30 +52,28 @@ model faculty {
   name_th         String     @postgres.VarChar(100)
   abbreviation    String?    @postgres.VarChar(50)
   abbreviation_th String?    @postgres.VarChar(50)
-  university       university  @relation(fields: [university_id], references: [id], onDelete: Cascade)
+  university      university @relation(fields: [university_id], references: [id], onDelete: Cascade)
 
-  programs        program[]
+  programs program[]
 
   @@map("faculty")
 }
 
 model course {
-  id         Int     @id @default(autoincrement())
-  code       String  @postgres.VarChar(50)
-  name       String  @postgres.VarChar(255)
-  name_th    String  @postgres.VarChar(255)
-  program_id Int
-  section    Int
-  semester   Int     @default(1)
-  program    program     @relation(fields: [program_id], references: [id], onDelete: Cascade)
-  students       StudentOnCourse[]
-  clo        clo[]
-  assignments Assignment[] 
+  id          Int               @id @default(autoincrement())
+  code        String            @postgres.VarChar(50)
+  name        String            @postgres.VarChar(255)
+  name_th     String            @postgres.VarChar(255)
+  program_id  Int
+  section     Int
+  semester    Int               @default(1)
+  program     program           @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  students    StudentOnCourse[]
+  clo         clo[]
+  assignments Assignment[]
 
   @@map("course")
 }
-
-
 
 model plo {
   id         Int     @id @default(autoincrement())
@@ -91,14 +89,15 @@ model plo {
 }
 
 model clo {
-  id        Int     @id @default(autoincrement())
-  code      String  @postgres.VarChar(20)
-  name      String  @postgres.VarChar(255)
-  name_th   String  @postgres.VarChar(255)
+  id        Int    @id @default(autoincrement())
+  code      String @postgres.VarChar(20)
+  name      String @postgres.VarChar(255)
+  name_th   String @postgres.VarChar(255)
   course_id Int
-  course    course  @relation(fields: [course_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+  course    course @relation(fields: [course_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
 
-  clo_plo_mappings clo_plo_mapping[]
+  clo_plo_mappings        clo_plo_mapping[]
+  assignment_clo_mappings assignment_clo_mapping[]
 
   @@map("clo")
 }
@@ -111,8 +110,8 @@ model clo_plo_mapping {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  clo       clo      @relation(fields: [cloId], references: [id], onDelete: Cascade)
-  plo       plo      @relation(fields: [ploId], references: [id], onDelete: Cascade)
+  clo clo @relation(fields: [cloId], references: [id], onDelete: Cascade)
+  plo plo @relation(fields: [ploId], references: [id], onDelete: Cascade)
 
   @@unique([cloId, ploId], map: "unique_clo_plo")
   @@map("clo_plo_mapping")
@@ -123,25 +122,28 @@ model Assignment {
   courseId    Int      @map("course_id")
   name        String
   description String?
-  maxScore    Decimal  @default(100) @map("max_score") 
+  maxScore    Decimal  @default(100) @map("max_score")
   weight      Decimal  @default(0)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  course      course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  @@map("assignment") 
+  // 🟢 ADDED: Reverse relation for Assignment Mapping
+  assignment_clo_mappings assignment_clo_mapping[]
+
+  @@map("assignment")
 }
 
 model student {
-  id             Int       @id @default(autoincrement())
-  student_id     String    @unique @postgres.VarChar(20)
-  first_name     String    @postgres.VarChar(100)
-  last_name      String    @postgres.VarChar(100)
-  program_id     Int
-  created_at     DateTime? @default(now()) @postgres.Timestamp(6)
-  program        program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
+  id         Int       @id @default(autoincrement())
+  student_id String    @unique @postgres.VarChar(20)
+  first_name String    @postgres.VarChar(100)
+  last_name  String    @postgres.VarChar(100)
+  program_id Int
+  created_at DateTime? @default(now()) @postgres.Timestamp(6)
+  program    program?  @relation(fields: [program_id], references: [id], onUpdate: NoAction, onDelete: Cascade)
 
-  courses        StudentOnCourse[] 
+  courses StudentOnCourse[]
 
   @@map("student")
 }
@@ -151,9 +153,21 @@ model StudentOnCourse {
   course_id  Int
   assignedAt DateTime @default(now())
 
-  student    student  @relation(fields: [student_id], references: [id], onDelete: Cascade)
-  course     course   @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  student student @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  course  course  @relation(fields: [course_id], references: [id], onDelete: Cascade)
 
   @@id([student_id, course_id])
   @@map("student_on_course")
+}
+
+model assignment_clo_mapping {
+  assignment_id Int
+  clo_id        Int
+  weight        Int @default(0)
+
+  assignment Assignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  clo        clo        @relation(fields: [clo_id], references: [id], onDelete: Cascade)
+
+  @@id([assignment_id, clo_id])
+  @@map("assignment_clo_mapping")
 }

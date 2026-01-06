@@ -19,7 +19,6 @@ export default function HomePage() {
     <div className="flex flex-col items-center justify-center min-h-screen text-center">
       {!isLoggedIn ? (
         <>
-          <h1 className="text-3xl font-bold mb-4">{t("please login first")}</h1>
           <LoginForm />
         </>
       ) : (

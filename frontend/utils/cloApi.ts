@@ -2,7 +2,7 @@ import { apiClient } from "./apiClient";
 
 // 1. Interfaces
 export interface CLO {
-  id: string;
+  id: number;
   code: string;
   name: string;
   name_th?: string;

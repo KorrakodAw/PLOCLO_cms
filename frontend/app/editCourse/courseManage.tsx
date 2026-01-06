@@ -277,10 +277,10 @@ export default function CourseManagement({
       );
       return;
     }
-    if (!selectedSemester || !selectedSection) {
-      showToast("Please complete the selection from the filter.", "error");
-      return;
-    }
+    // if (!selectedSemester || !selectedSection) {
+    //   showToast("Please complete the selection from the filter.", "error");
+    //   return;
+    // }
 
     let successCount = 0;
     let failCount = 0;
@@ -316,8 +316,8 @@ export default function CourseManagement({
         name_th: String(nameTh),
         name: String(nameEn),
         program_id: selectedProgram,
-        semester: selectedSemester,
-        section: selectedSection,
+        semester: selectedSemester || "1",
+        section: selectedSection || "1",
       };
 
       // 3. API Call

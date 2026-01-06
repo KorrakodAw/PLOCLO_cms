@@ -133,5 +133,11 @@
   "Students in this Course": "Students in this Course",
   "upload universities excel": "Upload Universities Excel",
   "or": "Or",
-  "Are you sure you want to delete the section": "Are you sure you want to delete the section"
+  "Are you sure you want to delete the section": "Are you sure you want to delete the section",
+  "Add Program Variant": "Add Program Variant",
+  "Presentation": "Presentation",
+  "Midterm": "Midterm",
+  "Final": "Final",
+  "Assignments": "Assignments",
+  "Total Weight": "Total Weight"
 }

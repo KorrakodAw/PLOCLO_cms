@@ -471,6 +471,66 @@ export default function EditProgramClient({
     }
   };
 
+  // ฟังก์ชันสำหรับ Duplicate Program ไปยังปีถัดไป
+  const handleDuplicateProgram = async () => {
+    if (!formData || !token) return;
+
+    const currentYear = Number(formData.program_year);
+    const nextYear = currentYear + 1;
+
+    // ตรวจสอบเบื้องต้นว่ามีปีถัดไปอยู่แล้วหรือไม่
+    const isDuplicate = duplicatePrograms.some(
+      (p) => p.program_year === nextYear
+    );
+    if (isDuplicate) {
+      showToast(
+        `${t("Program for year")} ${nextYear} ${t("already exists.")}`,
+        "error"
+      );
+      return;
+    }
+
+    // เตรียมข้อมูลชุดเดิมแต่เปลี่ยนปี
+    const payload = {
+      program_code: formData.program_code,
+      program_name_en: formData.program_name_en,
+      program_name_th: formData.program_name_th,
+      program_shortname_en: formData.program_shortname_en,
+      program_shortname_th: formData.program_shortname_th,
+      program_year: nextYear,
+      faculty_id: formData.faculty_id,
+    };
+
+    try {
+      setLoading(true);
+      // ใช้ endpoint เดียวกับตอนสร้าง program ใหม่ แต่ส่งข้อมูลชุดเดิม
+      await apiClient.post("/program", payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      showToast(
+        `${t("Program duplicated to year")} ${nextYear} ${t("successfully!")}`,
+        "success"
+      );
+
+      // รีเฟรชข้อมูลรายการปีทั้งหมดเพื่อให้ Dropdown อัปเดต
+      const response = await fetchMatchingPrograms(token, programCode);
+      const updatedPrograms = response.data || [];
+      setDuplicatePrograms(updatedPrograms);
+
+      // เลือกปีใหม่ที่เพิ่งสร้างให้อัตโนมัติ
+      const newVariant = updatedPrograms.find(
+        (p) => p.program_year === nextYear
+      );
+      if (newVariant) setSelectedProgramId(String(newVariant.id));
+    } catch (err: unknown) {
+      console.error(err);
+      showToast(t("Failed to duplicate program."), "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- Render Logic ---
 
   if (loading) {
@@ -513,27 +573,55 @@ export default function EditProgramClient({
               {t("Manage Program Variants & Data")}
             </h2>
 
-            {/* Secondary/Utility Action */}
-            <button
-              onClick={() => setShowEditPopup(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition-all active:scale-95"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            <div className="flex items-center gap-2">
+              {/* ปุ่มสร้างปีถัดไป (New Action) */}
+              <button
+                onClick={handleDuplicateProgram}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all active:scale-95 border border-blue-100 shadow-sm"
+                title={`${t("Create variant for year")} ${
+                  Number(formData?.program_year || 0) + 1
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
-              {t("edit")}
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                {t("Add Program Variant")} (
+                {Number(formData?.program_year || 0) + 1})
+              </button>
+
+              {/* ปุ่ม Edit เดิม */}
+              <button
+                onClick={() => setShowEditPopup(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition-all active:scale-95"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+                {t("edit")}
+              </button>
+            </div>
           </div>
 
           {/* Lower Row: Selectors and Tabs */}

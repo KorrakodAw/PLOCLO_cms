@@ -17,6 +17,7 @@ import FormEditPopup from "@/components/EditPopup";
 import AddButton from "@/components/AddButton";
 import CloPloMapping from "../cloploMapping";
 import AssignmentMapping from "../assignmentMapping";
+import AssignmentCloMapping from "../assignmentCloMapping";
 import AddStudentCourse from "../addStudentCourse";
 import AlertPopup from "@/components/AlertPopup";
 
@@ -72,12 +73,16 @@ export default function EditCourseClient({
   const [showCloPloMappingTable, setShowCloPloMappingTable] = useState(false);
   const [showAssignmentTable, setShowAssignmentTable] = useState(false);
   const [showCloTable, setShowCloTable] = useState(true);
+  const [showAssignmentCloMappingTable, setShowAssignmentCloMappingTable] =
+    useState(false);
+  const [showAssignmentPloMappingTable, setShowAssignmentPloMappingTable] =
+    useState(false);
 
-  const [students, setStudents] = useState<Student[]>([]);
+  const [, setStudents] = useState<Student[]>([]);
   const [clos, setClos] = useState<CLO[]>([]); // Replace 'any' with your CLO type
 
   const [showDeletePopup, setShowDeletePopup] = useState(false);
-  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [, setCourseToDelete] = useState<Course | null>(null);
 
   // --- Dropdown Options (Year + Section) ---
   const courseOptions: Option[] = useMemo(() => {
@@ -262,6 +267,16 @@ export default function EditCourseClient({
         // Fetch Assignment data here if needed
         setLoading(false);
       }
+
+      if (showAssignmentCloMappingTable) {
+        // Fetch Assignment-CLO mapping data here if needed
+        setLoading(false);
+      }
+
+      if (showAssignmentPloMappingTable) {
+        // Fetch Assignment-PLO mapping data here if needed
+        setLoading(false);
+      }
     }
   }, [
     formData,
@@ -269,6 +284,9 @@ export default function EditCourseClient({
     showStudentTable,
     showCloPloMappingTable,
     showAssignmentTable,
+    showAssignmentCloMappingTable,
+    showAssignmentPloMappingTable,
+    showToast,
   ]);
 
   // --- Table Columns ---
@@ -281,30 +299,44 @@ export default function EditCourseClient({
     {
       id: "clo",
       label: "CLO",
-      color: "text-orange-600",
-      dot: "bg-orange-500",
+      color: "text-blue-600",
+      dot: "bg-blue-500",
       state: showCloTable,
     },
     {
       id: "student",
-      label: "student",
-      color: "text-amber-600",
-      dot: "bg-amber-500",
+      label: "Student",
+      color: "text-emerald-600",
+      dot: "bg-emerald-500",
       state: showStudentTable,
     },
     {
       id: "mapping",
-      label: "clo-plo mapping",
-      color: "text-amber-700",
-      dot: "bg-amber-700",
+      label: "CLO–PLO Mapping",
+      color: "text-violet-600",
+      dot: "bg-violet-500",
       state: showCloPloMappingTable,
     },
     {
       id: "assignment",
-      label: "assignment mapping",
-      color: "text-amber-800",
-      dot: "bg-amber-800",
+      label: "Assignment",
+      color: "text-amber-600",
+      dot: "bg-amber-500",
       state: showAssignmentTable,
+    },
+    {
+      id: "assignment-clo-mapping",
+      label: "Assignment–CLO Mapping",
+      color: "text-rose-600",
+      dot: "bg-rose-500",
+      state: showAssignmentCloMappingTable,
+    },
+    {
+      id: "assignment-plo-mapping",
+      label: "Assignment–PLO Mapping",
+      color: "text-indigo-600",
+      dot: "bg-indigo-500",
+      state: showAssignmentPloMappingTable,
     },
   ];
 
@@ -315,6 +347,8 @@ export default function EditCourseClient({
     setShowStudentTable(tabId === "student");
     setShowCloPloMappingTable(tabId === "mapping");
     setShowAssignmentTable(tabId === "assignment");
+    setShowAssignmentCloMappingTable(tabId === "assignment-clo-mapping");
+    setShowAssignmentPloMappingTable(tabId === "assignment-plo-mapping");
   };
 
   // --- Handlers ---
@@ -517,54 +551,83 @@ export default function EditCourseClient({
             {/* Right Side: Tab Navigation */}
             <div className="w-full lg:w-auto">
               {/* MOBILE TABS */}
-              <div className="xl:hidden relative">
-                <div className="bg-gray-50 p-1 rounded-2xl border border-gray-200 shadow-inner">
-                  <div className="relative">
-                    <button className="w-full flex items-center justify-between px-5 py-3 bg-white rounded-xl shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`w-2.5 h-2.5 rounded-full ${activeTabObj.dot}`}
-                        />
-                        <span className={`font-bold ${activeTabObj.color}`}>
-                          {t(activeTabObj.label)}
-                        </span>
-                      </div>
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    </button>
-                    <select
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      value={activeTabObj.id}
-                      onChange={(e) => handleTabChange(e.target.value)}
-                    >
-                      {TABS.map((tab) => (
-                        <option key={tab.id} value={tab.id}>
-                          {t(tab.label)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
+              <div className="xl:hidden">
+                <div className="relative">
+                  <button
+                    className="
+          w-full flex items-center justify-between
+          px-4 py-3
+          bg-white
+          border border-gray-200
+          rounded-xl
+          shadow-sm
+          hover:bg-gray-50
+          transition
+        "
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-2 h-2 rounded-full ${activeTabObj.dot}`}
+                      />
+                      <span
+                        className={`font-semibold text-sm ${activeTabObj.color}`}
+                      >
+                        {t(activeTabObj.label)}
+                      </span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </button>
 
+                  <select
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    value={activeTabObj.id}
+                    onChange={(e) => handleTabChange(e.target.value)}
+                  >
+                    {TABS.map((tab) => (
+                      <option key={tab.id} value={tab.id}>
+                        {t(tab.label)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>{" "}
               {/* DESKTOP TABS */}
-              <div className="hidden xl:flex bg-gray-50 p-1.5 rounded-2xl border border-gray-200 shadow-inner items-center gap-1">
+              <div
+                className="
+      hidden xl:flex
+      items-center
+      bg-gray-100
+      border border-gray-200
+      rounded-2xl
+      p-1
+      gap-1
+    "
+              >
                 {TABS.map((tab) => {
                   const isActive = tab.state;
+
                   return (
                     <button
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
-                      className={`px-5 py-2 rounded-xl transition-all duration-200 text-sm font-bold flex items-center gap-2
-                  ${
-                    isActive
-                      ? `bg-white ${tab.color} shadow-sm scale-[1.02]`
-                      : "text-gray-400 hover:text-gray-600"
-                  }
-                `}
+                      className={`
+            relative
+            px-4 py-2
+            rounded-xl
+            text-sm
+            font-semibold
+            flex items-center gap-2
+            transition-all duration-200
+            ${
+              isActive
+                ? `bg-white ${tab.color} shadow-sm`
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
+            }
+          `}
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
-                          isActive ? tab.dot : "bg-transparent"
+                          isActive ? tab.dot : "bg-gray-300"
                         }`}
                       />
                       {t(tab.label)}
@@ -580,10 +643,10 @@ export default function EditCourseClient({
       {/* --- TABLES --- */}
       {showCloTable && formData && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">
+          <div className="flex justify-end mb-4">
+            {/* <h3 className="text-lg font-semibold">
               {t("Course Learning Outcomes")}
-            </h3>
+            </h3> */}
             <AddButton
               buttonText={t("create new clo")}
               placeholderText={{
@@ -604,7 +667,7 @@ export default function EditCourseClient({
       {showStudentTable && formData && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{t("Student List")}</h3>
+            {/* <h3 className="text-lg font-semibold">{t("Student List")}</h3> */}
             {/* <AddButton
               buttonText={t("Add Student")}
               onSubmit={() => {}}
@@ -621,9 +684,9 @@ export default function EditCourseClient({
 
       {showCloPloMappingTable && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4">
+          {/* <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{t("CLO-PLO Mapping")}</h3>
-          </div>
+          </div> */}
           <CloPloMapping
             courseId={formData ? formData.id : ""}
             programId={formData ? formData.program_id : ""}
@@ -633,10 +696,27 @@ export default function EditCourseClient({
 
       {showAssignmentTable && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4">
+          {/* <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{t("Assignment Mapping")}</h3>
-          </div>
+          </div> */}
           <AssignmentMapping courseId={formData ? formData.id : ""} />
+        </div>
+      )}
+
+      {showAssignmentCloMappingTable && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          {/* <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">{t("Assignment-CLO Mapping")}</h3>
+          </div> */}
+          <AssignmentCloMapping courseId={formData ? formData.id : ""} />
+        </div>
+      )}
+
+      {showAssignmentPloMappingTable && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          {/* <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">{t("Assignment-PLO Mapping")}</h3>
+          </div> */}
         </div>
       )}
 
