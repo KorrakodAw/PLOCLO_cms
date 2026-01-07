@@ -9,7 +9,7 @@ import { useState } from "react";
 export default function HomePage() {
   const { isLoggedIn, user } = useAuth();
   const { t } = useTranslation("common");
-  const [loading, setLoading] = useState(false);
+  const [loading, ] = useState(false);
 
   if (loading) {
     return <LoadingOverlay />;

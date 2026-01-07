@@ -75,7 +75,7 @@ export default function AssignmentCloMapping({
     };
 
     fetchData();
-  }, [courseId, token]);
+  }, [courseId, token, showToast]);
 
   useEffect(() => {
     if (clos.length > 0 && !selectedClo) {
