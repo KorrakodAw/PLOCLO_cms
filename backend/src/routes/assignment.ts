@@ -32,7 +32,7 @@ router.get("/", authenticateToken, async (req, res) => {
 router.post("/", authenticateToken, async (req, res) => {
   try {
     // FIX: Destructure the columns that actually exist in your image
-    const { course_id, name, description, max_score, weight } = req.body;
+    const { course_id, name, description, category, max_score, weight } = req.body;
 
     // Validation
     if (!course_id || !name) {
@@ -41,13 +41,14 @@ router.post("/", authenticateToken, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO assignment 
-      (course_id, name, description, max_score, weight) 
-      VALUES ($1, $2, $3, $4, $5) 
+      (course_id, name, description, category, max_score, weight) 
+      VALUES ($1, $2, $3, $4, $5, $6) 
       RETURNING *`,
       [
         course_id,
         name,
         description || "", // Handle optional description
+        category || "assignment", // Default category if missing
         max_score || 100, // Default to 100 if missing
         weight || 0, // Default to 0 if missing
       ]

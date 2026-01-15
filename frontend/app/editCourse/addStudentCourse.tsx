@@ -8,14 +8,15 @@ import { useTranslation } from "react-i18next";
 
 interface Student {
   id: number;
-  student_id: string;
+  student_code: string;
   first_name: string;
   last_name: string;
 }
 
 interface StudentCourse {
+  id: number;
   student_code: string;
-  student_id: number;
+  student_id: string | number;
   first_name: string;
   last_name: string;
   assignedAt: string;
@@ -38,8 +39,8 @@ export default function AddStudentCourse({
   const { t } = useTranslation("common");
 
   const loadData = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const programRes = await apiClient.get(`/student?programId=${programId}`);
       const enrolledRes = await apiClient.get(
         `/StudentOnCourse?courseId=${courseId}`
@@ -104,7 +105,7 @@ export default function AddStudentCourse({
   };
 
   // Explicitly type the array so TS checks accessors against StudentCourse
-  const StudentColumns: Column<StudentCourse>[] = [
+  const StudentColumns: Column<Student>[] = [
     {
       header: t("Student ID"),
       accessor: "student_code", // Must exist in StudentCourse
@@ -203,7 +204,7 @@ export default function AddStudentCourse({
                           }}
                         />
                       </td>
-                      <td className="p-2 text-sm">{s.student_id}</td>
+                      <td className="p-2 text-sm">{s.student_code}</td>
                       <td className="p-2 text-sm">
                         {s.first_name} {s.last_name}
                       </td>

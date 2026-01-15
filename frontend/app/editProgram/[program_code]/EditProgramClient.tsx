@@ -210,7 +210,7 @@ export default function EditProgramClient({
   const StudentColumn: Column<Student>[] = [
     {
       header: t("Student ID"),
-      accessor: "student_id",
+      accessor: "student_code",
       className: "font-semibold",
     },
     {
@@ -380,7 +380,7 @@ export default function EditProgramClient({
 
     // Map form fields to backend payload
     const payload = {
-      student_id: String(data.code), // code → student_id
+      student_code: String(data.code), // code → student_id
       first_name: String(data.nameEn), // nameEn → first_name
       last_name: String(data.nameTh), // nameTh → last_name
       program_id: formData.id, // Use current program ID
@@ -430,7 +430,7 @@ export default function EditProgramClient({
       }
 
       const payload = {
-        student_id: String(student_id),
+        student_code: String(student_id),
         first_name: String(first_name),
         last_name: String(last_name),
         program_id,

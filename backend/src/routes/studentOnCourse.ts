@@ -21,14 +21,14 @@ router.get("/", authenticateToken, async (_req, res) => {
         soc."assignedAt", 
         c.name AS course_name,
         c.code AS course_code,
-        s.student_id AS student_code,
+        s.student_code,
         s.first_name,
         s.last_name
       FROM student_on_course soc
       JOIN course c ON soc.course_id = c.id
       JOIN student s ON soc.student_id = s.id
       WHERE soc.course_id = $1
-      ORDER BY s.student_id ASC
+      ORDER BY s.id ASC
       `,
       [courseId]
     );

@@ -26,7 +26,7 @@ interface AddStudentProps {
 
 interface Student {
   id: number;
-  student_id: string;
+  student_code: string;
   name: string;
   first_name: string;
   last_name: string;
@@ -208,7 +208,7 @@ export default function AddStudent({
   };
 
   const studentColumns: Column<Student>[] = [
-    { header: t("student id"), accessor: "student_id" },
+    { header: t("student code"), accessor: "student_code" },
     {
       header: "full name",
       accessor: "name",
@@ -252,7 +252,7 @@ export default function AddStudent({
       await apiClient.patch(
         `/student/${selectedStudent.id}`,
         {
-          student_id: selectedStudent.student_id,
+          student_code: selectedStudent.student_code,
           first_name: selectedStudent.first_name,
           last_name: selectedStudent.last_name,
         },
@@ -318,11 +318,13 @@ export default function AddStudent({
 
     // Map form fields to backend payload
     const payload = {
-      student_id: String(data.code), // code → student_id
+      student_code: String(data.code), // code → student_code
       first_name: String(data.nameEn), // nameEn → first_name
       last_name: String(data.nameTh), // nameTh → last_name
       program_id: selectedProgram,
     };
+
+    console.log("PAYLOAD IN COMPONENT:", payload);
 
     try {
       await addStudent(payload, token);
@@ -359,20 +361,20 @@ export default function AddStudent({
     }));
 
     for (const [i, row] of rowsWithProgram.entries()) {
-      const student_id = row.student_id;
+      const student_code= row.student_code;
       const first_name = row.first_name;
       const last_name = row.last_name;
       const program_id = row.program_id;
 
       // ✅ Validate
-      if (!student_id || !first_name || !last_name || !program_id) {
+      if (!student_code || !first_name || !last_name || !program_id) {
         failCount++;
         errorDetails.push(`Row ${i + 1}: missing required fields`);
         continue;
       }
 
       const payload = {
-        student_id: String(student_id),
+        student_code: String(student_code),
         first_name: String(first_name),
         last_name: String(last_name),
         program_id,
@@ -473,7 +475,7 @@ export default function AddStudent({
           title={t("edit student")}
           data={selectedStudent}
           fields={[
-            { label: "student id", key: "student_id", type: "number" },
+            { label: "student id", key: "student_code", type: "number" },
             { label: "first name", key: "first_name", type: "text" },
             { label: "last name", key: "last_name", type: "text" },
           ]}

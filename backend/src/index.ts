@@ -19,6 +19,8 @@ import mappingRoutes from "./routes/mapping";
 import assignmentRoutes from "./routes/assignment";
 import studentOnCoureseRoutes from "./routes/studentOnCourse";
 import authRoutes from "./routes/auth";
+import scoreRoutes from "./routes/score";
+import gradeSettingRoutes from "./routes/grade";
 
 import passport from "passport";
 import "./config/passport"; // Import ไฟล์ตั้งค่าที่เราสร้างไว้
@@ -46,9 +48,11 @@ app.use("/api/university", univisityRoutes);
 app.use("/api/clo", cloRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/mapping", mappingRoutes);
-app.use("/api/assignments", assignmentRoutes);
+app.use("/api/assignment", assignmentRoutes);
 app.use("/api/studentOnCourse", studentOnCoureseRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/score", scoreRoutes);
+app.use("/api/grade", gradeSettingRoutes);
 
 app.listen(3001, async () => {
   await seedAdminUser();

@@ -13,6 +13,7 @@ interface Assignment {
   id: number;
   course_id: number;
   name: string;
+  category: string;
   description: string;
   max_score: number;
   weight: number;
@@ -28,6 +29,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [newAssignName, setNewAssignName] = useState("");
+  const [newAssignCategory, setNewAssignCategory] = useState("");
   const [newAssignWeight, setNewAssignWeight] = useState<string>("");
   const [newAssignMaxScore, setNewAssignMaxScore] = useState<string>("");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -48,7 +50,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
     if (!courseId || !token) return;
     setLoading(true);
     try {
-      const res = await apiClient.get(`/assignments?courseId=${courseId}`, {
+      const res = await apiClient.get(`/assignment?courseId=${courseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAssignments(res.data);
@@ -80,20 +82,29 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
       return;
     }
 
+    if (!newAssignCategory) {
+      showToast("Please select a category", "error");
+      return;
+    }
+
+    const payload = {
+      course_id: Number(courseId),
+      name: newAssignName.trim(),
+      max_score: Number(newAssignMaxScore),
+      category: newAssignCategory, // Check if this is "final" or "finalExam"
+      weight: Number(newAssignWeight),
+    };
+
     try {
       setLoading(true);
-      await apiClient.post(
-        "/assignments",
-        {
-          course_id: Number(courseId),
-          name: newAssignName.trim(),
-          max_score: Number(newAssignMaxScore),
-          weight: Number(newAssignWeight),
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await apiClient.post("/assignment", payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log(payload);
 
       showToast("Assignment added!", "success");
+      // setNewAssignCategory("");
       // setNewAssignName("");
       // setNewAssignWeight("");
       // setNewAssignMaxScore("");
@@ -125,7 +136,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
     try {
       setLoading(true);
       await apiClient.patch(
-        `/assignments/${editFormData.id}`,
+        `/assignment/${editFormData.id}`,
         {
           name: editFormData.name,
           max_score: Number(editFormData.max_score),
@@ -153,7 +164,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
 
     try {
       setLoading(true);
-      await apiClient.delete(`/assignments/${targetId}`, {
+      await apiClient.delete(`/assignment/${targetId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -181,7 +192,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
 
       // Option B: Frontend Loop (slower but works without backend changes)
       const deletePromises = assignments.map((a) =>
-        apiClient.delete(`/assignments/${a.id}`, {
+        apiClient.delete(`/assignment/${a.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
       );
@@ -217,6 +228,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
   const filteredData = useMemo(() => {
     let data = assignments;
 
+    // --- 1. Filter Logic ---
     if (activeFilter === "others") {
       data = assignments.filter(
         (a) =>
@@ -230,6 +242,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
       );
     }
 
+    // --- 2. Sorting Helpers ---
     const sortOrder = ["presentation", "assignment", "midterm", "final"];
 
     const getSortScore = (name: string) => {
@@ -240,14 +253,53 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
       return index === -1 ? 999 : index;
     };
 
+    // Mapping for common Roman numerals (up to 12 usually covers exams/parts)
+    const romanMap: Record<string, number> = {
+      i: 1,
+      ii: 2,
+      iii: 3,
+      iv: 4,
+      v: 5,
+      vi: 6,
+      vii: 7,
+      viii: 8,
+      ix: 9,
+      x: 10,
+      xi: 11,
+      xii: 12,
+    };
+
+    // Helper: Converts "Part-II" -> "part-2" for comparison
+    const normalizeName = (name: string) => {
+      return (
+        name
+          .toLowerCase()
+          // Regex looks for roman numerals surrounded by word boundaries (\b)
+          // This ensures we match " II " or "-II-" but not inside words like "video"
+          .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
+            return romanMap[match].toString();
+          })
+      );
+    };
+
+    // --- 3. Final Sort Execution ---
     return [...data].sort((a, b) => {
+      // Priority 1: Category Sort (Midterm, Final, etc.)
       const scoreA = getSortScore(a.name);
       const scoreB = getSortScore(b.name);
 
       if (scoreA !== scoreB) {
         return scoreA - scoreB;
       }
-      return a.name.localeCompare(b.name, undefined, { numeric: true });
+
+      // Priority 2: Roman Numeral Aware Natural Sort
+      const normA = normalizeName(a.name);
+      const normB = normalizeName(b.name);
+
+      // localeCompare with numeric: true handles:
+      // "Part-1" vs "Part-2" (Converted from I/II)
+      // "Problem-1" vs "Problem-10"
+      return normA.localeCompare(normB, undefined, { numeric: true });
     });
   }, [assignments, activeFilter]);
 
@@ -310,8 +362,56 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
           <span className="w-2 h-6 bg-blue-600 rounded-full"></span>Create
           Assignment
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
+
+        {/* 1. Changed div to form and added onSubmit handler */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAddAssignment();
+          }}
+          // CHANGED: Using Flexbox for better control over width ratios
+          className="flex flex-col md:flex-row gap-4 items-end w-full"
+        >
+          {/* 1. Category: Fixed width or percentage */}
+          <div className="max-w-[130px] md:w-1/4 ">
+            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
+              Category
+            </label>
+            <div className="relative">
+              <select
+                value={newAssignCategory}
+                onChange={(e) => setNewAssignCategory(e.target.value)}
+                className="w-full border border-gray-200 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-100 appearance-none bg-white cursor-pointer"
+              >
+                <option value="">{t("Select Category")}</option>
+                <option value="assignment">{t("assignment")}</option>
+                <option value="quiz">{t("Quiz")}</option>
+                <option value="project">{t("Project")}</option>
+                <option value="presentation">{t("Presentation")}</option>
+                <option value="midtermExam">{t("Midterm")}</option>
+                <option value="finalExam">{t("Final")}</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Name: flex-1 makes this expand to fill remaining space (Longer) */}
+          <div className="w-full md:flex-1">
             <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
               Name
             </label>
@@ -323,13 +423,16 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
               placeholder="e.g. Midterm"
             />
           </div>
-          <div>
+
+          {/* 3. Weight: Fixed small width (Closer) */}
+          <div className="w-full md:w-24 shrink-0">
             <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
               Weight (%)
             </label>
             <input
               type="text"
-              className="w-full border border-gray-200 p-3 rounded-2xl outline-none"
+              // Removed w-[50px], used w-full of the container instead
+              className="w-full border border-gray-200 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-100 text-center"
               value={newAssignWeight}
               onChange={(e) => {
                 const val = e.target.value;
@@ -340,13 +443,16 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
               placeholder="0.00"
             />
           </div>
-          <div>
+
+          {/* 4. Max Score: Fixed small width (Closer) */}
+          <div className="w-full md:w-24 shrink-0">
             <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
               Max Score
             </label>
             <input
               type="text"
-              className="w-full border border-gray-200 p-3 rounded-2xl outline-none"
+              // Removed w-[50px], used w-full of the container instead
+              className="w-full border border-gray-200 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-100 text-center"
               value={newAssignMaxScore}
               onChange={(e) => {
                 const val = e.target.value;
@@ -358,13 +464,14 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
             />
           </div>
 
+          {/* 5. Button */}
           <button
-            onClick={handleAddAssignment}
-            className="bg-blue-600 text-white font-black py-3.5 rounded-2xl hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100"
+            type="submit"
+            className="w-full md:w-auto px-6 bg-blue-600 text-white font-black py-3 rounded-2xl hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100 shrink-0 h-[50px]"
           >
             + Add
           </button>
-        </div>
+        </form>
       </div>
 
       {/* TABLE SECTION WITH FILTER */}
@@ -407,6 +514,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50/50 text-gray-400 text-[10px] uppercase font-black tracking-widest">
               <tr>
+                <th className="p-5 text-center w-16">#</th>
                 <th className="p-5">Name</th>
                 <th className="p-5 text-center">Score</th>
                 <th className="p-5 text-center">Weight</th>
@@ -416,11 +524,17 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredData.length > 0 ? (
-                filteredData.map((a) => (
+                // Added 'index' parameter here
+                filteredData.map((a, index) => (
                   <tr
                     key={a.id}
                     className="group hover:bg-blue-50/30 transition-all"
                   >
+                    {/* Added Number Column */}
+                    <td className="p-5 text-center text-gray-400 font-bold text-xs">
+                      {index + 1}
+                    </td>
+
                     <td className="p-5 font-bold text-gray-700">{a.name}</td>
                     <td className="p-5 text-center text-gray-500">
                       {Number(a.max_score).toFixed(0)}
@@ -481,7 +595,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
               ) : (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6} // Updated colSpan from 5 to 6
                     className="p-20 text-center text-gray-300 italic font-bold"
                   >
                     {t("No results found for ", { activeFilter })}

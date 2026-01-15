@@ -8,8 +8,6 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 import { getUniversities, University } from "../../utils/universityApi";
 import { getFaculties, Faculty } from "../../utils/facultyApi";
 import { getPrograms, Program } from "../../utils/programApi";
-import { Course } from "../../utils/courseApi";
-import { apiClient } from "@/utils/apiClient";
 
 import { useTranslation } from "react-i18next";
 
@@ -22,7 +20,7 @@ export default function EditCourse() {
   const [year, setYear] = useState("");
   const [semester, setSemester] = useState("");
   const [section, setSection] = useState("");
-  const [course, setCourse] = useState("");
+
   // const ACTIVE_TAB_KEY = "editCourseActiveTab";
   // const ACTIVE_TAB_KEY = `activeTab_${location.pathname}`;
 
@@ -38,19 +36,18 @@ export default function EditCourse() {
   const [yearOptions, setYearOptions] = useState<
     { label: string; value: string }[]
   >([]);
-  const [semesterOptions] = useState([
-    { label: t("all"), value: "" },
-    { label: "1", value: "1" },
-    { label: "2", value: "2" },
-    { label: "summer", value: "3" },
-  ]);
-  const [sectionOptions] = useState([
-    { label: t("all"), value: "" },
-    { label: "1", value: "1" },
-    { label: "2", value: "2" },
-    { label: "3", value: "3" },
-  ]);
-  const [, setCourseOptions] = useState<{ label: string; value: string }[]>([]);
+  // const [semesterOptions] = useState([
+  //   { label: t("all"), value: "" },
+  //   { label: "1", value: "1" },
+  //   { label: "2", value: "2" },
+  //   { label: "summer", value: "3" },
+  // ]);
+  // const [sectionOptions] = useState([
+  //   { label: t("all"), value: "" },
+  //   { label: "1", value: "1" },
+  //   { label: "2", value: "2" },
+  //   { label: "3", value: "3" },
+  // ]);
 
   const tabs = [
     { id: "general", label: t("general information") },
@@ -152,7 +149,6 @@ export default function EditCourse() {
 
       return;
     }
-    console.log("facultyId: ", faculty);
 
     getPrograms(token, faculty) // ← ส่ง facultyId ไป
       .then((data) => {
@@ -214,40 +210,6 @@ export default function EditCourse() {
       })
       .catch(() => setYearOptions([{ label: t("all"), value: "" }]));
   }, [program, faculty, t, lang]);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token || !faculty || !program || !year) {
-      setCourseOptions([{ label: t("all"), value: "" }]);
-      setCourse("");
-      return;
-    }
-
-    // Fetch courses based on selected filters
-    const fetchCourses = async () => {
-      try {
-        const data = await apiClient.get(
-          `/courses?facultyId=${faculty}&programCode=${program}&year=${year}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        setCourseOptions([
-          { label: t("all"), value: "" },
-          ...data.data.map((course: Course) => ({
-            label: course.name,
-            value: String(course.id),
-          })),
-        ]);
-      } catch (err) {
-        console.error(err);
-        setCourseOptions([{ label: t("all"), value: "" }]);
-      }
-    };
-
-    fetchCourses();
-  }, [faculty, program, year, t, lang]);
 
   // useEffect(() => {
   //   try {
@@ -318,7 +280,7 @@ export default function EditCourse() {
             options={yearOptions}
             disabled={!program}
           />
-          <DropdownSelect
+          {/* <DropdownSelect
             label={t("semester")}
             value={semester}
             onChange={(e) => setSemester(e.target.value)}
@@ -331,7 +293,7 @@ export default function EditCourse() {
             onChange={(e) => setSection(e.target.value)}
             options={sectionOptions}
             disabled={!semester}
-          />
+          /> */}
           <button
             onClick={() => {
               setUniversity("");

@@ -18,7 +18,7 @@ router.get("/", authenticateToken, async (_req, res) => {
     const result = await pool.query(
       `SELECT 
         student.id,
-        student.student_id,
+        student.student_code,
         student.first_name,
         student.last_name,
         student.program_id,
@@ -43,19 +43,19 @@ router.get("/", authenticateToken, async (_req, res) => {
  * ✅ POST create new student
  */
 router.post("/", authenticateToken, async (req, res) => {
-  const { student_id, first_name, last_name, program_id } = req.body;
+  const { student_code, first_name, last_name, program_id } = req.body;
 
-  if (!student_id || !first_name || !last_name || !program_id) {
+  if (!student_code || !first_name || !last_name || !program_id) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
     const result = await pool.query(
       `INSERT INTO student 
-        (student_id, first_name, last_name, program_id)
+        (student_code, first_name, last_name, program_id)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [student_id, first_name, last_name, program_id]
+      [student_code, first_name, last_name, program_id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -92,7 +92,7 @@ router.get("/paginate", authenticateToken, async (req, res) => {
     let query = `
       SELECT  
         student.id,
-        student.student_id,
+        student.student_code,
         student.first_name,
         student.last_name,
         student.program_id,
@@ -176,17 +176,17 @@ router.get("/paginate", authenticateToken, async (req, res) => {
 
 router.patch("/:id", authenticateToken, async (req, res) => {
   const studentId = req.params.id;
-  const { first_name, last_name, student_id } = req.body;
+  const { first_name, last_name, student_code } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE student
        SET first_name = $1,
            last_name = $2,
-           student_id = $3
+           student_code = $3
        WHERE id = $4
        RETURNING *`,
-      [first_name, last_name, student_id, studentId]
+      [first_name, last_name, student_code, studentId]
     );
 
     if (result.rows.length === 0) {

@@ -1,8 +1,9 @@
 import { apiClient } from "../utils/apiClient";
 
 export interface Student {
-  id: string;
-  student_id: string;
+  student_id: number;
+  id: number;
+  student_code: string;
   program_id: string;
   first_name: string;
   last_name: string;
@@ -11,7 +12,7 @@ export interface Student {
 }
 
 export interface StudentInput {
-  student_id: string;
+  student_code: string;
   program_id: number | string;
   first_name: string;
   last_name: string;

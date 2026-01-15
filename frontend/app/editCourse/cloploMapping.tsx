@@ -36,17 +36,15 @@ export default function CloPloMapping({
   const [loading, setLoading] = useState(false);
 
   // --- SELECTION STATES ---
-
   const [plos, setPlos] = useState<PLO[]>([]);
   const [clos, setClos] = useState<CLO[]>([]);
   const [mappingGrid, setMappingGrid] = useState<Record<string, number>>({});
 
-  // --------------------------------------------------------
-  // 1. DROPDOWN LOADING LOGIC
-  // --------------------------------------------------------
+  // 🟢 NEW: Track changed keys to only save what is modified
+  const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
 
   // --------------------------------------------------------
-  // 2. MATRIX DATA FETCHING
+  // 1. DATA FETCHING
   // --------------------------------------------------------
 
   // A. Fetch PLOs
@@ -75,19 +73,16 @@ export default function CloPloMapping({
   useEffect(() => {
     if (!courseId || !token) {
       setClos([]);
-      setMappingGrid({}); // Reset grid
+      setMappingGrid({});
       return;
     }
 
     setLoading(true);
 
-    // Fetch both endpoints in parallel
     Promise.all([
-      // 1. Get CLOs
       apiClient.get(`/clo?courseId=${courseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
-      // 2. Get Saved Weights
       apiClient.get(`/mapping/clo-plo/${courseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
@@ -95,7 +90,6 @@ export default function CloPloMapping({
       .then(([cloRes, mappingRes]) => {
         setClos(cloRes.data);
 
-        // Process Mappings into the Grid Dictionary
         const newGrid: Record<string, number> = {};
         const mappings = Array.isArray(mappingRes.data) ? mappingRes.data : [];
 
@@ -104,6 +98,8 @@ export default function CloPloMapping({
         });
 
         setMappingGrid(newGrid);
+        // 🟢 Reset changed keys on load
+        setChangedKeys(new Set());
       })
       .catch((err) => {
         console.error("Error loading matrix:", err);
@@ -119,32 +115,33 @@ export default function CloPloMapping({
   // --------------------------------------------------------
 
   const handleWeightChange = (cloId: number, ploId: number, val: string) => {
-    // Allow empty string (user deleting) or valid numbers only
     if (val !== "" && isNaN(Number(val))) return;
+
+    const key = `${cloId}_${ploId}`;
 
     setMappingGrid((prev) => ({
       ...prev,
-      // Ensure the value is converted to a number, or 0 if empty
-      [`${cloId}_${ploId}`]: val === "" ? 0 : Number(val),
+      [key]: val === "" ? 0 : Number(val),
     }));
+
+    // 🟢 Mark this cell as changed
+    setChangedKeys((prev) => new Set(prev).add(key));
   };
 
-  // --- NEW: Memoized calculation of total weight for each CLO ---
+  // Memoized calculation of total weight for each CLO
   const cloTotals = useMemo(() => {
     const totals: Record<number, number> = {};
 
-    // Group all weights by their CLO ID
     Object.keys(mappingGrid).forEach((key) => {
       const [cloIdStr] = key.split("_");
       const cloId = Number(cloIdStr);
-      const weight = mappingGrid[key] || 0; // Use 0 if key is empty/undefined
+      const weight = mappingGrid[key] || 0;
 
       if (clos.some((c) => c.id === cloId)) {
         totals[cloId] = (totals[cloId] || 0) + weight;
       }
     });
 
-    // Ensure all displayed CLOs have a total, even if 0
     clos.forEach((clo) => {
       if (!(clo.id in totals)) {
         totals[clo.id] = 0;
@@ -154,12 +151,8 @@ export default function CloPloMapping({
     return totals;
   }, [mappingGrid, clos]);
 
-  // --- NEW: Overall Validation Check ---
   const isValidationSuccess = useMemo(() => {
-    // If no CLOs are loaded, validation passes by default
     if (clos.length === 0) return true;
-
-    // Check if every CLO total is exactly 100
     return Object.values(cloTotals).every(
       (total) => Math.abs(total - 100) < 0.01
     );
@@ -168,26 +161,28 @@ export default function CloPloMapping({
   const handleSave = async () => {
     if (!token) return;
 
-    // --- 1. Client-side Validation Check ---
+    // 🟢 Check if there are any changes
+    if (changedKeys.size === 0) {
+      showToast(t("No changes to save"), "success");
+      return;
+    }
+
     if (!isValidationSuccess) {
       showToast(t("validation_error_100_percent"), "error");
-      return; // STOP here, do not save.
+      return;
     }
-    // --------------------------------------
 
     setLoading(true);
 
-    // Prepare the payload (only send mappings with a weight > 0)
-    const updates = Object.keys(mappingGrid)
-      .filter((key) => mappingGrid[key] > 0)
-      .map((key) => {
-        const [cloId, ploId] = key.split("_");
-        return {
-          clo_id: Number(cloId),
-          plo_id: Number(ploId),
-          weight: mappingGrid[key],
-        };
-      });
+    // 🟢 Filter updates: ONLY include keys that are in 'changedKeys'
+    const updates = Array.from(changedKeys).map((key) => {
+      const [cloId, ploId] = key.split("_");
+      return {
+        clo_id: Number(cloId),
+        plo_id: Number(ploId),
+        weight: mappingGrid[key] || 0, // Ensure value exists
+      };
+    });
 
     try {
       await apiClient.post(
@@ -196,6 +191,8 @@ export default function CloPloMapping({
         { headers: { Authorization: `Bearer ${token}` } }
       );
       showToast(t("Mapping saved successfully!"), "success");
+      // 🟢 Reset changes tracker on success
+      setChangedKeys(new Set());
     } catch (err: any) {
       console.error(err);
       showToast(err.response?.data?.message || t("Failed to save"), "error");
@@ -210,33 +207,40 @@ export default function CloPloMapping({
   return (
     <div className="mt-5 p-5">
       {loading && <LoadingOverlay />}
-      {/* --- MATRIX TABLE --- */}
       <div className="bg-white p-4 shadow-md rounded-lg overflow-x-auto min-h-[300px] border border-gray-200 ">
         <div className="flex flex-col">
           {/* Save Button */}
           {courseId && clos.length > 0 && plos.length > 0 && (
             <button
               onClick={handleSave}
-              disabled={loading || !isValidationSuccess} // 💡 DISABLE ON VALIDATION FAIL
-              className={`px-6 py-2.5 max-w-[300px] rounded shadow transition disabled:opacity-50 font-medium mb-2.5 self-end
+              // Disable if loading, invalid, OR no changes made
+              disabled={
+                loading || !isValidationSuccess || changedKeys.size === 0
+              }
+              className={`px-6 py-2.5 max-w-[300px] rounded shadow transition disabled:opacity-50 font-medium mb-2.5 self-end flex items-center gap-2 justify-center
                 ${
-                  isValidationSuccess
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : "bg-red-500 text-white cursor-not-allowed"
+                  !isValidationSuccess
+                    ? "bg-red-500 text-white cursor-not-allowed"
+                    : changedKeys.size === 0
+                    ? "bg-gray-300 text-gray-500"
+                    : "bg-green-600 hover:bg-green-700 text-white"
                 }`}
             >
               {loading ? t("Loading...") : t("Save Changes")}
+              {/* {changedKeys.size > 0 && (
+                <span className="bg-white/20 px-2 py-0.5 rounded text-xs">
+                  {changedKeys.size}
+                </span>
+              )} */}
             </button>
           )}
 
           {/* Matrix Content */}
           {courseId && clos.length > 0 && plos.length > 0 && (
             <table className="w-full border-collapse border border-gray-300 text-sm">
-              {/* HEADERS: PLOs as Columns + NEW TOTAL COLUMN */}
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border p-0 left-0 bg-gray-100 z-30 w-[100px] min-w-[70px] h-14 shadow-md">
-                    {/* Diagonal Box */}
                     <div className="relative w-full h-full">
                       <svg className="absolute inset-0 w-full h-full pointer-events-none">
                         <line
@@ -271,14 +275,12 @@ export default function CloPloMapping({
                     </th>
                   ))}
 
-                  {/* 💡 NEW: Total Column Header */}
-                  <th className="border p-2 min-w-[90px] text-center bg-gray-200 font-extrabold text-gray-800  right-0 z-20 shadow-inner">
+                  <th className="border p-2 min-w-[90px] text-center bg-gray-200 font-extrabold text-gray-800 right-0 z-20 shadow-inner">
                     {t("Total (%)")}
                   </th>
                 </tr>
               </thead>
 
-              {/* BODY: CLOs as Rows */}
               <tbody>
                 {clos.map((clo) => {
                   const total = cloTotals[clo.id] || 0;
@@ -289,9 +291,8 @@ export default function CloPloMapping({
                       key={clo.id}
                       className={`hover:bg-gray-50 transition-colors ${
                         !isTotalValid ? "border-t-2 border-red-400" : ""
-                      }`} // 💡 Highlight entire invalid row
+                      }`}
                     >
-                      {/* CLO Code */}
                       <td
                         className="border p-3 font-bold left-0 bg-white z-10 shadow-sm"
                         title={clo.name_en}
@@ -299,11 +300,12 @@ export default function CloPloMapping({
                         {clo.code}
                       </td>
 
-                      {/* PLO INPUTS */}
                       {plos.map((plo) => {
                         const key = `${clo.id}_${plo.id}`;
                         const weight = mappingGrid[key] || "";
                         const hasValue = Number(weight) > 0;
+                        const isChanged = changedKeys.has(key);
+
                         return (
                           <td
                             key={plo.id}
@@ -315,11 +317,18 @@ export default function CloPloMapping({
                               type="number"
                               min="0"
                               max="100"
-                              className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                                hasValue
-                                  ? "font-bold text-blue-700"
-                                  : "text-gray-400"
-                              }`}
+                              className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all 
+                                ${
+                                  hasValue
+                                    ? "font-bold text-blue-700"
+                                    : "text-gray-400"
+                                }
+                                ${
+                                  isChanged
+                                    ? "bg-yellow-50 ring-2 ring-yellow-200"
+                                    : ""
+                                }
+                              `}
                               placeholder="-"
                               value={weight}
                               onChange={(e) =>
@@ -334,7 +343,6 @@ export default function CloPloMapping({
                         );
                       })}
 
-                      {/* 💡 NEW: Total Column Cell (Validation Status) */}
                       <td
                         className={`border p-3 text-center font-extrabold ${
                           isTotalValid
@@ -354,7 +362,6 @@ export default function CloPloMapping({
                 })}
               </tbody>
 
-              {/* 💡 Validation Summary Row */}
               {!isValidationSuccess && (
                 <tfoot>
                   <tr>
@@ -370,7 +377,6 @@ export default function CloPloMapping({
             </table>
           )}
 
-          {/* Empty States */}
           {!loading && courseId && clos.length === 0 && (
             <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
               {t("no_clos_found")}
@@ -382,7 +388,6 @@ export default function CloPloMapping({
             </div>
           )}
 
-          {/* Default State */}
           {!courseId && (
             <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
               <p className="text-gray-400 font-medium">

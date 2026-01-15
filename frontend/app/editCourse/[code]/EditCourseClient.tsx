@@ -20,6 +20,9 @@ import AssignmentMapping from "../assignmentMapping";
 import AssignmentCloMapping from "../assignmentCloMapping";
 import AddStudentCourse from "../addStudentCourse";
 import AlertPopup from "@/components/AlertPopup";
+import ScoreMapping from "../scoreMapping";
+import AssignmentPloMapping from "../assignmentPloMapping";
+import GradeSetting from "../gradeSetting";
 
 interface PaginatedResponse {
   data: Course[];
@@ -77,6 +80,8 @@ export default function EditCourseClient({
     useState(false);
   const [showAssignmentPloMappingTable, setShowAssignmentPloMappingTable] =
     useState(false);
+  const [showScoreMappingTable, setShowScoreMappingTable] = useState(false);
+  const [showGradeSettingTable, setShowGradeSettingTable] = useState(false);
 
   const [, setStudents] = useState<Student[]>([]);
   const [clos, setClos] = useState<CLO[]>([]); // Replace 'any' with your CLO type
@@ -277,6 +282,21 @@ export default function EditCourseClient({
         // Fetch Assignment-PLO mapping data here if needed
         setLoading(false);
       }
+
+      if (showScoreMappingTable) {
+        // Fetch Score mapping data here if needed
+        setLoading(false);
+      }
+
+      if (showAssignmentPloMappingTable) {
+        setLoading(false);
+      }
+
+      if (showGradeSettingTable) {
+        // Fetch Grade Setting data here if needed
+        setLoading(false);
+      }
+      
     }
   }, [
     formData,
@@ -286,6 +306,9 @@ export default function EditCourseClient({
     showAssignmentTable,
     showAssignmentCloMappingTable,
     showAssignmentPloMappingTable,
+    showScoreMappingTable,
+    showAssignmentPloMappingTable,
+    showGradeSettingTable,
     showToast,
   ]);
 
@@ -298,46 +321,60 @@ export default function EditCourseClient({
   const TABS = [
     {
       id: "clo",
-      label: "CLO",
+      label:t("clo"),
       color: "text-blue-600",
       dot: "bg-blue-500",
       state: showCloTable,
     },
     {
       id: "student",
-      label: "Student",
+      label: t("student"),
       color: "text-emerald-600",
       dot: "bg-emerald-500",
       state: showStudentTable,
     },
     {
       id: "mapping",
-      label: "CLO–PLO Mapping",
+      label: t("CLO–PLO Mapping"),
       color: "text-violet-600",
       dot: "bg-violet-500",
       state: showCloPloMappingTable,
     },
     {
       id: "assignment",
-      label: "Assignment",
+      label: t("assignment"),
       color: "text-amber-600",
       dot: "bg-amber-500",
       state: showAssignmentTable,
     },
     {
       id: "assignment-clo-mapping",
-      label: "Assignment–CLO Mapping",
+      label: t("Assignment–CLO Mapping"),
       color: "text-rose-600",
       dot: "bg-rose-500",
       state: showAssignmentCloMappingTable,
     },
     {
       id: "assignment-plo-mapping",
-      label: "Assignment–PLO Mapping",
+      label: t("Assignment–PLO Mapping"),
       color: "text-indigo-600",
       dot: "bg-indigo-500",
       state: showAssignmentPloMappingTable,
     },
+    {
+      id: "score-mapping",
+      label: t("Score Mapping"),
+      color: "text-gray-600",
+      dot: "bg-gray-500",
+      state: showScoreMappingTable,
+    },
+    {
+      id: "grade-setting",
+      label: t("Grade Setting"),
+      color: "text-pink-600",
+      dot: "bg-pink-500",
+      state: showGradeSettingTable,
+    }
   ];
 
   const activeTabObj = TABS.find((t) => t.state) || TABS[0];
@@ -349,6 +386,8 @@ export default function EditCourseClient({
     setShowAssignmentTable(tabId === "assignment");
     setShowAssignmentCloMappingTable(tabId === "assignment-clo-mapping");
     setShowAssignmentPloMappingTable(tabId === "assignment-plo-mapping");
+    setShowScoreMappingTable(tabId === "score-mapping");
+    setShowGradeSettingTable(tabId === "grade-setting");
   };
 
   // --- Handlers ---
@@ -551,7 +590,7 @@ export default function EditCourseClient({
             {/* Right Side: Tab Navigation */}
             <div className="w-full lg:w-auto">
               {/* MOBILE TABS */}
-              <div className="xl:hidden">
+              <div className="2xl:hidden">
                 <div className="relative">
                   <button
                     className="
@@ -572,7 +611,7 @@ export default function EditCourseClient({
                       <span
                         className={`font-semibold text-sm ${activeTabObj.color}`}
                       >
-                        {t(activeTabObj.label)}
+                        {(activeTabObj.label)}
                       </span>
                     </div>
                     <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -585,7 +624,7 @@ export default function EditCourseClient({
                   >
                     {TABS.map((tab) => (
                       <option key={tab.id} value={tab.id}>
-                        {t(tab.label)}
+                        {(tab.label)}
                       </option>
                     ))}
                   </select>
@@ -594,14 +633,9 @@ export default function EditCourseClient({
               {/* DESKTOP TABS */}
               <div
                 className="
-      hidden xl:flex
-      items-center
-      bg-gray-100
-      border border-gray-200
-      rounded-2xl
-      p-1
-      gap-1
-    "
+                hidden
+                2xl:flex flex-wrap items-center bg-gray-100 border border-gray-200 rounded-2xl p-1 gap-1 w-[500px]
+                "
               >
                 {TABS.map((tab) => {
                   const isActive = tab.state;
@@ -611,26 +645,28 @@ export default function EditCourseClient({
                       key={tab.id}
                       onClick={() => handleTabChange(tab.id)}
                       className={`
-            relative
-            px-4 py-2
-            rounded-xl
-            text-sm
-            font-semibold
-            flex items-center gap-2
-            transition-all duration-200
-            ${
-              isActive
-                ? `bg-white ${tab.color} shadow-sm`
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
-            }
-          `}
+                        relative
+                        px-4 py-2
+                        rounded-xl
+                        text-sm
+                        font-semibold
+                        flex items-center gap-2
+                        transition-all duration-200
+                        whitespace-nowrap 
+                        flex-shrink-0
+                        ${
+                          isActive
+                            ? `bg-white ${tab.color} shadow-sm`
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
+                        }
+                      `}
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
                           isActive ? tab.dot : "bg-gray-300"
                         }`}
                       />
-                      {t(tab.label)}
+                      {(tab.label)}
                     </button>
                   );
                 })}
@@ -717,6 +753,22 @@ export default function EditCourseClient({
           {/* <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">{t("Assignment-PLO Mapping")}</h3>
           </div> */}
+          <AssignmentPloMapping courseId={formData ? formData.id : ""} />
+        </div>
+      )}
+
+      {showScoreMappingTable && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          {/* <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">{t("Score Mapping")}</h3>
+          </div> */}
+          <ScoreMapping courseId={formData ? formData.id : ""} />
+        </div>
+      )}
+
+      {showGradeSettingTable && formData && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <GradeSetting courseId={formData.id} />
         </div>
       )}
 
