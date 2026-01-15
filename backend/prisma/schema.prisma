@@ -126,7 +126,7 @@ model Assignment {
   id          Int         @id @default(autoincrement())
   courseId    Int         @map("course_id")
   name        String
-  category    AssCategory @default(assignment) // Added default to fix migration error
+  category    AssCategory @default(assignment) 
   description String?
   maxScore    Decimal     @default(100) @map("max_score")
   weight      Decimal     @default(0)

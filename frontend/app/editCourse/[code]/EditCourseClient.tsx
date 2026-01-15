@@ -23,6 +23,7 @@ import AlertPopup from "@/components/AlertPopup";
 import ScoreMapping from "../scoreMapping";
 import AssignmentPloMapping from "../assignmentPloMapping";
 import GradeSetting from "../gradeSetting";
+import ScoreCalculated from "../scoreCalculatedforGrade";
 
 interface PaginatedResponse {
   data: Course[];
@@ -82,6 +83,8 @@ export default function EditCourseClient({
     useState(false);
   const [showScoreMappingTable, setShowScoreMappingTable] = useState(false);
   const [showGradeSettingTable, setShowGradeSettingTable] = useState(false);
+  const [showScoreCalculatedTable, setShowScoreCalculatedTable] =
+    useState(false);
 
   const [, setStudents] = useState<Student[]>([]);
   const [clos, setClos] = useState<CLO[]>([]); // Replace 'any' with your CLO type
@@ -296,7 +299,10 @@ export default function EditCourseClient({
         // Fetch Grade Setting data here if needed
         setLoading(false);
       }
-      
+
+      if (showScoreCalculatedTable) {
+        setLoading(false);
+      }
     }
   }, [
     formData,
@@ -309,6 +315,7 @@ export default function EditCourseClient({
     showScoreMappingTable,
     showAssignmentPloMappingTable,
     showGradeSettingTable,
+    showScoreCalculatedTable,
     showToast,
   ]);
 
@@ -321,7 +328,7 @@ export default function EditCourseClient({
   const TABS = [
     {
       id: "clo",
-      label:t("clo"),
+      label: t("clo"),
       color: "text-blue-600",
       dot: "bg-blue-500",
       state: showCloTable,
@@ -374,7 +381,14 @@ export default function EditCourseClient({
       color: "text-pink-600",
       dot: "bg-pink-500",
       state: showGradeSettingTable,
-    }
+    },
+    {
+      id: "score-calculated",
+      label: "Score Calculated",
+      color: "text-green-600",
+      dot: "bg-green-500",
+      state: showScoreCalculatedTable,
+    },
   ];
 
   const activeTabObj = TABS.find((t) => t.state) || TABS[0];
@@ -388,6 +402,7 @@ export default function EditCourseClient({
     setShowAssignmentPloMappingTable(tabId === "assignment-plo-mapping");
     setShowScoreMappingTable(tabId === "score-mapping");
     setShowGradeSettingTable(tabId === "grade-setting");
+    setShowScoreCalculatedTable(tabId === "score-calculated");
   };
 
   // --- Handlers ---
@@ -611,7 +626,7 @@ export default function EditCourseClient({
                       <span
                         className={`font-semibold text-sm ${activeTabObj.color}`}
                       >
-                        {(activeTabObj.label)}
+                        {activeTabObj.label}
                       </span>
                     </div>
                     <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -624,7 +639,7 @@ export default function EditCourseClient({
                   >
                     {TABS.map((tab) => (
                       <option key={tab.id} value={tab.id}>
-                        {(tab.label)}
+                        {tab.label}
                       </option>
                     ))}
                   </select>
@@ -666,7 +681,7 @@ export default function EditCourseClient({
                           isActive ? tab.dot : "bg-gray-300"
                         }`}
                       />
-                      {(tab.label)}
+                      {tab.label}
                     </button>
                   );
                 })}
@@ -769,6 +784,12 @@ export default function EditCourseClient({
       {showGradeSettingTable && formData && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <GradeSetting courseId={formData.id} />
+        </div>
+      )}
+
+      {showScoreCalculatedTable && formData && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <ScoreCalculated courseId={formData.id} />
         </div>
       )}
 

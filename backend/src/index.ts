@@ -21,6 +21,7 @@ import studentOnCoureseRoutes from "./routes/studentOnCourse";
 import authRoutes from "./routes/auth";
 import scoreRoutes from "./routes/score";
 import gradeSettingRoutes from "./routes/grade";
+import Calculate from "./routes/calculation";
 
 import passport from "passport";
 import "./config/passport"; // Import ไฟล์ตั้งค่าที่เราสร้างไว้
@@ -53,6 +54,7 @@ app.use("/api/studentOnCourse", studentOnCoureseRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/score", scoreRoutes);
 app.use("/api/grade", gradeSettingRoutes);
+app.use("/api/calculation", Calculate);
 
 app.listen(3001, async () => {
   await seedAdminUser();
