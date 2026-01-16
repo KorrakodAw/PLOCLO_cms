@@ -9,10 +9,11 @@ const router = Router();
 interface UpdateItem {
   assignment_id: number;
   clo_id: number;
-  weight: number | string; // Accepts string in case JSON sends it as "50"
+  weight: number | string;
 }
 
 // GET /api/mapping/clo-plo/:courseId
+// Fetches mappings for the Master Course
 router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
   try {
     const courseId = parseInt(req.params.courseId);
@@ -21,7 +22,7 @@ router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid Course ID" });
     }
 
-    // Adjust 'clo_plo_mapping' to match your actual table name
+    // Using pool query for direct SQL control or consistency with existing patterns
     const result = await pool.query(
       `SELECT m.clo_id, m.plo_id, m.weight 
        FROM clo_plo_mapping m
@@ -37,6 +38,7 @@ router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/mapping/clo-plo
 router.post("/clo-plo", authenticateToken, async (req, res) => {
   const client = await pool.connect();
   try {
@@ -46,7 +48,6 @@ router.post("/clo-plo", authenticateToken, async (req, res) => {
 
     for (const item of updates) {
       if (item.weight > 0) {
-        // CASE 1: Value exists -> UPSERT (Insert or Update)
         await client.query(
           `INSERT INTO clo_plo_mapping (clo_id, plo_id, weight)
            VALUES ($1, $2, $3)
@@ -55,8 +56,6 @@ router.post("/clo-plo", authenticateToken, async (req, res) => {
           [item.clo_id, item.plo_id, item.weight]
         );
       } else {
-        // CASE 2: Value is 0 -> DELETE the mapping
-        // This keeps the database clean (only stores actual connections)
         await client.query(
           `DELETE FROM clo_plo_mapping 
            WHERE clo_id = $1 AND plo_id = $2`,
@@ -76,62 +75,60 @@ router.post("/clo-plo", authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/mapping/assignment-clo
 router.post("/assignment-clo", authenticateToken, async (req, res) => {
-  const { updates } = req.body; // Array of { assignment_id, clo_id, weight }
+  const { updates } = req.body;
 
   try {
-    // TRANSACTION
     await prisma.$transaction(async (tx) => {
-      // รับหลายค่าพร้อมกัน
-      for (const item of updates) {
-        const data = await tx.assignment.findUnique({
+      for (const item of updates as UpdateItem[]) {
+        const weight = Number(item.weight ?? 0);
+
+        // 1. Fetch Assignment (Now directly linked to Course)
+        const assignment = await tx.assignment.findUnique({
           where: { id: item.assignment_id },
-          select: {
-            courseId: true,
-            course: {
-              select: {
-                clo: {
-                  where: { id: item.clo_id },
-                  select: { id: true, course_id: true },
-                },
-              },
-            },
-          },
+          select: { course_id: true }, // Direct relation
         });
 
-        // เช็กว่า clo มีอยู่และ course_id ตรงกัน
-        const clo = data?.course?.clo?.[0];
-        if (!data || !clo) {
-          throw new Error(
-            `Data not found for assignment_id ${item.assignment_id} and CLO_id ${item.clo_id}`
-          );
-        }
-        if (data.courseId !== clo.course_id) {
-          throw new Error(
-            `Assignment_id ${item.assignment_id} and CLO_id ${item.clo_id} is not in the same course`
-          );
+        // 2. Fetch CLO (Linked to Course)
+        const clo = await tx.clo.findUnique({
+          where: { id: item.clo_id },
+          select: { course_id: true },
+        });
+
+        if (!assignment || !clo) {
+          throw new Error("ASSIGNMENT_OR_CLO_NOT_FOUND");
         }
 
-        // เช็กผลรวม weight ของ assignment นั้น ๆ ไม่ให้เกิน 100
-        const assWeight = await tx.assignmentCloMapping.findMany({
+        // 3. Validation: Must belong to the same Master Course
+        if (assignment.course_id !== clo.course_id) {
+          throw new Error("COURSE_MISMATCH");
+        }
+
+        // 4. Weight Validation (Optional: Check total weight for assignment)
+        //
+        const existingMappings = await tx.assignmentCloMapping.findMany({
           where: {
             assId: item.assignment_id,
+            cloId: { not: item.clo_id }, // Exclude current CLO being updated
           },
           select: { weight: true },
         });
-        const totalWeight = assWeight.reduce(
+
+        const currentTotal = existingMappings.reduce(
           (acc, curr) => acc + (curr.weight ?? 0),
           0
         );
-        if (totalWeight + Number(item.weight) > 100) {
-          return res.status(400).json({
-            error: "Total weight for one assignments cannot exceed 100",
-          });
+
+        // Note: Strict validation logic depends on your business rules.
+        // If updating mapping for one CLO, checking total > 100 might be tricky
+        // if user hasn't finished adjusting others. Be careful here.
+        if (currentTotal + weight > 100) {
+          // throw new Error("WEIGHT_LIMIT_EXCEEDED"); // Uncomment if strict enforcement is desired
         }
 
-        // weight เป็น percentage (0-100)
-        if (item.weight > 0 && item.weight <= 100) {
-          // CASE 1: UPSERT
+        // 5. Update DB
+        if (weight > 0 && weight <= 100) {
           await tx.assignmentCloMapping.upsert({
             where: {
               assId_cloId: {
@@ -140,18 +137,17 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
               },
             },
             update: {
-              weight: item.weight,
+              weight,
               updatedAt: new Date(),
             },
             create: {
               assId: item.assignment_id,
               cloId: item.clo_id,
-              weight: item.weight,
+              weight,
               updatedAt: new Date(),
             },
           });
         } else {
-          // CASE 2: DELETE
           await tx.assignmentCloMapping.deleteMany({
             where: {
               assId: item.assignment_id,
@@ -165,10 +161,26 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
     res.json({ success: true, message: "Mapping saved" });
   } catch (err) {
     console.error(err);
+    if (err instanceof Error) {
+      if (err.message === "ASSIGNMENT_OR_CLO_NOT_FOUND") {
+        return res.status(404).json({ error: "Assignment or CLO not found" });
+      }
+      if (err.message === "COURSE_MISMATCH") {
+        return res
+          .status(400)
+          .json({ error: "Assignment and CLO must belong to the same course" });
+      }
+      if (err.message === "WEIGHT_LIMIT_EXCEEDED") {
+        return res
+          .status(400)
+          .json({ error: "Total weight for assignment cannot exceed 100" });
+      }
+    }
     res.status(500).json({ error: "Failed to save mapping" });
   }
 });
 
+// GET /api/mapping/assignment-clo/:courseId
 router.get("/assignment-clo/:courseId", authenticateToken, async (req, res) => {
   try {
     const courseId = parseInt(req.params.courseId);
@@ -177,13 +189,13 @@ router.get("/assignment-clo/:courseId", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid Course ID" });
     }
 
-    // Adjust 'clo_plo_mapping' to match your actual table name
+    // Updated Query: Both Assignment and CLO are now directly under Course
     const result = await pool.query(
       `SELECT m.assignment_id, m.clo_id, m.weight 
        FROM assignment_clo_mapping m
        JOIN assignment a ON m.assignment_id = a.id
        JOIN clo c ON m.clo_id = c.id
-       WHERE c.course_id = $1`,
+       WHERE a.course_id = $1 AND c.course_id = $1`,
       [courseId]
     );
 

@@ -32,7 +32,7 @@ interface FormPopupProps<T> {
   selectedUniversity?: string;
   selectedYear?: number | string;
   selectedFaculty?: string;
-  selectedProgram?: string;
+  selectedProgram?: string | number;
   selectedSemester?: number | string;
   selectedSection?: number | string;
   selectedCourse?: string;

@@ -1,25 +1,22 @@
 import { Router } from "express";
-import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const router = Router();
 
-// GET /api/grade/settings/:courseId
-// ✅ Fix: Add ":courseId" to the route path
+// GET /api/grade/settings/:course
 router.get("/settings/:courseId", authenticateToken, async (req, res) => {
   try {
     const courseId = parseInt(req.params.courseId);
 
-    // Safety check: ensure ID is a valid number
     if (isNaN(courseId)) {
-      return res.status(400).json({ error: "Invalid Course ID" });
+      return res.status(400).json({ error: "Invalid Section ID" });
     }
 
     const settings = await prisma.gradeSetting.findMany({
       where: { course_id: courseId },
-      orderBy: { score: "desc" }, // Optional: Sort grades high to low
+      orderBy: { score: "desc" }, // Sort A -> F by default
     });
 
     res.json(settings);
@@ -29,7 +26,8 @@ router.get("/settings/:courseId", authenticateToken, async (req, res) => {
   }
 });
 
-router.post("/settings/add", authenticateToken, async (req, res) => {
+// POST /api/grade/settings
+router.post("/settings", authenticateToken, async (req, res) => {
   try {
     const { courseId, settings } = req.body;
 
@@ -38,28 +36,38 @@ router.post("/settings/add", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid input data" });
     }
 
-    // 2. TRANSACTION: Delete old settings, then insert the new list
-    // We use $transaction to ensure both happen or neither happens
-    await prisma.$transaction([
-      // A. Delete existing settings for this course to prevent duplicates
-      prisma.gradeSetting.deleteMany({
+    // 2. TRANSACTION: Delete old settings, then insert new ones
+    await prisma.$transaction(async (tx) => {
+      // A. Delete existing settings for this section
+      await tx.gradeSetting.deleteMany({
         where: { course_id: courseId },
-      }),
+      });
 
-      // B. Insert the fresh list of settings
-      prisma.gradeSetting.createMany({
-        data: settings.map((item) => ({
-          course_id: courseId,
-          grade: item.grade,
-          score: item.score, // Ensure frontend sends 'score' as Int
-        })),
-      }),
-    ]);
+      // B. Insert the fresh list
+      const validSettings = settings.filter(
+        (s: any) => s.score !== "" && s.score !== null
+      );
 
-    // 3. Return success
-    // Note: createMany returns a count, not the created objects
+      if (validSettings.length > 0) {
+        await tx.gradeSetting.createMany({
+          data: validSettings.map((item: any) => ({
+            course_id: courseId,
+            grade: item.grade,
+            score: item.score,
+          })),
+        });
+      }
+    });
+
+    // 3. Fetch the newly created settings to return to frontend
+    const createdSettings = await prisma.gradeSetting.findMany({
+      where: { course_id: courseId },
+      orderBy: { score: "desc" },
+    });
+
     res.json({
       message: "Grade settings updated successfully",
+      createdSettings,
     });
   } catch (err) {
     console.error("Error updating settings:", err);

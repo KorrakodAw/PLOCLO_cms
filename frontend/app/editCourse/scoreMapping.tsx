@@ -8,20 +8,26 @@ import { Save } from "lucide-react";
 
 interface Assignment {
   id: number;
-  course_id: number;
+  section_id: number;
   name: string;
-  max_score: number;
+  maxScore: number;
   weight: number;
 }
 
 interface StudentScore {
   student_id: number;
-  course_id: number;
+  section_id: number;
   assignment_id: number;
   score: number;
 }
 
-export default function ScoreMapping({ courseId }: { courseId: string }) {
+export default function ScoreMapping({
+  masterCourseId,
+  sectionId
+}: {
+  masterCourseId: string | number;
+  sectionId?: string | number;
+}) {
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
 
@@ -42,13 +48,13 @@ export default function ScoreMapping({ courseId }: { courseId: string }) {
       setLoading(true);
       try {
         const [studentRes, assignRes, scoreRes] = await Promise.all([
-          apiClient.get(`/studentOnCourse?courseId=${courseId}`, {
+          apiClient.get(`/studentOnCourse?sectionId=${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          apiClient.get(`/assignment?courseId=${courseId}`, {
+          apiClient.get(`/assignment?courseId=${masterCourseId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          apiClient.get(`/score?courseId=${courseId}`, {
+          apiClient.get(`/score?sectionId=${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -73,7 +79,7 @@ export default function ScoreMapping({ courseId }: { courseId: string }) {
     };
 
     fetchData();
-  }, [courseId, token]);
+  }, [masterCourseId, sectionId, token]);
 
   const sortedAssignments = useMemo(() => {
     const data = assignments;
@@ -128,14 +134,15 @@ export default function ScoreMapping({ courseId }: { courseId: string }) {
     val: string,
     maxScore: number
   ) => {
+    // 🟢 FIX: Define the key here (combining studentId and assignId)
+    const key = `${studentId}_${assignId}`;
+
     if (val !== "" && isNaN(Number(val))) return;
 
     if (val !== "" && Number(val) > maxScore) {
       showToast(`Score cannot exceed ${Number(maxScore).toFixed(2)}`, "error");
       return;
     }
-
-    const key = `${studentId}_${assignId}`;
 
     setScoreGrid((prev) => ({
       ...prev,
@@ -163,7 +170,7 @@ export default function ScoreMapping({ courseId }: { courseId: string }) {
           return {
             student_id: Number(studentId),
             assignment_id: Number(assignId),
-            course_id: Number(courseId),
+            course_id: Number(masterCourseId),
             score: val,
           };
         }
@@ -231,7 +238,7 @@ export default function ScoreMapping({ courseId }: { courseId: string }) {
                   <div className="flex flex-col">
                     <span className="font-medium">{index + 1}</span>
                     <span className="text-[9px] text-red-400">
-                      Max: {Number(assign.max_score).toFixed(2)}
+                      Max: {Number(assign.maxScore).toFixed(2)}
                     </span>
                   </div>
                 </th>
@@ -285,7 +292,7 @@ export default function ScoreMapping({ courseId }: { courseId: string }) {
                           <input
                             type="number"
                             min="0"
-                            max={assign.max_score}
+                            max={assign.maxScore}
                             className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent font-medium 
                             ${hasValue ? "text-blue-700" : "text-gray-400"}
                             ${
@@ -301,7 +308,7 @@ export default function ScoreMapping({ courseId }: { courseId: string }) {
                                 studentId,
                                 assign.id,
                                 e.target.value,
-                                assign.max_score
+                                assign.maxScore
                               )
                             }
                           />

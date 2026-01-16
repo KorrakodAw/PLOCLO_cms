@@ -11,17 +11,21 @@ import AlertPopup from "@/components/AlertPopup";
 
 interface Assignment {
   id: number;
-  course_id: number;
+  section_id: number;
   name: string;
   category: string;
   description: string;
-  max_score: number;
+  maxScore: number;
   weight: number;
-  created_at: string;
+  createdAt: string;
   updated_at: string;
 }
 
-export default function AssignmentMapping({ courseId }: { courseId: string }) {
+export default function AssignmentMapping({
+  courseId,
+}: {
+  courseId: string | number;
+}) {
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
   const { t } = useTranslation("common");
@@ -90,7 +94,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
     const payload = {
       course_id: Number(courseId),
       name: newAssignName.trim(),
-      max_score: Number(newAssignMaxScore),
+      maxScore: Number(newAssignMaxScore),
       category: newAssignCategory, // Check if this is "final" or "finalExam"
       weight: Number(newAssignWeight),
     };
@@ -121,7 +125,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
     if (assignmentToEdit) {
       const cleanedData = {
         ...assignmentToEdit,
-        max_score: parseFloat(Number(assignmentToEdit.max_score).toString()),
+        max_score: parseFloat(Number(assignmentToEdit.maxScore).toString()),
         weight: parseFloat(Number(assignmentToEdit.weight).toString()),
       };
 
@@ -139,7 +143,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
         `/assignment/${editFormData.id}`,
         {
           name: editFormData.name,
-          max_score: Number(editFormData.max_score),
+          max_score: Number(editFormData.maxScore),
           weight: Number(editFormData.weight),
           description: editFormData.description,
         },
@@ -537,7 +541,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
 
                     <td className="p-5 font-bold text-gray-700">{a.name}</td>
                     <td className="p-5 text-center text-gray-500">
-                      {Number(a.max_score).toFixed(0)}
+                      {Number(a.maxScore).toFixed(0)}
                     </td>
                     <td className="p-5 text-center">
                       <span className="bg-blue-100 text-blue-700 px-4 py-1.5 rounded-2xl text-[10px] font-black">
@@ -545,7 +549,7 @@ export default function AssignmentMapping({ courseId }: { courseId: string }) {
                       </span>
                     </td>
                     <td className="p-5 text-center text-gray-400 text-[10px]">
-                      {new Date(a.created_at).toLocaleDateString("en-GB")}
+                      {new Date(a.createdAt).toLocaleDateString("en-GB")}
                     </td>
                     <td className="p-5 text-right">
                       <button

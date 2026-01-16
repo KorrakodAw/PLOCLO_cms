@@ -12,7 +12,7 @@ import { Info, Calculator } from "lucide-react";
 
 interface Assignment {
   id: number;
-  course_id: number;
+  section_id: number;
   name: string;
   max_score: number;
   weight: number;
@@ -21,7 +21,7 @@ interface Assignment {
 export default function AssignmentCloMapping({
   courseId,
 }: {
-  courseId: string;
+  courseId: string | number;
 }) {
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();

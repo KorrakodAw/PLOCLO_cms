@@ -1,43 +1,37 @@
-// ไฟล์กับ database นี้ เอาไว้ test api/calculation
-
 import { Router } from "express";
-//import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { PrismaClient } from "@prisma/client";
 
 const router = Router();
 const prisma = new PrismaClient();
 
+// POST: Batch save/update scores
 router.post("/", authenticateToken, async (req, res) => {
   try {
-    // 1. Receive the array 'updates' from the frontend
-    const { updates } = req.body;
+    const { updates } = req.body; // Expects [{ student_id, assignment_id, score }, ...]
 
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({ error: "No updates provided" });
     }
 
-    // 2. Process all updates in a transaction
+    // Process all upserts in a single transaction
     const results = await prisma.$transaction(
       updates.map((item) => {
         return prisma.studentScore.upsert({
-          // Check for existing score using the unique compound key
           where: {
+            // Unique compound key from your schema
             student_id_assignment_id: {
-              // Ensure this unique constraint exists in schema.prisma!
-              student_id: item.student_id,
-              assignment_id: item.assignment_id,
+              student_id: Number(item.student_id),
+              assignment_id: Number(item.assignment_id),
             },
           },
-          // If it exists, update the score
           update: {
             score: Number(item.score),
+            updatedAt: new Date(),
           },
-          // If it doesn't exist, create it
           create: {
-            student_id: item.student_id,
-            course_id: item.course_id, // Ensure frontend sends this or you fetch it
-            assignment_id: item.assignment_id,
+            student_id: Number(item.student_id),
+            assignment_id: Number(item.assignment_id),
             score: Number(item.score),
           },
         });
@@ -46,19 +40,63 @@ router.post("/", authenticateToken, async (req, res) => {
 
     res.json({ message: "Scores saved successfully", count: results.length });
   } catch (err: any) {
-    console.error(err);
+    console.error("Error saving scores:", err);
     res.status(500).json({ error: "Failed to save scores: " + err.message });
   }
 });
 
+// GET: Fetch scores for a specific SECTION
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const courseId = req.query.courseId;
+    const sectionId = Number(req.query.sectionId);
+
+    if (isNaN(sectionId)) {
+      return res.status(400).json({ error: "Invalid or missing sectionId" });
+    }
+
+    // 1. Get the Master Course ID for this section
+    const sectionInfo = await prisma.courseSection.findUnique({
+      where: { id: sectionId },
+      select: { course_id: true },
+    });
+
+    if (!sectionInfo) {
+      return res.status(404).json({ error: "Section not found" });
+    }
+
+    // 2. Fetch Scores based on the Relationship logic
+    // We want scores where:
+    // A. The Assignment belongs to this Master Course
+    // B. The Student is enrolled in this specific Section
     const result = await prisma.studentScore.findMany({
       where: {
-        course_id: Number(courseId),
+        assignment: {
+          course_id: sectionInfo.course_id,
+        },
+        student: {
+          sections: {
+            some: {
+              section_id: sectionId,
+            },
+          },
+        },
       },
-      orderBy: { id: "asc" },
+      // 🟢 Select specific fields to keep the response clean and matching frontend
+      select: {
+        id: true,
+        student_id: true,
+        assignment_id: true,
+        score: true,
+        // Optional: Include student details for display if needed
+        student: {
+          select: {
+            student_code: true,
+            first_name: true,
+            last_name: true,
+          },
+        },
+      },
+      orderBy: { student_id: "asc" },
     });
 
     res.status(200).json(result);
@@ -68,52 +106,48 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE: Remove a score
 router.delete("/:id", authenticateToken, async (req, res) => {
-  const scoreId = req.params.id;
+  const scoreId = Number(req.params.id);
+
+  if (isNaN(scoreId)) return res.status(400).json({ error: "Invalid ID" });
 
   try {
-    const deletedScore = await prisma.studentScore.delete({
-      where: { id: Number(scoreId) }, // แปลงเป็น number ถ้า id เป็น Int
+    await prisma.studentScore.delete({
+      where: { id: scoreId },
     });
-
-    if (!deletedScore) {
-      return res.status(404).json({ error: "Score not found" });
-    }
 
     res.json({ message: "Score deleted successfully" });
   } catch (err: any) {
-    // Prisma จะ throw error ถ้าไม่เจอ record
     if (err.code === "P2025") {
       return res.status(404).json({ error: "Score not found" });
     }
-
     console.error("Error deleting score:", err);
     res.status(500).json({ error: "Failed to delete score" });
   }
 });
 
+// PATCH: Update a single score
 router.patch("/:id", authenticateToken, async (req, res) => {
-  const scoreId = req.params.id;
-  const { student_id, course_id, assignment_id, score } = req.body;
+  const scoreId = Number(req.params.id);
+  const { score } = req.body; // Usually we only patch the score value
+
+  if (isNaN(scoreId)) return res.status(400).json({ error: "Invalid ID" });
 
   try {
     const updatedScore = await prisma.studentScore.update({
-      where: { id: Number(scoreId) }, // ถ้า id เป็น Int
+      where: { id: scoreId },
       data: {
-        student_id,
-        course_id,
-        assignment_id,
         score: Number(score),
+        updatedAt: new Date(),
       },
     });
 
     res.json(updatedScore);
   } catch (err: any) {
-    // Prisma จะ throw error P2025 ถ้าไม่เจอ record
     if (err.code === "P2025") {
       return res.status(404).json({ error: "Score not found" });
     }
-
     console.error("Error updating score:", err);
     res.status(500).json({ error: "Failed to update score" });
   }

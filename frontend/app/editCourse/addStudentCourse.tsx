@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "@/utils/apiClient";
 import { useToast } from "@/components/Toast";
 import { Column, Table } from "@/components/Table";
@@ -26,9 +26,10 @@ export default function AddStudentCourse({
   courseId,
   programId,
 }: {
-  courseId: string;
-  programId: string;
+  courseId: string | number;
+  programId: string | number;
 }) {
+  const sectionId = courseId; // courseId represents a specific course section
   const [allProgramStudents, setAllProgramStudents] = useState<Student[]>([]);
   const [enrolledStudents, setEnrolledStudents] = useState<StudentCourse[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
@@ -38,12 +39,12 @@ export default function AddStudentCourse({
   const { showToast, ToastElement } = useToast();
   const { t } = useTranslation("common");
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const programRes = await apiClient.get(`/student?programId=${programId}`);
       const enrolledRes = await apiClient.get(
-        `/StudentOnCourse?courseId=${courseId}`
+        `/studentOnCourse?sectionId=${sectionId}`
       );
       setAllProgramStudents(programRes.data);
       setEnrolledStudents(enrolledRes.data);
@@ -52,11 +53,11 @@ export default function AddStudentCourse({
       console.error("Failed to fetch data", err);
       setLoading(false);
     }
-  };
+  }, [programId, sectionId]);
 
   useEffect(() => {
-    if (programId && courseId) loadData();
-  }, [programId, courseId]);
+    if (programId && sectionId) loadData();
+  }, [programId, sectionId, loadData]);
 
   // Filter: Hide students already in the course from the popup selection
   const availableStudents = allProgramStudents.filter(
@@ -69,8 +70,8 @@ export default function AddStudentCourse({
     setLoading(true);
 
     try {
-      const response = await apiClient.post("/StudentOnCourse/bulk", {
-        courseId: parseInt(courseId),
+      const response = await apiClient.post("/studentOnCourse/bulk", {
+        sectionId: parseInt(sectionId),
         studentIds: selectedStudentIds,
       });
 

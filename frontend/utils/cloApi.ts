@@ -64,7 +64,7 @@ export async function addClo(
     code: string;
     name: string;
     name_th?: string;
-    course_id: string;
+    course_id: string | number;
   },
   token: string
 ) {

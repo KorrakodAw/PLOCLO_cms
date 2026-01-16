@@ -1,5 +1,7 @@
+"use client";
+
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import AddButton from "@/components/AddButton";
 import { Table, Column } from "@/components/Table";
 import PaginationControlButton from "@/components/PaignateControlButton";
@@ -18,12 +20,6 @@ import { apiClient } from "@/utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useRouter } from "next/navigation";
 
-// interface ProgramOption {
-//   label: string;
-//   value: string;
-//   program_shortname_en?: string;
-// }
-
 interface CourseManagementProps {
   universityId?: string;
   facultyId?: string;
@@ -34,25 +30,17 @@ interface CourseManagementProps {
   course?: string;
 }
 
-// Define this outside your component or in a types file
 interface ExcelCourseRow {
-  // Possible keys for Code
   code?: string | number;
   Code?: string | number;
   course_id?: string | number;
-
-  // Possible keys for Thai Name
   nameTh?: string;
   course_name?: string;
   ชื่อไทย?: string;
-
-  // Possible keys for English Name
   nameEn?: string;
   course_engname?: string;
   ชื่ออังกฤษ?: string;
   PLO_engname?: string;
-
-  // Allow other unknown columns from Excel without throwing errors
   [key: string]: unknown;
 }
 
@@ -68,14 +56,15 @@ export default function CourseManagement({
   const lang = i18n.language;
   const { token, isLoggedIn, initialized } = useAuth();
   const router = useRouter();
+  const { showToast, ToastElement } = useToast();
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoadingCourse] = useState(false);
   const [page, setPage] = useState(1);
   const limit = 10;
   const [totalPages, setTotalPages] = useState(1);
-  const { showToast, ToastElement } = useToast();
 
+  // --- Dropdown Options ---
   const [yearOptions, setYearOptions] = useState<
     { label: string; value: string }[]
   >([]);
@@ -88,19 +77,23 @@ export default function CourseManagement({
   const [facultyOptions, setFacultyOptions] = useState<
     { label: string; value: string }[]
   >([]);
-  const [semesterOptions] = useState([
-    { label: "Please select a semester", value: "" },
-    { label: "semester 1", value: "1" },
-    { label: "semester 2", value: "2" },
-    { label: "summer", value: "3" },
-  ]);
-  const [sectionOptions] = useState([
-    { label: "Please select a section", value: "" },
-    { label: "section 1", value: "1" },
-    { label: "section 2", value: "2" },
-    { label: "section 3", value: "3" },
-  ]);
 
+  // Static options
+  const semesterOptions = [
+    { label: t("Please select a semester"), value: "" },
+    { label: "1", value: "1" },
+    { label: "2", value: "2" },
+    { label: "Summer", value: "3" },
+  ];
+  const sectionOptions = [
+    { label: t("Please select a section"), value: "" },
+    { label: "1", value: "1" },
+    { label: "2", value: "2" },
+    { label: "3", value: "3" },
+    { label: "4", value: "4" },
+  ];
+
+  // --- Create/Add State (Local) ---
   const [selectedProgram, setSelectedProgram] = useState("");
   const [selectedUniversity, setSelectedUniversity] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("");
@@ -108,12 +101,13 @@ export default function CourseManagement({
   const [selectedSemester, setSelectedSemester] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
 
+  // --- Action State ---
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [showEditPopup, setShowEditPopup] = useState(false);
 
-  // Fetch university options
+  // 1. Fetch Universities
   useEffect(() => {
     if (!isLoggedIn || !token) return;
     const fetchUniversities = async () => {
@@ -122,7 +116,7 @@ export default function CourseManagement({
         setUniversityOptions([
           { label: t("please select a university"), value: "" },
           ...data.map((u: University) => ({
-            label: u.name,
+            label: lang === "th" ? u.name_th : u.name,
             value: String(u.id),
           })),
         ]);
@@ -131,20 +125,17 @@ export default function CourseManagement({
       }
     };
     fetchUniversities();
-  }, [isLoggedIn, token, t, , showToast]);
+  }, [isLoggedIn, token, t, lang, showToast]);
 
-  //fetch Faculties
-  // // Fetch faculties for selected university (use parent universityId)
+  // 2. Fetch Faculties
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedUniversity) {
+      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
       setProgramOptions([{ label: t("please select a program"), value: "" }]);
       setYearOptions([{ label: t("please select a year"), value: "" }]);
-      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
-      setSelectedProgram("");
       setSelectedFaculty("");
-      setSelectedSection("");
+      setSelectedProgram("");
       setSelectedYear("");
-      setSelectedSemester("");
       return;
     }
     const fetchFaculties = async () => {
@@ -152,43 +143,40 @@ export default function CourseManagement({
         const data = await getFaculties(token, selectedUniversity);
         setFacultyOptions([
           { label: t("please select a faculty"), value: "" },
-          ...data
-            .filter(
-              (f: Faculty) => String(f.university_id) === selectedUniversity
-            )
-            .map((f: Faculty) => ({ label: f.name, value: String(f.id) })),
+          ...data.map((f: Faculty) => ({
+            label: lang === "th" ? f.name_th : f.name,
+            value: String(f.id),
+          })),
         ]);
       } catch {
         showToast("API faculty error", "error");
       }
     };
     fetchFaculties();
-  }, [isLoggedIn, token, t, selectedUniversity, showToast]);
+  }, [isLoggedIn, token, t, lang, selectedUniversity, showToast]);
 
+  // 3. Fetch Years (Derived from Programs in Faculty)
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedFaculty) {
       setYearOptions([{ label: t("please select a year"), value: "" }]);
+      setSelectedYear("");
       return;
     }
 
     getPrograms(token, selectedFaculty)
       .then((data) => {
-        // Explicitly tell TypeScript that these are numbers
         const years = Array.from(
-          new Set<number>(
-            data.map((p: Program) => Number(p.program_year)) // ensure numeric
-          )
-        ).sort((a, b) => b - a); // optional: sort descending
+          new Set<number>(data.map((p: Program) => Number(p.program_year)))
+        ).sort((a, b) => b - a);
 
         if (years.length === 0) {
           setYearOptions([{ label: t("no years available"), value: "" }]);
-          return;
         } else {
           setYearOptions([
             { label: t("please select a year"), value: "" },
             ...years.map((y) => {
               const label = lang === "en" ? String(y - 543) : String(y);
-              return { label, value: String(y) }; // display converted label, keep real value
+              return { label, value: String(y) };
             }),
           ]);
         }
@@ -196,16 +184,16 @@ export default function CourseManagement({
       .catch((err) => showToast("API program error: " + err.message, "error"));
   }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
 
+  // 4. Fetch Programs (Filtered by Year)
   useEffect(() => {
     if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
       setProgramOptions([{ label: t("please select a program"), value: "" }]);
+      setSelectedProgram("");
       return;
     }
 
-    // Fetch programs for the selected faculty
     getPrograms(token, selectedFaculty)
       .then((data) => {
-        // Filter programs by the selected year
         const programs = data.filter(
           (p: Program) => String(p.program_year) === selectedYear
         );
@@ -216,7 +204,10 @@ export default function CourseManagement({
           setProgramOptions([
             { label: t("please select a program"), value: "" },
             ...programs.map((p: Program) => ({
-              label: p.program_shortname_en,
+              label:
+                lang === "th"
+                  ? `${p.program_code} - ${p.program_shortname_th}`
+                  : `${p.program_code} - ${p.program_shortname_en}`,
               value: String(p.id),
             })),
           ]);
@@ -225,203 +216,12 @@ export default function CourseManagement({
       .catch((err: unknown) => {
         if (err instanceof Error) {
           showToast("API program error: " + err.message, "error");
-        } else {
-          showToast("API program error: unknown error", "error");
         }
       });
-  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
+  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, lang, showToast]);
 
-  const handleAddCourse = async (data: Record<string, unknown>) => {
-    if (!token) return;
-    if (!selectedProgram) {
-      showToast("Please select the program from the filter above.", "error");
-      return;
-    }
-    if (!selectedSemester || !selectedSection) {
-      showToast(
-        "Please complete the selection from the filter above.",
-        "error"
-      );
-      return;
-    }
-    try {
-      await addCourse(
-        {
-          code: String(data.code),
-          name: String(data.nameEn),
-          name_th: String(data.nameTh),
-          program_id: String(selectedProgram),
-          section: String(selectedSection),
-          semester: String(selectedSemester),
-        },
-        token
-      );
-      fetchCourses();
-      setPage(1);
-      showToast(t("Course added successfully!"), "success");
-    } catch {
-      showToast(t("Failed to add course"), "error");
-    }
-  };
-
-  const handleAddCourseExcel = async (rows: ExcelCourseRow[]) => {
-    // 1. Guard Clauses
-    if (!initialized) {
-      showToast("Auth context not initialized.", "error");
-      return;
-    }
-    if (!isLoggedIn || !token) {
-      showToast(
-        "You are logged out or token expired. Please log in again.",
-        "error"
-      );
-      return;
-    }
-    // if (!selectedSemester || !selectedSection) {
-    //   showToast("Please complete the selection from the filter.", "error");
-    //   return;
-    // }
-
-    let successCount = 0;
-    let failCount = 0;
-    const errorDetails: string[] = [];
-
-    // 2. Loop through rows
-    for (const [i, row] of rows.entries()) {
-      const missingFields: string[] = [];
-
-      // Safe access using the Interface keys
-      const code = row.code || row.Code || row.course_id;
-      const nameTh = row.nameTh || row.course_name || row["ชื่อไทย"];
-      const nameEn =
-        row.nameEn ||
-        row.course_engname ||
-        row["ชื่ออังกฤษ"] ||
-        row.PLO_engname;
-
-      // Validation
-      if (!code) missingFields.push("code");
-      if (!nameTh) missingFields.push("nameTh");
-      if (!nameEn) missingFields.push("nameEn");
-
-      if (missingFields.length > 0) {
-        failCount++;
-        errorDetails.push(`Row ${i + 1}: missing ${missingFields.join(", ")}`);
-        continue; // Skip to next row
-      }
-
-      // Prepare Payload (Ensure values are strings)
-      const payload = {
-        code: String(code),
-        name_th: String(nameTh),
-        name: String(nameEn),
-        program_id: selectedProgram,
-        semester: selectedSemester || "1",
-        section: selectedSection || "1",
-      };
-
-      // 3. API Call
-      try {
-        await addCourse(payload, token);
-        successCount++;
-        // REMOVED: window.location.reload() from here.
-        // Reloading inside the loop would stop the process after 1 item.
-      } catch (err: unknown) {
-        failCount++;
-
-        let backendMsg = "Unknown error";
-
-        // Safe Error Handling (Replacing 'any' logic)
-        if (err instanceof Error) {
-          backendMsg = err.message;
-        } else if (typeof err === "string") {
-          backendMsg = err;
-        } else {
-          // If your API throws a promise or custom object, handle it safely
-          try {
-            backendMsg = JSON.stringify(err);
-          } catch {
-            backendMsg = "Non-serializable error";
-          }
-        }
-
-        errorDetails.push(`Row ${i + 1}: backend error - ${backendMsg}`);
-        console.error(`Error adding row ${i + 1}:`, err);
-      }
-    }
-
-    // 4. Final Summary & State Update
-    let summary = `เพิ่มข้อมูลจาก Excel สำเร็จ: ${successCount} รายการ\nล้มเหลว: ${failCount} รายการ`;
-
-    if (errorDetails.length > 0) {
-      summary += `\n\nรายละเอียดข้อผิดพลาด:\n` + errorDetails.join("\n");
-    }
-
-    showToast(summary, failCount > 0 ? "error" : "success");
-
-    // Refresh Data
-    try {
-      // Only refresh/reload if at least one item succeeded
-      if (successCount > 0) {
-        fetchCourses();
-        setPage(1);
-        setSelectedProgram("");
-        // Ideally call your fetch function here instead of reloading the page
-        // await fetchCourses();
-
-        // If you must reload the page, do it here at the VERY END:
-      }
-    } catch {
-      showToast("Failed to refresh list after upload.", "error");
-    }
-  };
-
-  // Optional: render program name instead of ID
-  // const programIdToShortName = (id: string | number) => {
-  //   const found = programOptions.find((p) => p.value === String(id));
-  //   return found?.label || id;
-  // };
-
-  const courseColumns: Column<Course>[] = [
-    { header: t("course id"), accessor: "code" },
-    lang === "en"
-      ? { header: "Name", accessor: "name" }
-      : { header: "ชื่อหลักสูตร", accessor: "name_th" },
-    {
-      header: "Actions",
-      accessor: "code",
-      actions: [
-        {
-          label: t("view details"),
-          color: "blue",
-          hoverColor: "blue",
-          onClick: (row: Course) => {
-            router.push(`/editCourse/${row.code}`);
-          },
-        },
-        // {
-        //   label: t("edit"),
-        //   color: "blue",
-        //   hoverColor: "blue",
-        //   onClick: (row: Course) => {
-        //     setSelectedCourse(row);
-        //     setShowEditPopup(true);
-        //   },
-        // },
-        // {
-        //   label: t("delete"),
-        //   color: "red",
-        //   hoverColor: "red",
-        //   onClick: (row: Course) => {
-        //     setCourseToDelete(row);
-        //     setShowDeletePopup(true);
-        //   },
-        // },
-      ],
-    },
-  ];
-
-  const fetchCourses = async () => {
+  // --- Fetch List Logic ---
+  const fetchCourses = useCallback(async () => {
     if (!isLoggedIn || !token) return;
     setLoadingCourse(true);
 
@@ -435,41 +235,20 @@ export default function CourseManagement({
         section,
       });
 
-      const courseData = data.data || data;
-      let uniqueCourses = courseData;
+      const courseData = data.data || [];
 
-      if (Array.isArray(courseData)) {
-        const uniqueCoursesMap = new Map();
+      // Store ALL data (so pagination works correctly)
+      setCourses(courseData);
 
-        courseData.forEach((course: Course) => {
-          if (!uniqueCoursesMap.has(course.code)) {
-            uniqueCoursesMap.set(course.code, course);
-          }
-        });
-
-        uniqueCourses = Array.from(uniqueCoursesMap.values());
-
-        setCourses(uniqueCourses);
-
-        const currentUniqueCount = uniqueCourses.length || 1;
-        setTotalPages(Math.ceil(currentUniqueCount / limit));
-      } else {
-        setCourses([]);
-        setTotalPages(1);
-      }
+      const totalItems = data.pagination?.total || courseData.length;
+      // Note: If you group items, total pages logic might need adjustment depending on if you paginate "Groups" or "Items"
+      // For now, we paginate based on raw items returned from backend.
+      setTotalPages(Math.ceil(totalItems / limit));
     } catch (err) {
-      if (err instanceof Error) {
-        showToast("Error fetching programs: " + err.message, "error");
-      } else {
-        showToast("Error fetching programs", "error");
-      }
+      showToast("Error fetching courses", "error");
     } finally {
       setLoadingCourse(false);
     }
-  };
-
-  useEffect(() => {
-    fetchCourses();
   }, [
     isLoggedIn,
     token,
@@ -480,28 +259,173 @@ export default function CourseManagement({
     year,
     semester,
     section,
+    showToast,
   ]);
 
-  const saveEdit = async () => {
-    if (!selectedCourse || !token) return;
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  // 🟢 UNIQUE COURSES LOGIC
+  // This creates a filtered list for the table display only.
+  // It takes the first occurrence of every unique 'code'.
+  const uniqueCoursesDisplay = useMemo(() => {
+    const seenCodes = new Set();
+    return courses.filter((course) => {
+      if (seenCodes.has(course.code)) {
+        return false;
+      }
+      seenCodes.add(course.code);
+      return true;
+    });
+  }, [courses]);
+
+  // --- ADD COURSE Handlers ---
+
+  const handleAddCourse = async (data: Record<string, unknown>) => {
+    if (!token) return;
+
+    if (!selectedProgram) {
+      showToast("Please select a Program.", "error");
+      return;
+    }
+    if (!selectedYear) {
+      showToast("Please select an Academic Year.", "error");
+      return;
+    }
+    if (!selectedSemester) {
+      showToast("Please select a Semester.", "error");
+      return;
+    }
+    if (!selectedSection) {
+      showToast("Please select a Section.", "error");
+      return;
+    }
 
     try {
-      await apiClient.patch(`/course/${selectedCourse.id}`, selectedCourse, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      showToast(t("Course updated successfully!"), "success");
+      await addCourse(
+        {
+          code: String(data.code),
+          name: String(data.nameEn),
+          name_th: String(data.nameTh),
+          program_id: String(selectedProgram),
+          year: selectedYear,
+          semester: selectedSemester,
+          section: selectedSection,
+        },
+        token
+      );
       fetchCourses();
-    } catch {
-      showToast(t("Failed to update course"), "error");
-    } finally {
-      setShowEditPopup(false);
-      setSelectedCourse(null);
+      setPage(1);
+      showToast(t("Course added successfully!"), "success");
+    } catch (err: any) {
+      const msg = err.response?.data?.error || t("Failed to add course");
+      showToast(msg, "error");
     }
   };
 
+  const handleAddCourseExcel = async (rows: ExcelCourseRow[]) => {
+    if (!initialized || !isLoggedIn || !token) {
+      showToast("Authentication error. Please log in.", "error");
+      return;
+    }
+
+    if (!selectedProgram || !selectedYear) {
+      showToast(
+        "Please select Program and Year from the dropdowns first.",
+        "error"
+      );
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    const errorDetails: string[] = [];
+
+    for (const [i, row] of rows.entries()) {
+      const code = row.code || row.Code || row.course_id;
+      const nameTh = row.nameTh || row.course_name || row["ชื่อไทย"];
+      const nameEn =
+        row.nameEn ||
+        row.course_engname ||
+        row["ชื่ออังกฤษ"] ||
+        row.PLO_engname;
+
+      if (!code || !nameTh || !nameEn) {
+        failCount++;
+        errorDetails.push(`Row ${i + 1}: Missing code or name.`);
+        continue;
+      }
+
+      const payload = {
+        code: String(code),
+        name_th: String(nameTh),
+        name: String(nameEn),
+        program_id: selectedProgram,
+        year: selectedYear,
+        semester: selectedSemester || "1",
+        section: selectedSection || "1",
+      };
+
+      try {
+        await addCourse(payload, token);
+        successCount++;
+      } catch (err: any) {
+        failCount++;
+        const backendMsg =
+          err.response?.data?.error || err.message || "Unknown error";
+        errorDetails.push(`Row ${i + 1} (${code}): ${backendMsg}`);
+      }
+    }
+
+    let summary = `Success: ${successCount}, Failed: ${failCount}`;
+    if (errorDetails.length > 0) {
+      summary +=
+        `\nErrors:\n` +
+        errorDetails.slice(0, 3).join("\n") +
+        (errorDetails.length > 3 ? "..." : "");
+    }
+    showToast(summary, failCount > 0 ? "error" : "success");
+
+    if (successCount > 0) {
+      fetchCourses();
+      setPage(1);
+    }
+  };
+
+  // --- Table Configuration ---
+  const courseColumns: Column<Course>[] = [
+    { header: t("course id"), accessor: "code" },
+    lang === "en"
+      ? { header: "Name", accessor: "name" }
+      : { header: "ชื่อหลักสูตร", accessor: "name_th" },
+
+    // 🟢 Removed Section/Semester columns from display if you want grouping
+    // If you want to show "how many sections", you would need backend aggregation.
+
+    {
+      header: "Actions",
+      accessor: "code",
+      actions: [
+        {
+          label: t("view details"),
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Course) => {
+            // When clicking, we go to details.
+            // Note: Since we have multiple sections for this code,
+            // the details page should probably list all available sections for this Master Course Code.
+            router.push(`/editCourse/${row.code}`);
+          },
+        },
+        // Delete button removed from grouped view because deleting "one" row
+        // implies deleting a specific section, which is ambiguous here.
+      ],
+    },
+  ];
+
   const confirmDelete = async () => {
     if (!courseToDelete || !token) return;
-
     try {
       await apiClient.delete(`/course/${courseToDelete.id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -516,22 +440,41 @@ export default function CourseManagement({
     }
   };
 
+  const saveEdit = async () => {
+    if (!selectedCourse || !token) return;
+    try {
+      await apiClient.patch(`/course/${selectedCourse.id}`, selectedCourse, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast(t("Course updated successfully!"), "success");
+      fetchCourses();
+    } catch (err: any) {
+      showToast(
+        err.response?.data?.error || t("Failed to update course"),
+        "error"
+      );
+    } finally {
+      setShowEditPopup(false);
+      setSelectedCourse(null);
+    }
+  };
+
   return (
     <div className="mt-5 p-5">
       {loading && <LoadingOverlay />}
       <ToastElement />
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-extralight">{t("course management")}</h1>
         <AddButton
           buttonText={t("create new course")}
           placeholderText={{
-            code: "Course Id",
+            code: "Course Id (e.g. CS101)",
             nameEn: "Course Name (EN)",
             nameTh: "Course Name (TH)",
           }}
           submitButtonText={{
-            insert: "Insert Course",
-            upload: "Upload Course (Excel)",
+            insert: "Insert Course Section",
+            upload: "Upload Excel",
           }}
           showAbbreviationInputs={false}
           programOptions={programOptions}
@@ -546,29 +489,21 @@ export default function CourseManagement({
           selectedYear={selectedYear}
           selectedSemester={selectedSemester}
           selectedSection={selectedSection}
-          onProgramChange={(e) => setSelectedProgram(e.target.value)}
-          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
           onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
-          onYearChange={(e) => {
-            const selectedYear = e.target.value;
-            setSelectedYear(selectedYear);
-          }}
-          onSemesterChange={(e) => {
-            const selectedSemester = e.target.value;
-            setSelectedSemester(selectedSemester);
-          }}
-          onSectionChange={(e) => {
-            const selectedSection = e.target.value;
-            setSelectedSection(selectedSection);
-          }}
+          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
+          onProgramChange={(e) => setSelectedProgram(e.target.value)}
+          onYearChange={(e) => setSelectedYear(e.target.value)}
+          onSemesterChange={(e) => setSelectedSemester(e.target.value)}
+          onSectionChange={(e) => setSelectedSection(e.target.value)}
           onSubmit={handleAddCourse}
           onSubmitExcel={handleAddCourseExcel}
         />
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow-xl">
-        <Table<Course> columns={courseColumns} data={courses} />
-        {/* Pagination Controls */}
+        {/* 🟢 PASS UNIQUE COURSES TO TABLE */}
+        <Table<Course> columns={courseColumns} data={uniqueCoursesDisplay} />
+
         <div className="pt-4 flex justify-end">
           <PaginationControlButton
             page={page}
@@ -578,39 +513,10 @@ export default function CourseManagement({
         </div>
       </div>
 
-      {selectedCourse && showEditPopup && (
-        <FormEditPopup
-          title="Edit Course"
-          data={selectedCourse}
-          fields={[
-            { label: "Course ID", key: "code", type: "text" },
-            {
-              label: lang === "en" ? "Course Name" : "ชื่อหลักสูตร",
-              key: lang === "en" ? "name" : "name_th",
-              type: "text",
-            },
-            {
-              label: "Section",
-              key: "section",
-              type: "select",
-              options: ["1", "2", "3"],
-            },
-          ]}
-          onChange={(update) => {
-            setSelectedCourse(update);
-          }}
-          onClose={() => {
-            setShowEditPopup(false);
-            setSelectedCourse(null);
-          }}
-          onSave={saveEdit}
-        />
-      )}
-
       <AlertPopup
-        title="Delete Course"
+        title="Delete Course Section"
         type="confirm"
-        message={`Are you sure you want to delete the course ${courseToDelete?.code}?`}
+        message={`Are you sure you want to delete ${courseToDelete?.code}?`}
         isOpen={showDeletePopup}
         onCancel={() => {
           setShowDeletePopup(false);

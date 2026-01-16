@@ -18,7 +18,7 @@ interface AddButtonProps<T> {
   // Selected Values (รับมาจาก Parent ทั้งหมด ไม่ต้องเก็บ State เอง)
   selectedUniversity?: string;
   selectedFaculty?: string;
-  selectedProgram?: string;
+  selectedProgram?: string | number;
   selectedYear?: number | string;
   selectedSemester?: number | string;
   selectedSection?: string;

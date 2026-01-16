@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, BookOpen, Calculator } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/components/Toast";
 import { useTranslation } from "react-i18next";
 import { Course, getCoursePaginate } from "@/utils/courseApi";
 import { addClo, CLO, CLOInputExcel } from "@/utils/cloApi";
 import { Student } from "@/utils/studentApi";
-// Assuming you have CLO utils similar to PLO
 import { apiClient } from "@/utils/apiClient";
 import { Column, Table } from "@/components/Table";
 import LoadingOverlay from "@/components/LoadingOverlay";
@@ -42,7 +41,7 @@ async function fetchMatchingCourses(
   token: string,
   courseCode: string
 ): Promise<PaginatedResponse> {
-  const limit = 100;
+  const limit = 10;
   const page = 1;
   try {
     const res = await getCoursePaginate(token, page, limit, {
@@ -70,7 +69,10 @@ export default function EditCourseClient({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [duplicateCourses, setDuplicateCourses] = useState<Course[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"setup" | "grading">("setup");
+
+  // 🟢 Stores the SECTION ID (e.g. 55)
+  const [selectedSectionId, setSelectedSectionId] = useState<string>("");
 
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [showStudentTable, setShowStudentTable] = useState(false);
@@ -87,21 +89,29 @@ export default function EditCourseClient({
     useState(false);
 
   const [, setStudents] = useState<Student[]>([]);
-  const [clos, setClos] = useState<CLO[]>([]); // Replace 'any' with your CLO type
+  const [clos, setClos] = useState<CLO[]>([]);
 
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [, setCourseToDelete] = useState<Course | null>(null);
 
-  // --- Dropdown Options (Year + Section) ---
+  // --- Dropdown Options ---
   const courseOptions: Option[] = useMemo(() => {
     if (duplicateCourses.length === 0) return [];
     return [...duplicateCourses]
-      .sort((b, a) => Number(b.section) - Number(a.section))
+      .sort((a, b) => {
+        if (Number(b.year) !== Number(a.year))
+          return Number(b.year) - Number(a.year);
+        if (Number(b.semester) !== Number(a.semester))
+          return Number(b.semester) - Number(a.semester);
+        return Number(a.section) - Number(b.section);
+      })
       .map((c) => ({
-        label: `${t("Section")} ${c.section}`,
-        value: String(c.id),
+        label: `${t("Year")} ${c.year} / ${t("Sem")} ${c.semester} - ${t(
+          "Sec"
+        )} ${c.section}`,
+        value: String(c.id), // This is the SECTION ID
       }));
-  }, [duplicateCourses]);
+  }, [duplicateCourses, t]);
 
   // --- Fetch Matching Variants ---
   useEffect(() => {
@@ -114,10 +124,14 @@ export default function EditCourseClient({
         const matching = response.data || [];
         setDuplicateCourses(matching);
         if (matching.length > 0) {
-          const latest = matching.sort(
-            (b, a) => Number(b.section) - Number(a.section)
-          )[0];
-          setSelectedCourseId(String(latest.id));
+          const latest = matching.sort((a, b) => {
+            if (Number(b.year) !== Number(a.year))
+              return Number(b.year) - Number(a.year);
+            if (Number(b.semester) !== Number(a.semester))
+              return Number(b.semester) - Number(a.semester);
+            return Number(a.section) - Number(b.section);
+          })[0];
+          setSelectedSectionId(String(latest.id));
         } else {
           setError(t("Course data not found."));
         }
@@ -129,17 +143,19 @@ export default function EditCourseClient({
   // --- Sync Selection to Form ---
   useEffect(() => {
     const selected = duplicateCourses.find(
-      (c) => String(c.id) === selectedCourseId
+      (c) => String(c.id) === selectedSectionId
     );
     setFormData(selected || null);
-  }, [selectedCourseId, duplicateCourses]);
+  }, [selectedSectionId, duplicateCourses]);
 
-  // --- Fetch CLOs/Students when Selection changes ---
-  const fetchClosByCourse = async (courseId: string) => {
+  // --- Fetchers ---
+
+  // 🟢 CLOs use Master ID
+  const fetchClosByMasterCourse = async (masterCourseId: string) => {
     try {
       const res = await apiClient.get("/clo", {
         headers: { Authorization: `Bearer ${token}` },
-        params: { courseId },
+        params: { courseId: masterCourseId },
       });
       setClos(res.data);
       setLoading(false);
@@ -148,11 +164,12 @@ export default function EditCourseClient({
     }
   };
 
-  const fetchStudentsByCourse = async (courseId: string) => {
+  // 🟢 Students use Section ID
+  const fetchStudentsBySection = async (sectionId: string) => {
     try {
       const res = await apiClient.get("/studentOnCourse", {
         headers: { Authorization: `Bearer ${token}` },
-        params: { courseId },
+        params: { sectionId: sectionId },
       });
       setStudents(res.data);
     } catch {
@@ -160,20 +177,38 @@ export default function EditCourseClient({
     }
   };
 
+  // --- Main Data Loading ---
+  useEffect(() => {
+    if (formData?.id) {
+      setLoading(true);
+
+      // 1. CLOs: Master ID
+      if (showCloTable && formData.course_id) {
+        fetchClosByMasterCourse(String(formData.course_id)).finally(() =>
+          setLoading(false)
+        );
+      } else if (showCloTable) {
+        setLoading(false);
+      }
+
+      // 2. Students: Section ID
+      if (showStudentTable) {
+        fetchStudentsBySection(String(formData.id)).finally(() =>
+          setLoading(false)
+        );
+      }
+
+      if (!showCloTable && !showStudentTable) {
+        setLoading(false);
+      }
+    }
+  }, [formData, showCloTable, showStudentTable]);
+
   const handleAddClo = async (data: Record<string, CLO>) => {
-    if (!initialized) return;
-    if (!isLoggedIn || !token) {
-      showToast(t("You must be logged in to perform this action."), "error");
-      return;
-    }
+    if (!initialized || !isLoggedIn || !token || !formData) return;
 
-    if (!data.code || !data.name || !data.name_th) {
+    if (!data.code || !data.name) {
       showToast(t("Please fill in all required fields."), "error");
-      return;
-    }
-
-    if (!formData) {
-      showToast(t("Course data is not loaded."), "error");
       return;
     }
 
@@ -183,51 +218,31 @@ export default function EditCourseClient({
           code: String(data.code),
           name: String(data.name),
           name_th: String(data.name_th),
-          course_id: formData.id,
+          course_id: formData.course_id, // 🟢 Master ID
         },
         token
       );
       showToast(t("CLO added successfully."), "success");
       setLoading(true);
-      fetchClosByCourse(String(formData.id));
-    } catch (err) {
-      if (err instanceof Error) {
-        showToast(t("Failed to add CLO: ") + err.message, "error");
-      } else {
-        showToast(t("Failed to add CLO."), "error");
-      }
+      fetchClosByMasterCourse(String(formData.course_id));
+    } catch (err: any) {
+      showToast(t("Failed to add CLO"), "error");
     }
   };
 
   const handleAddCloExcel = async (rows: CLOInputExcel[]) => {
-    if (!initialized) return;
-
-    if (!isLoggedIn || !token) {
-      showToast(t("You must be logged in to perform this action."), "error");
-      return;
-    }
-
-    if (!formData) {
-      showToast(t("Course data is not loaded."), "error");
-      return;
-    }
+    if (!initialized || !isLoggedIn || !token || !formData) return;
 
     let successCount = 0;
     let failureCount = 0;
-    const errorDetails = [];
 
-    for (const [i, row] of rows.entries()) {
-      const missingFields = [];
+    for (const row of rows) {
       const code = String(row.code || row.CLO_code || "").trim();
       const name = String(row.nameEn || row.CLO_engname || "").trim();
       const name_th = String(row.nameTh || row.CLO_name || "").trim();
 
-      if (!code) missingFields.push("code");
-      if (!name) missingFields.push("nameTh");
-      if (!name_th) missingFields.push("nameEn");
-      if (missingFields.length > 0) {
+      if (!code || !name) {
         failureCount++;
-        errorDetails.push(`Row ${i + 1}: missing ${missingFields.join(", ")}`);
         continue;
       }
 
@@ -237,87 +252,22 @@ export default function EditCourseClient({
             code,
             name,
             name_th,
-            course_id: formData.id,
+            course_id: formData.course_id, // 🟢 Master ID
           },
           token
         );
-        setLoading(true);
         successCount++;
       } catch {
         failureCount++;
-        errorDetails.push(`Row ${i + 1}: missing ${missingFields.join(", ")}`);
       }
     }
 
-    let summary = `เพิ่มข้อมูลจาก Excel สำเร็จ: ${successCount} รายการ\nล้มเหลว: ${failureCount} รายการ`;
-    if (errorDetails.length > 0) {
-      summary += `\n\nรายละเอียดข้อผิดพลาด:\n` + errorDetails.join("\n");
-    }
-    showToast(summary, failureCount > 0 ? "error" : "success");
-    fetchClosByCourse(String(formData.id));
+    showToast(
+      `Added: ${successCount}, Failed: ${failureCount}`,
+      failureCount > 0 ? "error" : "success"
+    );
+    fetchClosByMasterCourse(String(formData.course_id));
   };
-
-  useEffect(() => {
-    if (formData?.id) {
-      setLoading(true);
-      if (showCloTable)
-        fetchClosByCourse(String(formData.id)).finally(() => setLoading(false));
-      if (showStudentTable)
-        fetchStudentsByCourse(String(formData.id)).finally(() =>
-          setLoading(false)
-        );
-      if (showCloPloMappingTable) {
-        // Fetch CLO-PLO mapping data here if needed
-        setLoading(false);
-      }
-
-      if (showAssignmentTable) {
-        // Fetch Assignment data here if needed
-        setLoading(false);
-      }
-
-      if (showAssignmentCloMappingTable) {
-        // Fetch Assignment-CLO mapping data here if needed
-        setLoading(false);
-      }
-
-      if (showAssignmentPloMappingTable) {
-        // Fetch Assignment-PLO mapping data here if needed
-        setLoading(false);
-      }
-
-      if (showScoreMappingTable) {
-        // Fetch Score mapping data here if needed
-        setLoading(false);
-      }
-
-      if (showAssignmentPloMappingTable) {
-        setLoading(false);
-      }
-
-      if (showGradeSettingTable) {
-        // Fetch Grade Setting data here if needed
-        setLoading(false);
-      }
-
-      if (showScoreCalculatedTable) {
-        setLoading(false);
-      }
-    }
-  }, [
-    formData,
-    showCloTable,
-    showStudentTable,
-    showCloPloMappingTable,
-    showAssignmentTable,
-    showAssignmentCloMappingTable,
-    showAssignmentPloMappingTable,
-    showScoreMappingTable,
-    showAssignmentPloMappingTable,
-    showGradeSettingTable,
-    showScoreCalculatedTable,
-    showToast,
-  ]);
 
   // --- Table Columns ---
   const CLOColumn: Column<CLO>[] = [
@@ -325,7 +275,7 @@ export default function EditCourseClient({
     { header: t("CLO Name"), accessor: lang === "th" ? "name_th" : "name" },
   ];
 
-  const TABS = [
+  const SETUP_TABS = [
     {
       id: "clo",
       label: t("clo"),
@@ -369,19 +319,23 @@ export default function EditCourseClient({
       state: showAssignmentPloMappingTable,
     },
     {
-      id: "score-mapping",
-      label: t("Score Mapping"),
-      color: "text-gray-600",
-      dot: "bg-gray-500",
-      state: showScoreMappingTable,
-    },
-    {
       id: "grade-setting",
       label: t("Grade Setting"),
       color: "text-pink-600",
       dot: "bg-pink-500",
       state: showGradeSettingTable,
     },
+  ];
+
+  const GRADING_TABS = [
+    {
+      id: "score-mapping",
+      label: t("Score Mapping"),
+      color: "text-gray-600",
+      dot: "bg-gray-500",
+      state: showScoreMappingTable,
+    },
+
     {
       id: "score-calculated",
       label: "Score Calculated",
@@ -391,18 +345,43 @@ export default function EditCourseClient({
     },
   ];
 
-  const activeTabObj = TABS.find((t) => t.state) || TABS[0];
+  const currentTabs = viewMode === "setup" ? SETUP_TABS : GRADING_TABS;
+  const activeTabObj = currentTabs.find((t) => t.state) || currentTabs[0];
 
   const handleTabChange = (tabId: string) => {
-    setShowCloTable(tabId === "clo");
-    setShowStudentTable(tabId === "student");
-    setShowCloPloMappingTable(tabId === "mapping");
-    setShowAssignmentTable(tabId === "assignment");
-    setShowAssignmentCloMappingTable(tabId === "assignment-clo-mapping");
-    setShowAssignmentPloMappingTable(tabId === "assignment-plo-mapping");
-    setShowScoreMappingTable(tabId === "score-mapping");
-    setShowGradeSettingTable(tabId === "grade-setting");
-    setShowScoreCalculatedTable(tabId === "score-calculated");
+    // Reset all tabs first (Optional, but safer to prevent overlap if logic changes)
+    setShowCloTable(false);
+    setShowStudentTable(false);
+    setShowCloPloMappingTable(false);
+    setShowAssignmentTable(false);
+    setShowAssignmentCloMappingTable(false);
+    setShowAssignmentPloMappingTable(false);
+    setShowScoreMappingTable(false);
+    setShowGradeSettingTable(false);
+    setShowScoreCalculatedTable(false);
+
+    // Set active tab
+    if (tabId === "clo") setShowCloTable(true);
+    if (tabId === "student") setShowStudentTable(true);
+    if (tabId === "mapping") setShowCloPloMappingTable(true);
+    if (tabId === "assignment") setShowAssignmentTable(true);
+    if (tabId === "assignment-clo-mapping")
+      setShowAssignmentCloMappingTable(true);
+    if (tabId === "assignment-plo-mapping")
+      setShowAssignmentPloMappingTable(true);
+    if (tabId === "score-mapping") setShowScoreMappingTable(true);
+    if (tabId === "grade-setting") setShowGradeSettingTable(true);
+    if (tabId === "score-calculated") setShowScoreCalculatedTable(true);
+  };
+
+  // 🟢 3. Handler for Mode Switching
+  const handleModeChange = (mode: "setup" | "grading") => {
+    setViewMode(mode);
+    if (mode === "setup") {
+      handleTabChange("clo"); // Default tab for Setup
+    } else {
+      handleTabChange("score-mapping"); // Default tab for Grading
+    }
   };
 
   // --- Handlers ---
@@ -411,45 +390,41 @@ export default function EditCourseClient({
   if (error || !formData)
     return <div className="p-8 text-red-500">{error || "Error"}</div>;
 
-  // 1. Add this function inside your EditCourseClient component
   const handleDuplicateSection = async () => {
     if (!formData || !token) return;
 
-    // Find the highest section number currently available
+    const existingSectionsInTerm = duplicateCourses.filter(
+      (c) =>
+        String(c.year) === String(formData.year) &&
+        String(c.semester) === String(formData.semester)
+    );
+
     const maxSection = Math.max(
-      ...duplicateCourses.map((c) => Number(c.section)),
+      ...existingSectionsInTerm.map((c) => Number(c.section)),
       0
     );
-    const nextSection = String(maxSection + 1).padStart(3, "0"); // e.g., "002"
+    const nextSection = String(maxSection + 1).padStart(3, "0");
 
     setLoading(true);
     try {
-      // We send the current formData but override the section and remove the ID
       const { ...payload } = formData;
-
       const res = await apiClient.post(
         "/course",
         {
           ...payload,
           section: nextSection,
-          // You might want to clarify if you want to copy CLOs as well.
-          // Usually, backends handle deep copying, but if not,
-          // this creates a fresh section with the same metadata.
+          year: formData.year,
+          semester: formData.semester,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       showToast(`${t("Created Section")} ${nextSection}`, "success");
-
-      // Refresh the list of variants to include the new one
       const updatedResponse = await fetchMatchingCourses(token, courseCode);
       setDuplicateCourses(updatedResponse.data);
-      setSelectedCourseId(String(res.data.id)); // Switch to the new section automatically
-    } catch (err) {
+      setSelectedSectionId(String(res.data.id));
+    } catch {
       showToast(t("Failed to duplicate section"), "error");
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -457,7 +432,6 @@ export default function EditCourseClient({
 
   const deleteCourseVariant = async () => {
     if (!formData || !token) return;
-
     setLoading(true);
     try {
       await apiClient.delete(`/course/${formData.id}`, {
@@ -468,10 +442,14 @@ export default function EditCourseClient({
         const matching = response.data || [];
         setDuplicateCourses(matching);
         if (matching.length > 0) {
-          const latest = matching.sort(
-            (b, a) => Number(b.section) - Number(a.section)
-          )[0];
-          setSelectedCourseId(String(latest.id));
+          const latest = matching.sort((a, b) => {
+            if (Number(b.year) !== Number(a.year))
+              return Number(b.year) - Number(a.year);
+            if (Number(b.semester) !== Number(a.semester))
+              return Number(b.semester) - Number(a.semester);
+            return Number(a.section) - Number(b.section);
+          })[0];
+          setSelectedSectionId(String(latest.id));
         } else {
           setFormData(null);
           setError(t("No more course variants available."));
@@ -480,224 +458,164 @@ export default function EditCourseClient({
       setCourseToDelete(null);
       setShowDeletePopup(false);
       showToast(t("Course variant deleted successfully"), "success");
-    } catch (err) {
+    } catch {
       showToast(t("Failed to delete course variant"), "error");
-      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-5 md:p-8 min-h-screen">
+    <div className="p-5 md:p-8 min-h-screen bg-gray-50/50">
       {loading && <LoadingOverlay />}
       <ToastElement />
 
-      {/* --- HEADER --- */}
-      <div className="mb-8 border-b pb-4">
+      {/* Header Section */}
+      <div className="mb-8 border-b pb-4 bg-white p-6 rounded-2xl shadow-sm border-gray-100">
         <h1 className="text-3xl font-semibold text-gray-800">
           {lang === "en" ? formData.name : formData.name_th}:{" "}
           <span className="text-orange-600">{courseCode}</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {t("Currently editing ID")}: {formData.id} | {t("Section")}:{" "}
-          {formData.section}
+        <p className="text-sm text-gray-500 mt-1 font-mono">
+          {t("Year")}: {formData.year} | {t("Sem")}: {formData.semester} |{" "}
+          {t("Sec")}: {formData.section}
         </p>
       </div>
 
-      {/* --- MANAGE BOX --- */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
-        <div className="flex flex-col space-y-8">
-          {/* --- TOP ROW: Title & Primary Actions --- */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-gray-800 tracking-tight">
-                {t("Manage Course Variants & Data")}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {t("Configure sections, CLOs, and student mappings")}
-              </p>
+        <div className="flex flex-col space-y-6">
+          {/* Top Controls: Dropdown & Edit Buttons */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-end gap-3 w-full lg:w-auto">
+              <div className="w-full sm:w-80">
+                <DropdownSelect
+                  label={t("Select Year / Semester / Section")}
+                  value={selectedSectionId}
+                  options={courseOptions}
+                  onChange={(e) => {
+                    setLoading(true);
+                    setSelectedSectionId(e.target.value);
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDuplicateSection}
+                  className="px-4 py-2.5 text-sm font-bold text-blue-700 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all border border-blue-100 shadow-sm whitespace-nowrap"
+                >
+                  {t("Add Section")}
+                </button>
+                <button
+                  onClick={() => setShowDeletePopup(true)}
+                  className="p-2.5 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all border border-red-100 shadow-sm"
+                  title={t("Delete Section")}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-
             <button
               onClick={() => setShowEditPopup(true)}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-orange-600 bg-orange-50 rounded-xl hover:bg-orange-100 transition-all active:scale-95 border border-orange-100 shadow-sm whitespace-nowrap"
+              className="px-5 py-2.5 text-sm font-bold text-orange-600 bg-orange-50 rounded-xl hover:bg-orange-100 transition-all border border-orange-100 shadow-sm whitespace-nowrap"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                />
-              </svg>
               {t("Edit Metadata")}
             </button>
           </div>
 
-          {/* --- BOTTOM ROW: Selection & Navigation --- */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pt-8 border-t border-gray-100">
-            {/* Left Side: Section Controls */}
-            <div className="flex flex-col sm:flex-row items-end gap-3 w-full lg:w-auto">
-              <div className="w-full sm:w-64">
-                <DropdownSelect
-                  label={t("Current Section")}
-                  value={selectedCourseId}
-                  options={courseOptions}
-                  onChange={(e) => {
-                    setLoading(true);
-                    setSelectedCourseId(e.target.value);
-                  }}
-                />
-              </div>
+          <hr className="border-gray-100" />
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  onClick={handleDuplicateSection}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-blue-700 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all active:scale-95 border border-blue-100 shadow-sm whitespace-nowrap"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  {t("Add Section")}
-                </button>
+          {/* 🟢 4. NEW: Mode Selection Buttons */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
+              <button
+                onClick={() => handleModeChange("setup")}
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                  viewMode === "setup"
+                    ? "bg-white text-blue-700 shadow-sm ring-1 ring-black/5"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <BookOpen size={18} />
+                {t("Course Setup")}
+              </button>
+              <button
+                onClick={() => handleModeChange("grading")}
+                className={`flex-1 sm:flex-none px-6 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                  viewMode === "grading"
+                    ? "bg-white text-green-700 shadow-sm ring-1 ring-black/5"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Calculator size={18} />
+                {t("Grading & Scores")}
+              </button>
+            </div>
+          </div>
 
-                <button
-                  onClick={() => setShowDeletePopup(true)}
-                  className="flex items-center justify-center p-2.5 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-all active:scale-95 border border-red-100 shadow-sm"
-                  title={t("Delete Section")}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+          {/* 🟢 5. Tab Navigation (Filtered by Mode) */}
+          <div className="w-full">
+            {/* Mobile Dropdown */}
+            <div className="2xl:hidden">
+              <div className="relative">
+                <button className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`w-2 h-2 rounded-full ${activeTabObj.dot}`}
                     />
-                  </svg>
+                    <span
+                      className={`font-semibold text-sm ${activeTabObj.color}`}
+                    >
+                      {activeTabObj.label}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
+                <select
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  value={activeTabObj.id}
+                  onChange={(e) => handleTabChange(e.target.value)}
+                >
+                  {currentTabs.map((tab) => (
+                    <option key={tab.id} value={tab.id}>
+                      {tab.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Right Side: Tab Navigation */}
-            <div className="w-full lg:w-auto">
-              {/* MOBILE TABS */}
-              <div className="2xl:hidden">
-                <div className="relative">
-                  <button
-                    className="
-          w-full flex items-center justify-between
-          px-4 py-3
-          bg-white
-          border border-gray-200
-          rounded-xl
-          shadow-sm
-          hover:bg-gray-50
-          transition
-        "
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`w-2 h-2 rounded-full ${activeTabObj.dot}`}
-                      />
-                      <span
-                        className={`font-semibold text-sm ${activeTabObj.color}`}
-                      >
-                        {activeTabObj.label}
-                      </span>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  </button>
-
-                  <select
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    value={activeTabObj.id}
-                    onChange={(e) => handleTabChange(e.target.value)}
-                  >
-                    {TABS.map((tab) => (
-                      <option key={tab.id} value={tab.id}>
-                        {tab.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>{" "}
-              {/* DESKTOP TABS */}
-              <div
-                className="
-                hidden
-                2xl:flex flex-wrap items-center bg-gray-100 border border-gray-200 rounded-2xl p-1 gap-1 w-[500px]
-                "
-              >
-                {TABS.map((tab) => {
-                  const isActive = tab.state;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleTabChange(tab.id)}
-                      className={`
-                        relative
-                        px-4 py-2
-                        rounded-xl
-                        text-sm
-                        font-semibold
-                        flex items-center gap-2
-                        transition-all duration-200
-                        whitespace-nowrap 
-                        flex-shrink-0
-                        ${
-                          isActive
-                            ? `bg-white ${tab.color} shadow-sm`
-                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
-                        }
-                      `}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isActive ? tab.dot : "bg-gray-300"
-                        }`}
-                      />
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Desktop Tabs */}
+            <div className="hidden 2xl:flex flex-wrap items-center bg-gray-100 border border-gray-200 rounded-2xl p-1 gap-1">
+              {currentTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`relative px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
+                    tab.state
+                      ? `bg-white ${tab.color} shadow-sm`
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      tab.state ? tab.dot : "bg-gray-300"
+                    }`}
+                  />
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- TABLES --- */}
+      {/* --- CONTENT SECTION --- */}
+      {/* The content rendering remains effectively the same, just controlled by the boolean flags */}
+
+      {/* Setup Tables */}
       {showCloTable && formData && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-end mb-4">
-            {/* <h3 className="text-lg font-semibold">
-              {t("Course Learning Outcomes")}
-            </h3> */}
             <AddButton
               buttonText={t("create new clo")}
               placeholderText={{
@@ -708,7 +626,7 @@ export default function EditCourseClient({
               showAbbreviationInputs={false}
               onSubmit={handleAddClo}
               onSubmitExcel={handleAddCloExcel}
-              selectedProgram={formData.id}
+              selectedProgram={String(formData.course_id)}
             />
           </div>
           <Table columns={CLOColumn} data={clos} />
@@ -717,15 +635,6 @@ export default function EditCourseClient({
 
       {showStudentTable && formData && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4">
-            {/* <h3 className="text-lg font-semibold">{t("Student List")}</h3> */}
-            {/* <AddButton
-              buttonText={t("Add Student")}
-              onSubmit={() => {}}
-              selectedProgram={formData.id}
-            /> */}
-          </div>
-          {/* <Table columns={StudentColumn} data={students} /> */}
           <AddStudentCourse
             courseId={formData.id}
             programId={formData.program_id}
@@ -735,11 +644,8 @@ export default function EditCourseClient({
 
       {showCloPloMappingTable && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          {/* <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{t("CLO-PLO Mapping")}</h3>
-          </div> */}
           <CloPloMapping
-            courseId={formData ? formData.id : ""}
+            masterCourseId={formData ? String(formData.course_id) : ""}
             programId={formData ? formData.program_id : ""}
           />
         </div>
@@ -747,68 +653,64 @@ export default function EditCourseClient({
 
       {showAssignmentTable && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          {/* <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{t("Assignment Mapping")}</h3>
-          </div> */}
-          <AssignmentMapping courseId={formData ? formData.id : ""} />
+          <AssignmentMapping
+            courseId={formData ? String(formData.course_id) : ""}
+          />
         </div>
       )}
 
       {showAssignmentCloMappingTable && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          {/* <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{t("Assignment-CLO Mapping")}</h3>
-          </div> */}
-          <AssignmentCloMapping courseId={formData ? formData.id : ""} />
+          <AssignmentCloMapping
+            courseId={formData ? String(formData.course_id) : ""}
+          />
         </div>
       )}
 
       {showAssignmentPloMappingTable && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          {/* <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{t("Assignment-PLO Mapping")}</h3>
-          </div> */}
-          <AssignmentPloMapping courseId={formData ? formData.id : ""} />
+          <AssignmentPloMapping
+            courseId={formData ? String(formData.course_id) : ""}
+          />
         </div>
       )}
 
+      {/* Grading Tables */}
       {showScoreMappingTable && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          {/* <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">{t("Score Mapping")}</h3>
-          </div> */}
-          <ScoreMapping courseId={formData ? formData.id : ""} />
+          {/*  - Context: showing how score mapping looks inside the Grading mode */}
+          <ScoreMapping
+            masterCourseId={formData ? String(formData.course_id) : ""}
+            sectionId={formData ? String(formData.id) : ""}
+          />
         </div>
       )}
 
       {showGradeSettingTable && formData && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <GradeSetting courseId={formData.id} />
+          <GradeSetting
+            masterCourseId={formData ? String(formData.course_id) : ""}
+          />
         </div>
       )}
 
       {showScoreCalculatedTable && formData && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <ScoreCalculated courseId={formData.id} />
+          <ScoreCalculated
+            masterCourseId={formData ? String(formData.course_id) : ""}
+            sectionId={formData ? String(formData.id) : ""}
+          />
         </div>
       )}
 
-      {/* --- EDIT POPUP --- */}
+      {/* Popups */}
       {showEditPopup && formData && (
         <FormEditPopup
           title={t("Edit Course")}
           data={formData}
           fields={[
-            {
-              label: t("Course Name (EN)"),
-              key: "name",
-              type: "text",
-            },
-            {
-              label: t("Course Name (TH)"),
-              key: "name_th",
-              type: "text",
-            },
+            { label: t("Course Name (EN)"), key: "name", type: "text" },
+            { label: t("Course Name (TH)"), key: "name_th", type: "text" },
           ]}
           onSave={() => {}}
           onChange={(updated) => setFormData(updated)}

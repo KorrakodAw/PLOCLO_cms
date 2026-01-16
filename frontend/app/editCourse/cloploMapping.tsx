@@ -22,12 +22,13 @@ interface CLO {
   name_en: string;
 }
 
+// 🟢 FIX: Renamed prop to 'masterCourseId' to avoid confusion with Section ID
 export default function CloPloMapping({
-  courseId,
+  masterCourseId,
   programId,
 }: {
-  courseId: string;
-  programId: string;
+  masterCourseId: string | number; // This must be the MASTER Course ID (e.g. CS101), NOT Section ID
+  programId: string | number;
 }) {
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
@@ -40,7 +41,6 @@ export default function CloPloMapping({
   const [clos, setClos] = useState<CLO[]>([]);
   const [mappingGrid, setMappingGrid] = useState<Record<string, number>>({});
 
-  // 🟢 NEW: Track changed keys to only save what is modified
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
 
   // --------------------------------------------------------
@@ -71,7 +71,8 @@ export default function CloPloMapping({
 
   // B. Fetch CLOs AND Existing Mappings
   useEffect(() => {
-    if (!courseId || !token) {
+    // 🟢 FIX: Check for masterCourseId
+    if (!masterCourseId || !token) {
       setClos([]);
       setMappingGrid({});
       return;
@@ -80,10 +81,11 @@ export default function CloPloMapping({
     setLoading(true);
 
     Promise.all([
-      apiClient.get(`/clo?courseId=${courseId}`, {
+      // 🟢 FIX: Use masterCourseId for fetching
+      apiClient.get(`/clo?courseId=${masterCourseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
-      apiClient.get(`/mapping/clo-plo/${courseId}`, {
+      apiClient.get(`/mapping/clo-plo/${masterCourseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
     ])
@@ -98,7 +100,6 @@ export default function CloPloMapping({
         });
 
         setMappingGrid(newGrid);
-        // 🟢 Reset changed keys on load
         setChangedKeys(new Set());
       })
       .catch((err) => {
@@ -108,7 +109,7 @@ export default function CloPloMapping({
       .finally(() => {
         setLoading(false);
       });
-  }, [courseId, token, showToast, t]);
+  }, [masterCourseId, token, showToast, t]); // 🟢 Depend on masterCourseId
 
   // --------------------------------------------------------
   // 3. VALIDATION & HANDLERS
@@ -124,11 +125,9 @@ export default function CloPloMapping({
       [key]: val === "" ? 0 : Number(val),
     }));
 
-    // 🟢 Mark this cell as changed
     setChangedKeys((prev) => new Set(prev).add(key));
   };
 
-  // Memoized calculation of total weight for each CLO
   const cloTotals = useMemo(() => {
     const totals: Record<number, number> = {};
 
@@ -161,7 +160,6 @@ export default function CloPloMapping({
   const handleSave = async () => {
     if (!token) return;
 
-    // 🟢 Check if there are any changes
     if (changedKeys.size === 0) {
       showToast(t("No changes to save"), "success");
       return;
@@ -174,13 +172,12 @@ export default function CloPloMapping({
 
     setLoading(true);
 
-    // 🟢 Filter updates: ONLY include keys that are in 'changedKeys'
     const updates = Array.from(changedKeys).map((key) => {
       const [cloId, ploId] = key.split("_");
       return {
         clo_id: Number(cloId),
         plo_id: Number(ploId),
-        weight: mappingGrid[key] || 0, // Ensure value exists
+        weight: mappingGrid[key] || 0,
       };
     });
 
@@ -191,7 +188,6 @@ export default function CloPloMapping({
         { headers: { Authorization: `Bearer ${token}` } }
       );
       showToast(t("Mapping saved successfully!"), "success");
-      // 🟢 Reset changes tracker on success
       setChangedKeys(new Set());
     } catch (err: any) {
       console.error(err);
@@ -210,10 +206,9 @@ export default function CloPloMapping({
       <div className="bg-white p-4 shadow-md rounded-lg overflow-x-auto min-h-[300px] border border-gray-200 ">
         <div className="flex flex-col">
           {/* Save Button */}
-          {courseId && clos.length > 0 && plos.length > 0 && (
+          {masterCourseId && clos.length > 0 && plos.length > 0 && (
             <button
               onClick={handleSave}
-              // Disable if loading, invalid, OR no changes made
               disabled={
                 loading || !isValidationSuccess || changedKeys.size === 0
               }
@@ -227,16 +222,11 @@ export default function CloPloMapping({
                 }`}
             >
               {loading ? t("Loading...") : t("Save Changes")}
-              {/* {changedKeys.size > 0 && (
-                <span className="bg-white/20 px-2 py-0.5 rounded text-xs">
-                  {changedKeys.size}
-                </span>
-              )} */}
             </button>
           )}
 
           {/* Matrix Content */}
-          {courseId && clos.length > 0 && plos.length > 0 && (
+          {masterCourseId && clos.length > 0 && plos.length > 0 && (
             <table className="w-full border-collapse border border-gray-300 text-sm">
               <thead className="bg-gray-100">
                 <tr>
@@ -377,18 +367,18 @@ export default function CloPloMapping({
             </table>
           )}
 
-          {!loading && courseId && clos.length === 0 && (
+          {!loading && masterCourseId && clos.length === 0 && (
             <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
               {t("no_clos_found")}
             </div>
           )}
-          {!loading && courseId && plos.length === 0 && (
+          {!loading && masterCourseId && plos.length === 0 && (
             <div className="text-center text-red-400 py-10 bg-red-50 rounded-lg">
               {t("no_plos_found")}
             </div>
           )}
 
-          {!courseId && (
+          {!masterCourseId && (
             <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
               <p className="text-gray-400 font-medium">
                 {t("select_course_section")}

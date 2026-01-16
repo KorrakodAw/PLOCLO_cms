@@ -8,7 +8,7 @@ import { Calculator } from "lucide-react";
 // --- Interfaces ---
 interface Student {
   id: number;
-  student_id: number;
+  student_id: number; // Handle nested vs flat response structure
   first_name: string;
   last_name: string;
   student_code: string;
@@ -18,7 +18,7 @@ interface Assignment {
   id: number;
   name: string;
   category: string;
-  max_score: number;
+  maxScore: number; // 🟢 FIX: Changed from max_score to maxScore (matches Prisma default)
   weight: number;
 }
 
@@ -39,10 +39,16 @@ interface StudentResult {
   student: Student;
   categoryScores: Record<string, number>;
   totalScore: number;
-  grade: string; // 🟢 NEW: Grade property
+  grade: string;
 }
 
-export default function ScoreCalculated({ courseId }: { courseId: string }) {
+export default function ScoreCalculated({
+  masterCourseId,
+  sectionId,
+}: {
+  masterCourseId: string | number;
+  sectionId: string | number;
+}) {
   const [loading, setLoading] = useState(true);
   const { ToastElement, showToast } = useToast();
 
@@ -53,35 +59,44 @@ export default function ScoreCalculated({ courseId }: { courseId: string }) {
 
   // 1. Fetch Data
   useEffect(() => {
-    if (!courseId) return;
+    if (!masterCourseId || !sectionId) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
         const [studentRes, assignRes, scoreRes, gradeRes] = await Promise.all([
-          apiClient.get(`/studentOnCourse?courseId=${courseId}`),
-          apiClient.get(`/assignment?courseId=${courseId}`),
-          apiClient.get(`/score?courseId=${courseId}`),
-          apiClient.get(`/grade/settings/${courseId}`),
+          // Students belong to the SECTION
+          apiClient.get(`/studentOnCourse?sectionId=${sectionId}`),
+
+          // Assignments belong to the MASTER COURSE
+          apiClient.get(`/assignment?courseId=${masterCourseId}`),
+
+          // Scores belong to the SECTION (via students)
+          apiClient.get(`/score?sectionId=${sectionId}`),
+
+          // 🟢 FIX: Grades belong to the SECTION (GradeSetting -> CourseSection)
+          apiClient.get(`/grade/settings/${masterCourseId}`),
         ]);
 
         setStudents(studentRes.data);
         setAssignments(assignRes.data);
         setScores(scoreRes.data);
-        // Ensure grades are sorted High -> Low (e.g., A first, then B)
+
+        // Ensure grades are sorted High -> Low (A -> F) for correct finding logic
+        const rawGrades = Array.isArray(gradeRes.data) ? gradeRes.data : [];
         setGradeSettings(
-          (gradeRes.data as GradeSetting[]).sort((a, b) => b.score - a.score)
+          (rawGrades as GradeSetting[]).sort((a, b) => b.score - a.score)
         );
       } catch (err) {
         console.error(err);
-        showToast("Failed to load data", "error");
+        showToast("Failed to load calculation data", "error");
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [courseId, showToast]);
+  }, [masterCourseId, sectionId, showToast]);
 
   // 2. Process & Calculate Scores + Map Grades
   const processedData: StudentResult[] = useMemo(() => {
@@ -90,20 +105,28 @@ export default function ScoreCalculated({ courseId }: { courseId: string }) {
     const assignMap = new Map<number, Assignment>();
     assignments.forEach((a) => assignMap.set(a.id, a));
 
+    // Map scores for O(1) access
     const scoreMap = new Map<string, number>();
     scores.forEach((s) =>
-      scoreMap.set(`${s.student_id}_${s.assignment_id}`, s.score)
+      scoreMap.set(`${s.student_id}_${s.assignment_id}`, Number(s.score))
     );
 
     return students.map((student) => {
       const categoryScores: Record<string, number> = {};
       let totalScore = 0;
 
+      // Handle potential ID location difference
       const sId = student.student_id || student.id;
 
       assignments.forEach((assign) => {
         const rawScore = scoreMap.get(`${sId}_${assign.id}`) || 0;
-        const calculatedScore = (rawScore / assign.max_score) * assign.weight;
+
+        // 🟢 FIX: Use maxScore (camelCase) and prevent division by zero
+        const max = Number(assign.maxScore) || 100;
+        const weight = Number(assign.weight) || 0;
+
+        // Weighted Calculation
+        const calculatedScore = (rawScore / max) * weight;
 
         if (!categoryScores[assign.category]) {
           categoryScores[assign.category] = 0;
@@ -114,8 +137,7 @@ export default function ScoreCalculated({ courseId }: { courseId: string }) {
       });
 
       // 🟢 GRADE MAPPING LOGIC
-      // Find the first grade where totalScore >= minScore
-      // Since gradeSettings is sorted desc, the first match is the best grade
+      // Find the first grade where totalScore >= minScore (since sorted Descending)
       const assignedGrade =
         gradeSettings.find((g) => totalScore >= g.score)?.grade || "F";
 
