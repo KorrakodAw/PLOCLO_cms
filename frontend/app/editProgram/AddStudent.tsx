@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import AddButton from "../../components/AddButton";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -7,10 +6,16 @@ import { addStudent, getStudentsPaginated } from "../../utils/studentApi";
 
 import { Column, Table } from "../../components/Table";
 import PaginationControlButton from "../../components/PaignateControlButton";
-import { getFaculties } from "../../utils/facultyApi";
-import { getUniversities } from "../../utils/universityApi";
-import { getPrograms } from "../../utils/programApi";
+import { Faculty, getFaculties } from "../../utils/facultyApi";
+import { getUniversities, University } from "../../utils/universityApi";
+import { getPrograms, Program } from "../../utils/programApi";
 import { useToast } from "../../components/Toast";
+
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
+import { apiClient } from "../../utils/apiClient";
+
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 interface AddStudentProps {
   universityId?: string;
@@ -21,12 +26,14 @@ interface AddStudentProps {
 
 interface Student {
   id: number;
-  student_id: string;
+  student_code: string;
   name: string;
   first_name: string;
   last_name: string;
   program_shortname_en: string;
   program_shortname_th: string;
+  year_of_admission?: number;
+  year?: number;
 }
 
 export default function AddStudent({
@@ -55,11 +62,16 @@ export default function AddStudent({
   const [yearOptions, setYearOptions] = useState<
     { label: string; value: string }[]
   >([]);
-  const [, setLoadingStudent] = useState(false);
-  const [students, setStudents] = useState<any[]>([]);
+  const [loadingStudent, setLoadingStudent] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
+
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
 
   const { showToast, ToastElement } = useToast();
 
@@ -71,7 +83,10 @@ export default function AddStudent({
         const data = await getUniversities(token);
         setUniversityOptions([
           { label: t("please select a university"), value: "" },
-          ...data.map((u: any) => ({ label: u.name, value: String(u.id) })),
+          ...data.map((u: University) => ({
+            label: u.name,
+            value: String(u.id),
+          })),
         ]);
       } catch {
         showToast("Failed to fetch universities", "error");
@@ -92,8 +107,10 @@ export default function AddStudent({
         setFacultyOptions([
           { label: t("please select a faculty"), value: "" },
           ...data
-            .filter((f: any) => String(f.university_id) === selectedUniversity)
-            .map((f: any) => ({ label: f.name, value: String(f.id) })),
+            .filter(
+              (f: Faculty) => String(f.university_id) === selectedUniversity
+            )
+            .map((f: Faculty) => ({ label: f.name, value: String(f.id) })),
         ]);
       } catch {
         showToast("Failed to fetch faculties", "error");
@@ -113,7 +130,7 @@ export default function AddStudent({
         // Explicitly tell TypeScript that these are numbers
         const years = Array.from(
           new Set<number>(
-            data.map((p: any) => Number(p.program_year)) // ensure numeric
+            data.map((p: Program) => Number(p.program_year)) // ensure numeric
           )
         ).sort((a, b) => b - a); // optional: sort descending
 
@@ -140,7 +157,7 @@ export default function AddStudent({
       .then((data) => {
         // Filter programs by the selected year
         const programs = data.filter(
-          (p: any) => String(p.program_year) === selectedYear
+          (p: Program) => String(p.program_year) === selectedYear
         );
 
         if (programs.length === 0) {
@@ -148,8 +165,8 @@ export default function AddStudent({
         } else {
           setProgramOptions([
             { label: t("please select a program"), value: "" },
-            ...programs.map((p: any) => ({
-              label: p.program_name_en,
+            ...programs.map((p: Program) => ({
+              label: p.program_shortname_en,
               value: String(p.id),
             })),
           ]);
@@ -167,8 +184,7 @@ export default function AddStudent({
       });
   }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
 
-  // 🧩 Load paginated student list
-  useEffect(() => {
+  const fetchStudents = async () => {
     if (!isLoggedIn || !token) return;
     setLoadingStudent(true);
     const filters: Record<string, string | undefined> = {};
@@ -189,20 +205,146 @@ export default function AddStudent({
         showToast("API student error: " + err.message, "error");
       })
       .finally(() => setLoadingStudent(false));
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    limit,
-    universityId,
-    facultyId,
-    programId,
-    year,
-    showToast,
-  ]);
+  };
+
+  const studentColumns: Column<Student>[] = [
+    { header: t("student code"), accessor: "student_code" },
+    {
+      header: "full name",
+      accessor: "name",
+      render: (value, row) => `${row.first_name} ${row.last_name}`,
+    },
+    {
+      header: t("program"),
+      accessor: lang === "en" ? "program_shortname_en" : "program_shortname_th",
+      render: (v) => v || "-",
+    },
+    {
+      header: t("actions"),
+      accessor: "id",
+      actions: [
+        {
+          label: t("edit"),
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Student) => {
+            setSelectedStudent(row);
+            setShowEditPopup(true);
+          },
+        },
+        {
+          label: t("delete"),
+          color: "red",
+          hoverColor: "red",
+          onClick: (row: Student) => {
+            setStudentToDelete(row);
+            setShowDeletePopup(true);
+          },
+        },
+      ],
+    },
+  ];
+
+  const saveEdit = async () => {
+    if (!selectedStudent || !token) return;
+
+    try {
+      await apiClient.patch(
+        `/student/${selectedStudent.id}`,
+        {
+          student_code: selectedStudent.student_code,
+          first_name: selectedStudent.first_name,
+          last_name: selectedStudent.last_name,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      showToast("Student updated successfully!", "success");
+      setShowEditPopup(false);
+      fetchStudents();
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Failed to update student: " + err.message, "error");
+      } else if (typeof err === "string") {
+        showToast("Failed to update student: " + err, "error");
+      } else {
+        showToast(
+          "Failed to update student: An unknown error occurred",
+          "error"
+        );
+      }
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!studentToDelete || !token) return;
+
+    try {
+      await apiClient.delete(`/student/${studentToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast("Student deleted successfully!", "success");
+      setShowDeletePopup(false);
+      setStudentToDelete(null);
+      fetchStudents();
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Failed to delete student: " + err.message, "error");
+      } else if (typeof err === "string") {
+        showToast("Failed to delete student: " + err, "error");
+      } else {
+        showToast(
+          "Failed to delete student: An unknown error occurred",
+          "error"
+        );
+      }
+    }
+  };
+
+  const resetSelection = () => {
+    setSelectedUniversity("");
+    setSelectedFaculty("");
+    setSelectedProgram("");
+    setSelectedYear("");
+  };
+
+  // 🧩 Add single student manually
+  const handleAddStudent = async (data: Record<string, unknown>) => {
+    if (!initialized) return;
+    if (!isLoggedIn || !token)
+      return showToast("Please log in again.", "error");
+    if (!selectedProgram) return showToast("Please select a program.", "error");
+
+    // Map form fields to backend payload
+    const payload = {
+      student_code: String(data.code), // code → student_code
+      first_name: String(data.nameEn), // nameEn → first_name
+      last_name: String(data.nameTh), // nameTh → last_name
+      program_id: selectedProgram,
+    };
+
+    console.log("PAYLOAD IN COMPONENT:", payload);
+
+    try {
+      await addStudent(payload, token);
+      resetSelection();
+      fetchStudents();
+      showToast("Student added successfully!", "success");
+      setPage(1); // Reset to first page to see new entries
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Failed to add student: " + err.message, "error");
+      } else if (typeof err === "string") {
+        showToast("Failed to add student: " + err, "error");
+      } else {
+        showToast("Failed to add student: An unknown error occurred", "error");
+      }
+    }
+  };
 
   // 🧩 Add from Excel
-  const handleAddStudentExcel = async (rows: any[]) => {
+  const handleAddStudentExcel = async (rows: Student[]) => {
     if (!initialized) return alert("Auth not initialized.");
     if (!isLoggedIn || !token) return alert("Please log in again.");
     if (!selectedProgram) return alert("Please select a program first.");
@@ -219,20 +361,20 @@ export default function AddStudent({
     }));
 
     for (const [i, row] of rowsWithProgram.entries()) {
-      const student_id = row.student_id;
+      const student_code= row.student_code;
       const first_name = row.first_name;
       const last_name = row.last_name;
       const program_id = row.program_id;
 
       // ✅ Validate
-      if (!student_id || !first_name || !last_name || !program_id) {
+      if (!student_code || !first_name || !last_name || !program_id) {
         failCount++;
         errorDetails.push(`Row ${i + 1}: missing required fields`);
         continue;
       }
 
       const payload = {
-        student_id: String(student_id),
+        student_code: String(student_code),
         first_name: String(first_name),
         last_name: String(last_name),
         program_id,
@@ -241,10 +383,20 @@ export default function AddStudent({
       try {
         await addStudent(payload, token);
         successCount++;
-        window.location.reload();
-      } catch (err: any) {
+        resetSelection();
+        fetchStudents();
+        setPage(1); // Reset to first page to see new entries
+      } catch (err) {
         failCount++;
-        errorDetails.push(`Row ${i + 1}: ${err.message}`);
+        if (err instanceof Error) {
+          errorDetails.push(`Row ${i + 1}: ${err.message}`);
+        } else if (typeof err === "string") {
+          // Handle cases where a string might be thrown
+          errorDetails.push(`Row ${i + 1}: ${err}`);
+        } else {
+          // Fallback for non-Error, non-string throws
+          errorDetails.push(`Row ${i + 1}: An unknown error occurred`);
+        }
       }
     }
 
@@ -260,64 +412,31 @@ export default function AddStudent({
     }
   };
 
-  const studentColumns: Column<Student>[] = [
-    { header: t("student id"), accessor: "student_id" },
-    {
-      header: "full name",
-      accessor: "name",
-      render: (value, row) => `${row.first_name} ${row.last_name}`,
-    },
-    {
-      header: t("program"),
-      accessor: lang === "en" ? "program_shortname_en" : "program_shortname_th",
-      render: (v) => v || "-",
-    },
-  ];
-
-  // 🧩 Add single student manually
-  const handleAddStudent = async (data: Record<string, unknown>) => {
-    if (!initialized) return;
-    if (!isLoggedIn || !token)
-      return alert("You are logged out or token expired. Please log in again.");
-    if (!selectedProgram) return alert("Please select a program.");
-
-    // Map form fields to backend payload
-    const payload = {
-      student_id: String(data.code), // code → student_id
-      first_name: String(data.nameEn), // nameEn → first_name
-      last_name: String(data.nameTh), // nameTh → last_name
-      program_id: selectedProgram,
-    };
-
-    try {
-      await addStudent(payload, token);
-      showToast("Student added successfully!", "success");
-      // Update students table
-      getStudentsPaginated(token, page, limit).then((res) =>
-        setStudents(res.data)
-      );
-    } catch (err: any) {
-      showToast("Failed to add student: " + err.message, "error");
-    }
-  };
+  useEffect(() => {
+    fetchStudents();
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
 
   return (
-    <div className="mt-5 p-5">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-extralight">{t("student management")}</h1>
+    <div className="p-5 md:p-8 min-h-screen">
+      {loadingStudent && <LoadingOverlay />}
+      <ToastElement />
+      <div className="mb-6 flex justify-between items-center border-b pb-4">
+        <h1 className="text-3xl font-extrabold text-gray-800">
+          {t("student management")}
+        </h1>
 
         <AddButton
           buttonText={t("create new student")}
           placeholderText={{
-            code: "Student Code",
-            nameEn: "First Name",
-            nameTh: "Last Name",
-            abbrEn: "Year of Admission",
-            abbrTh: "Email",
+            code: t("student id"),
+            nameEn: t("first name"),
+            nameTh: t("last name"),
+            abbrEn: t("year of admission"),
+            abbrTh: t("email"),
           }}
           submitButtonText={{
-            insert: "Insert Student",
-            upload: "Upload Student (Excel)",
+            insert: t("insert student"),
+            upload: t("upload student (excel)"),
           }}
           showAbbreviationInputs={false}
           programOptions={programOptions}
@@ -340,20 +459,46 @@ export default function AddStudent({
         />
       </div>
 
-      <hr className="my-3" />
-
-      <div className="mt-4">
-        <Table<any> columns={studentColumns} data={students} />
-
-        {/* Simple Pagination */}
-        <PaginationControlButton
-          page={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-        />
-
-        <ToastElement />
+      <div className="bg-white p-4 rounded-lg shadow-xl">
+        <Table<Student> columns={studentColumns} data={students} />
+        <div className="pt-4 flex justify-end">
+          <PaginationControlButton
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
       </div>
+
+      {selectedStudent && showEditPopup && (
+        <FormEditPopup
+          title={t("edit student")}
+          data={selectedStudent}
+          fields={[
+            { label: "student id", key: "student_code", type: "number" },
+            { label: "first name", key: "first_name", type: "text" },
+            { label: "last name", key: "last_name", type: "text" },
+          ]}
+          onChange={(update) => {
+            setSelectedStudent(update);
+          }}
+          onClose={() => setShowEditPopup(false)}
+          onSave={saveEdit}
+        />
+      )}
+
+      <AlertPopup
+        title={t("delete student")}
+        type="confirm"
+        message={t("are you sure you want to delete this student?")}
+        isOpen={showDeletePopup}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setStudentToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+      {/* Simple Pagination */}
     </div>
   );
 }

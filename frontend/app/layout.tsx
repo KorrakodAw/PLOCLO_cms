@@ -4,6 +4,8 @@ import "./globals.css";
 import I18nProvider from "../i18nProvider";
 import ClientWrapper from "../components/ClientWrapper";
 import { AuthProvider } from "./context/AuthContext";
+// 1. Import the Provider
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 const kanit = Kanit({
   weight: ["300", "400", "500", "600", "700"],
@@ -25,11 +27,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${kanit.variable} font-kanit antialiased`}>
-        <AuthProvider>
-          <I18nProvider>
-            <ClientWrapper>{children}</ClientWrapper>
-          </I18nProvider>
-        </AuthProvider>
+        {/* 2. Wrap everything with your Client ID */}
+        <GoogleOAuthProvider clientId={process.env.GOOGLE_CLIENT_ID || ""}>
+          <AuthProvider>
+            <I18nProvider>
+              <ClientWrapper>{children}</ClientWrapper>
+            </I18nProvider>
+          </AuthProvider>
+        </GoogleOAuthProvider>
       </body>
     </html>
   );

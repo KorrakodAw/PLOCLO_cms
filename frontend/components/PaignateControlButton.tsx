@@ -15,23 +15,52 @@ const PaginationControlButton: React.FC<PaginationProps> = ({
   const { t } = useTranslation("common");
 
   return (
-    <div className="flex justify-center mt-4 gap-2">
+    <div className="flex justify-center items-center mt-4 gap-3">
+      {/* Previous Button */}
       <button
-        className={`px-3 py-1 border rounded disabled:opacity-50 
-          ${page !== 1 ? "hover:text-white hover:bg-orange-500" : ""}`}
+        className={`
+                px-4 py-2 
+                border border-gray-300 rounded-lg 
+                text-sm font-medium 
+                transition-all duration-200 
+                shadow-sm 
+                
+                ${
+                  page === 1
+                    ? "text-gray-400 bg-gray-50 cursor-not-allowed" // Disabled state
+                    : "bg-white text-gray-700 hover:bg-orange-500 hover:text-white hover:shadow-md" // Active state
+                }
+            `}
         disabled={page === 1}
         onClick={() => onPageChange(Math.max(1, page - 1))}
       >
         {t("previous")}
       </button>
 
-      <span className="flex items-center">
-        {t("page")} {page} {t("of")} {totalPages}
+      {/* Page Indicator */}
+      <span className="flex items-center text-sm text-gray-600 font-medium whitespace-nowrap">
+        {t("page")} {/* Current Page Number - Highlighted */}
+        <span className="px-2 font-bold text-lg text-orange-600 mx-1">
+          {page}
+        </span>
+        {t("of")} {totalPages}
       </span>
 
+      {/* Next Button */}
       <button
-        className={`px-3 py-1 border rounded disabled:opacity-50 
-          ${page !== totalPages ? "hover:text-white hover:bg-orange-500" : ""}`}
+        className={`
+                px-4 py-2 
+                border border-gray-300 rounded-lg 
+                text-sm font-medium 
+                transition-all duration-200 
+                shadow-sm 
+                
+                ${
+                  page === totalPages
+                    ? "text-gray-400 bg-gray-50 cursor-not-allowed" // Disabled state
+                    : "bg-white text-gray-700 hover:bg-orange-500 hover:text-white hover:shadow-md" // Active state
+                }
+            `}
         disabled={page === totalPages}
         onClick={() => onPageChange(Math.min(totalPages, page + 1))}
       >

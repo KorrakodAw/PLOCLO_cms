@@ -3,24 +3,30 @@
 import { useAuth } from "./context/AuthContext";
 import LoginForm from "../components/LoginForm";
 import { useTranslation } from "react-i18next";
+import LoadingOverlay from "../components/LoadingOverlay";
+import { useState } from "react";
 
 export default function HomePage() {
   const { isLoggedIn, user } = useAuth();
   const { t } = useTranslation("common");
+  const [loading, ] = useState(false);
+
+  if (loading) {
+    return <LoadingOverlay />;
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-center">
       {!isLoggedIn ? (
         <>
-          <h1 className="text-3xl font-bold mb-4">{t("please login first")}</h1>
           <LoginForm />
         </>
       ) : (
         <>
           <h1 className="text-3xl font-bold mb-4">
-            Welcome, {user?.username || "User"} 👋
+            {t("welcome")}, {user?.username || "User"} 👋
           </h1>
-          <p className="text-gray-600">You are logged in</p>
+          <p className="text-gray-600">{t("you are logged in")}</p>
         </>
       )}
     </div>

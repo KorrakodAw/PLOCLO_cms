@@ -1,13 +1,18 @@
 "use client";
 
 import React, { useCallback, useEffect, useState, useRef } from "react";
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  XMarkIcon,
+} from "@heroicons/react/20/solid"; // Assuming you use Heroicons
 
 export function Toast({
   message,
   type = "success",
   visible,
   onClose,
-  duration = 10000,
+  duration = 5000,
   toastKey,
 }: {
   message: string;
@@ -44,37 +49,51 @@ export function Toast({
 
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 max-w-xl w-full rounded-lg shadow-lg border px-4 py-3 flex flex-col gap-2 transition-transform duration-300 transform ${
+      // Refined positioning, reduced max-width for less screen intrusion
+      className={`fixed bottom-6 right-6 z-50 max-w-sm w-full rounded-xl shadow-2xl border px-4 py-3 flex flex-col transition-transform duration-300 animate-slide-in 
+      ${
         type === "success"
-          ? "bg-green-50 border-green-300 text-green-800"
-          : "bg-red-50 border-red-300 text-red-800"
-      } animate-slide-in`}
+          ? "bg-white border-green-200 text-gray-800"
+          : "bg-white border-red-200 text-gray-800"
+      }`}
     >
       <div className="flex items-start gap-3">
-        <span
-          className={`w-3 h-3 mt-1 rounded-full ${
-            type === "success" ? "bg-green-500" : "bg-red-500"
-          }`}
-        />
+        {/* 1. Icon Slot (Replaces the dot) */}
+        <div className="flex-shrink-0 pt-0.5">
+          {type === "success" ? (
+            <CheckCircleIcon
+              className="h-6 w-6 text-green-500"
+              aria-hidden="true"
+            />
+          ) : (
+            <XCircleIcon className="h-6 w-6 text-red-500" aria-hidden="true" />
+          )}
+        </div>
 
-        <div className="flex-1 text-sm">{message}</div>
+        {/* 2. Message Content */}
+        <div className="flex-1 mt-0.5 text-sm font-medium leading-relaxed">
+          {message}
+        </div>
 
+        {/* 3. Close Button */}
         <button
           onClick={onClose}
-          className="ml-2 text-gray-400 hover:text-gray-600 transition-colors"
+          className="ml-2 flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 rounded-full transition-colors duration-150"
         >
-          ✕
+          {/* Using a clear X icon instead of the character ✕ */}
+          <XMarkIcon className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+      {/* 4. Progress Bar (Uncommented and improved styling) */}
+      {/* <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-2">
         <div
-          className={`h-1 ${
+          className={`h-1 rounded-full ${
             type === "success" ? "bg-green-500" : "bg-red-500"
           } transition-all duration-75 ease-linear`}
           style={{ width: `${progress}%` }}
         ></div>
-      </div>
+      </div> */}
     </div>
   );
 }
@@ -91,7 +110,7 @@ export function useToast() {
     type: "success",
     visible: false,
     key: 0,
-    duration: 10000,
+    duration: 5000,
   });
 
   // refs to avoid adding toast.duration/toast.visible to deps
@@ -108,7 +127,7 @@ export function useToast() {
     (
       message: string,
       type: "success" | "error" = "success",
-      duration = 10000
+      duration = 5000
     ) => {
       setToast({
         message,

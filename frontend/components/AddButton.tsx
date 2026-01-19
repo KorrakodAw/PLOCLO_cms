@@ -18,7 +18,7 @@ interface AddButtonProps<T> {
   // Selected Values (รับมาจาก Parent ทั้งหมด ไม่ต้องเก็บ State เอง)
   selectedUniversity?: string;
   selectedFaculty?: string;
-  selectedProgram?: string;
+  selectedProgram?: string | number;
   selectedYear?: number | string;
   selectedSemester?: number | string;
   selectedSection?: string;
@@ -52,6 +52,8 @@ interface AddButtonProps<T> {
 
   // Toggles
   showAbbreviationInputs?: boolean;
+  showCodeInput?: boolean;
+  requiredFields?: string[];
 }
 
 // 3. ประกาศ Component แบบ Generic <T,>
@@ -60,6 +62,7 @@ export default function AddButton<T>({
   placeholderText = {},
   submitButtonText = {},
   showAbbreviationInputs = true,
+  showCodeInput = true,
   onSubmit,
   onSubmitExcel,
   universityOptions = [],
@@ -83,6 +86,7 @@ export default function AddButton<T>({
   onSemesterChange,
   onSectionChange,
   onCourseChange,
+  requiredFields = [],
 }: AddButtonProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -138,6 +142,7 @@ export default function AddButton<T>({
           placeholderText={placeholderText}
           submitButtonText={submitButtonText}
           showAbbreviationInputs={showAbbreviationInputs}
+          showCodeInput={showCodeInput}
           // Values
           selectedUniversity={selectedUniversity}
           selectedFaculty={selectedFaculty}
@@ -154,6 +159,7 @@ export default function AddButton<T>({
           semesterOptions={semesterOptions}
           sectionOptions={sectionOptions}
           courseOptions={courseOptions}
+          requiredFields={requiredFields}
           // Change Handlers (ส่งตรงจาก Parent ไป FormPopup เลย ไม่ต้องผ่าน Local State)
           onUniversityChange={onUniversityChange}
           onFacultyChange={onFacultyChange}

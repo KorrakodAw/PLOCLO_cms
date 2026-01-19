@@ -5,8 +5,18 @@ export interface Faculty {
   name: string;
   name_th?: string;
   university_id?: number;
+  university_name?: string;
+  university_name_th?: string;
   abbreviation?: string;
   abbreviation_th?: string;
+}
+
+export interface CreateFacultyPayload {
+  name: string;
+  name_th: string;
+  university_id: number;
+  abbreviation: string;
+  abbreviation_th: string;
 }
 
 /**
@@ -16,17 +26,12 @@ export interface Faculty {
  * @returns A promise that resolves to an array of Faculty objects.
  */
 export async function getFaculties(token: string, universityId?: string) {
-  const query = universityId ? `?university_id=${universityId}` : "";
-  const res = await apiClient(`/api/faculty${query}`, {
+  const res = await apiClient.get("/faculty", {
     headers: { Authorization: `Bearer ${token}` },
+    params: universityId ? { university_id: universityId } : {},
   });
 
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Unable to retrieve faculty information");
-  }
-
-  return res.json();
+  return res.data;
 }
 
 /**
@@ -34,24 +39,11 @@ export async function getFaculties(token: string, universityId?: string) {
  */
 export async function createFaculty(
   token: string,
-  payload: {
-    name: string;
-    name_th?: string;
-    university_id: number;
-    abbreviation?: string;
-    abbreviation_th?: string;
-  }
+  payload: CreateFacultyPayload
 ) {
-  const res = await apiClient(`/api/faculty`, {
-    method: "POST",
+  const res = await apiClient.post("/faculty", payload, {
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to create faculty");
-  }
-
-  return res.json();
+  return res.data;
 }

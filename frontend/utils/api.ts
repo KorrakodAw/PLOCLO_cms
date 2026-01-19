@@ -1,4 +1,4 @@
-export const API_URL = "http://localhost:3001"; // backend URL
+import { apiClient } from "./apiClient";
 
 // Register
 export async function register(
@@ -6,22 +6,24 @@ export async function register(
   email: string,
   password: string
 ) {
-  const res = await fetch(`${API_URL}/users/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, email, password }),
+  // Axios automatically handles JSON.stringify and Content-Type
+  const res = await apiClient.post("/users/register", {
+    username,
+    email,
+    password,
   });
-  return res.json();
+  return res.data;
 }
 
 // Login
 export async function login(email: string, password: string) {
-  const res = await fetch(`${API_URL}/users/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+  const res = await apiClient.post("/users/login", {
+    email,
+    password,
   });
-  const data = await res.json();
+
+  // Access data directly via res.data
+  const data = res.data;
 
   if (data.token) {
     localStorage.setItem("token", data.token); // store token
@@ -31,9 +33,8 @@ export async function login(email: string, password: string) {
 
 // Get all users (protected)
 export async function getUsers() {
-  const token = localStorage.getItem("token");
-  const res = await fetch(`${API_URL}/users`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return res.json();
+  // We do NOT need to manually add headers or get the token here.
+  // The 'apiClient' interceptor does it automatically.
+  const res = await apiClient.get("/users");
+  return res.data;
 }

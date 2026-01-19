@@ -4,23 +4,106 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { authenticateToken, AuthRequest } from "../middleware/authMiddleware";
 import { authorizeRoles } from "../middleware/roleMiddleware";
+import { OAuth2Client } from "google-auth-library";
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
 
-// ===== REGISTER =====
+router.post("/auth/google/verify", async (req, res) => {
+  const { token } = req.body;
+  try {
+    // 1. ตรวจสอบ Token กับ Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email)
+      return res.status(400).json({ error: "Invalid Google Token" });
+
+    // 2. ใช้ Logic เดียวกับ Passport (Pool) เพื่อหาหรือสร้าง User
+    const email = payload.email;
+    let result = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    let user = result.rows[0];
+
+    if (!user) {
+      const newUser = await pool.query(
+        "INSERT INTO users (username, email, role) VALUES ($1, $2, $3) RETURNING *",
+        [payload.name, email, "guest"]
+      );
+      user = newUser.rows[0];
+    }
+
+    // 3. สร้าง JWT ของระบบเราส่งกลับไป
+    const jwtToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1hr" }
+    );
+
+    res.json({ token: jwtToken });
+  } catch (err) {
+    res.status(500).json({ error: "Google verification failed" });
+  }
+});
+
+// ===== REGISTER (Fixed for consistency with Google Verify) =====
 router.post("/register", async (req, res) => {
   const { username, email, password, role } = req.body;
+
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      "INSERT INTO users (username,email,password_hash,role) VALUES ($1,$2,$3,$4) RETURNING id, username, email, role, created_at",
-      [username, email, hashedPassword, role || "student"]
+    // 1. ตรวจสอบข้อมูลบังคับ (Username และ Email ห้ามว่าง)
+    if (!email || !username) {
+      return res.status(400).json({ error: "Username and email are required" });
+    }
+
+    // 2. จัดการรหัสผ่าน: ถ้าเป็น null หรือไม่มีค่ามา จะบันทึกเป็น null
+    let hashedPassword = null;
+    if (password !== null && password !== undefined && password !== "") {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    // 3. ใช้ SQL Upsert เพื่อเพิ่มหรืออัปเดตข้อมูลผู้ใช้
+    // หมายเหตุ: Schema ของคุณกำหนด username เป็น @unique ดังนั้นถ้า username ซ้ำจะเกิด conflict เช่นกัน
+    const query = `
+      INSERT INTO users (username, email, password_hash, role)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (email) 
+      DO UPDATE SET 
+        username = EXCLUDED.username, 
+        role = EXCLUDED.role,
+        password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash)
+      RETURNING id, username, email, role, created_at;
+    `;
+
+    const result = await pool.query(query, [
+      username,
+      email,
+      hashedPassword, // ส่งค่า null ได้เพราะ Prisma Schema ของคุณเป็น String?
+      role || "guest", // ใช้ค่าเริ่มต้นจาก Schema คือ "guest" หากไม่ได้ส่งมา
+    ]);
+
+    const user = result.rows[0];
+
+    // 4. สร้าง JWT Token
+    const jwtToken = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1hr" }
     );
-    res.status(201).json(result.rows[0]);
+
+    res.status(201).json({
+      token: jwtToken,
+      user: user,
+    });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    // กรณี Error 500 ส่วนใหญ่มักเกิดจาก Username ซ้ำ (เนื่องจากตั้งเป็น @unique)
+    console.error("REGISTER ERROR:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -85,34 +168,6 @@ router.get("/", authenticateToken, async (_req, res) => {
   res.json(result.rows);
 });
 
-// PATCH /api/users/:id/role
-router.patch("/:id/role", authenticateToken, async (req: AuthRequest, res) => {
-  const requester = req.user; // จาก middleware
-  const { id } = req.params;
-  const { role } = req.body;
-
-  // ตรวจสอบว่า requester เป็น admin
-  if (requester?.role !== "admin") {
-    return res
-      .status(403)
-      .json({ error: "Forbidden: only admin can change roles" });
-  }
-
-  try {
-    const result = await pool.query(
-      "UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, email, role",
-      [role, id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    res.json({ message: "Role updated successfully", user: result.rows[0] });
-  } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
-  }
-});
-
 // Get user by ID
 router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.params.id;
@@ -126,29 +181,51 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Update user by ID
-router.put("/:id", authenticateToken, async (req: AuthRequest, res) => {
-  const userId = req.params.id;
-  const { username, email, password, role } = req.body;
+// ยุบรวม PATCH /:id และเพิ่มการรองรับ Google User (password เป็น null)
+router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const { username, email, role, password } = req.body;
+  const requester = req.user;
 
-  const user = await pool.query("SELECT * FROM users WHERE id=$1", [userId]);
-  if (user.rows.length === 0)
-    return res.status(404).json({ error: "User not found" });
+  try {
+    // 🔒 1. สิทธิ์การเปลี่ยน Role (เฉพาะ Admin)
+    if (role && requester?.role !== "system_admin") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: only admin can change roles" });
+    }
 
-  const hashedPassword = password
-    ? await bcrypt.hash(password, 10)
-    : user.rows[0].password_hash;
+    // 🔍 2. ค้นหา User เดิม
+    const userQuery = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+    if (userQuery.rows.length === 0)
+      return res.status(404).json({ error: "User not found" });
+    const current = userQuery.rows[0];
 
-  const result = await pool.query(
-    "UPDATE users SET username=$1,email=$2,password_hash=$3,role=$4 WHERE id=$5 RETURNING id, username, email, role, created_at",
-    [
-      username || user.rows[0].username,
-      email || user.rows[0].email,
-      hashedPassword,
-      role || user.rows[0].role,
-      userId,
-    ]
-  );
-  res.json(result.rows[0]);
+    // 🔐 3. จัดการรหัสผ่าน (ข้ามถ้าเป็น Google User หรือไม่ได้ส่ง pass มา)
+    let hashedPassword = current.password_hash;
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    // ✅ 4. อัปเดตข้อมูลแบบ Dynamic
+    const result = await pool.query(
+      `UPDATE users 
+       SET username=$1, email=$2, password_hash=$3, role=$4 
+       WHERE id=$5 
+       RETURNING id, username, email, role, created_at`,
+      [
+        username || current.username,
+        email || current.email,
+        hashedPassword, // จะเป็นค่าเดิม, ค่าใหม่ หรือ null (กรณี Google User)
+        role || current.role,
+        id,
+      ]
+    );
+
+    res.json({ message: "User updated successfully", user: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 // instructor และ admin ใช้ได้
@@ -172,8 +249,6 @@ router.delete("/:id", authenticateToken, async (req: AuthRequest, res) => {
     return res.status(404).json({ error: "User not found" });
   res.json({ message: `User deleted: ${result.rows[0].username}` });
 });
-
-export default router;
 
 // ===== EDIT USER INFO (email, username, role) =====
 router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
@@ -226,3 +301,5 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+export default router;

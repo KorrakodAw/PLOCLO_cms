@@ -10,6 +10,10 @@ import { getUniversities } from "../../utils/universityApi";
 import { getFaculties } from "../../utils/facultyApi";
 import { getPrograms } from "../../utils/programApi";
 import { useToast } from "../../components/Toast";
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
+import { apiClient } from "../../utils/apiClient";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 interface AddPloProps {
   universityId?: string;
@@ -25,9 +29,9 @@ interface Plo {
   code: string;
   program_shortname_en: string;
   program_shortname_th: string;
-  program_year: number;
+  program_year: string;
   program_id: number;
-  year: number;
+  year: string;
 }
 
 export default function AddPlo({
@@ -41,7 +45,7 @@ export default function AddPlo({
   const { token, isLoggedIn, initialized } = useAuth();
 
   const [plos, setPlos] = useState<Plo[]>([]);
-  const [, setLoadingPlos] = useState(false);
+  const [loadingPlos, setLoadingPlos] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10);
@@ -63,6 +67,11 @@ export default function AddPlo({
   const [selectedUniversity, setSelectedUniversity] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
+
+  const [selectedPlo, setSelectedPlo] = useState<Plo | null>(null);
+  const [ploToDelete, setPloToDelete] = useState<Plo | null>(null);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
 
   const { showToast, ToastElement } = useToast();
 
@@ -161,7 +170,7 @@ export default function AddPlo({
           setProgramOptions([
             { label: t("please select a program"), value: "" },
             ...programs.map((p: any) => ({
-              label: p.program_name_en,
+              label: p.program_shortname_en,
               value: String(p.id),
             })),
           ]);
@@ -175,6 +184,36 @@ export default function AddPlo({
         }
       });
   }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
+
+  const fetchPlos = async () => {
+    if (!isLoggedIn || !token) return;
+    setLoadingPlos(true);
+    const filters: Record<string, string | undefined> = {};
+
+    if (universityId) filters.universityId = universityId;
+    if (facultyId) filters.facultyId = facultyId;
+    if (programId) filters.programId = programId;
+    if (year) filters.year = year;
+
+    getPlosPaginated(token, page, limit, filters)
+      .then((res) => {
+        const data = Array.isArray(res) ? res : res.data || [];
+        const total = res.total || data.length || 1;
+        setPlos(data);
+        setTotalPages(Math.ceil(total / limit));
+      })
+      .catch((err) => {
+        showToast("API program error: " + err.message, "error");
+      })
+      .finally(() => setLoadingPlos(false));
+  };
+
+  const resetSelection = () => {
+    setSelectedUniversity("");
+    setSelectedFaculty("");
+    setSelectedProgram("");
+    setSelectedYear("");
+  };
 
   // ฟังก์ชันสำหรับเพิ่ม PLO จาก Excel
   const handleAddPloExcel = async (rows: any[]) => {
@@ -242,45 +281,13 @@ export default function AddPlo({
     showToast(summary, failCount > 0 ? "error" : "success");
     // รีเฟรชรายการ PLO หลังเพิ่ม
     try {
+      resetSelection();
+      fetchPlos();
       setPage(1);
-      window.location.reload();
     } catch {
       showToast("Failed to refresh PLO list after Excel upload.", "error");
     }
   };
-
-  useEffect(() => {
-    if (!isLoggedIn || !token) return;
-    setLoadingPlos(true);
-    const filters: Record<string, string | undefined> = {};
-
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
-
-    getPlosPaginated(token, page, 10, filters)
-      .then((res) => {
-        const data = Array.isArray(res) ? res : res.data || [];
-        const total = res.total || data.length || 1;
-        setPlos(data);
-        setTotalPages(Math.ceil(total / limit));
-      })
-      .catch((err) => {
-        showToast("API program error: " + err.message, "error");
-      })
-      .finally(() => setLoadingPlos(false));
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    limit,
-    universityId,
-    facultyId,
-    programId,
-    year,
-    showToast,
-  ]);
 
   // ฟังก์ชันสำหรับเพิ่ม PLO
   const handleAddPlo = async (data: Record<string, unknown>) => {
@@ -324,15 +331,57 @@ export default function AddPlo({
         },
         token
       );
+      resetSelection();
+      fetchPlos();
       showToast(t("PLO added successfully!"), "success");
       setPage(1);
-      window.location.reload();
     } catch (err: unknown) {
       if (err instanceof Error) {
         showToast("Error: " + err.message, "error");
       } else {
         showToast("Unexpected error occurred while adding PLO.", "error");
       }
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!ploToDelete || !token) return;
+
+    try {
+      await apiClient.delete(`/plo/${ploToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast("PLO deleted successfully", "success");
+      setPlos((prev) => prev.filter((plo) => plo.id !== ploToDelete.id));
+    } catch {
+      showToast("Failed to delete PLO", "error");
+    } finally {
+      setShowDeletePopup(false);
+      setPloToDelete(null);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!selectedPlo || !token) return;
+
+    try {
+      await apiClient.patch(
+        `/plo/${selectedPlo.id}`,
+        {
+          code: selectedPlo.code,
+          name: selectedPlo.name,
+          engname: selectedPlo.engname,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      fetchPlos();
+      showToast("PLO updated successfully", "success");
+    } catch {
+      showToast("Failed to update PLO", "error");
+    } finally {
+      setSelectedPlo(null);
     }
   };
 
@@ -357,22 +406,56 @@ export default function AddPlo({
       accessor: "program_year",
       render: (value) => (lang === "en" ? Number(value) - 543 : value),
     },
+    {
+      header: t("actions"),
+      accessor: "id",
+      actions: [
+        {
+          label: t("edit"),
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Plo) => {
+            setSelectedPlo(row);
+            setShowEditPopup(true);
+          },
+        },
+        {
+          label: t("delete"),
+          color: "red",
+          hoverColor: "red",
+          onClick: (row: Plo) => {
+            setPloToDelete(row);
+            setShowDeletePopup(true);
+          },
+        },
+      ],
+    },
   ];
 
+  useEffect(() => {
+    fetchPlos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
+
   return (
-    <div className="mt-5 p-5">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-extralight">{t("plo management")}</h1>
+    <div className="p-5 md:p-8 min-h-screen">
+      {loadingPlos && <LoadingOverlay />}
+      <ToastElement />
+      <div className="mb-6 flex justify-between items-center border-b pb-4">
+        <h1 className="text-3xl font-extrabold text-gray-800">
+          {t("plo management")}
+        </h1>
         <AddButton
           buttonText={t("create new plo")}
           placeholderText={{
-            code: "PLO Code",
-            nameEn: "PLO Name (EN)",
-            nameTh: "PLO Name (TH)",
+            code: t("plo code"),
+            nameEn: t("plo name (en)"),
+            nameTh: t("plo name (th)"),
           }}
           showAbbreviationInputs={false}
           submitButtonText={{
-            insert: "Insert PLO",
+            insert: t("insert plo"),
+            upload: t("upload plo (excel)"),
           }}
           onSubmit={handleAddPlo}
           onSubmitExcel={handleAddPloExcel}
@@ -396,19 +479,48 @@ export default function AddPlo({
         />
       </div>
 
-      <hr className="my-3" />
-      {/* Pagination Controls */}
-
-      <div className="mt-4">
-        <Table<any> columns={ploColumns} data={plos} />
-
-        <PaginationControlButton
-          page={page}
-          totalPages={totalPages}
-          onPageChange={setPage}
-        />
-        <ToastElement />
+      <div className="bg-white p-4 rounded-lg shadow-xl">
+        <Table<Plo> columns={ploColumns} data={plos} />
+        <div className="pt-4 flex justify-end">
+          <PaginationControlButton
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
       </div>
+
+      {/* Edit PLO Popup */}
+      {showEditPopup && selectedPlo && (
+        <FormEditPopup
+          title={t("edit plo")}
+          data={selectedPlo}
+          fields={[
+            { label: "PLO Code", key: "code", type: "text" },
+            { label: "PLO Name (TH)", key: "name", type: "text" },
+            { label: "PLO Name (EN)", key: "engname", type: "text" },
+          ]}
+          onClose={() => {
+            setShowEditPopup(false);
+            setSelectedPlo(null);
+          }}
+          onChange={(updated) => setSelectedPlo(updated)}
+          onSave={saveEdit}
+        />
+      )}
+
+      {/* Delete PLO Popup */}
+      <AlertPopup
+        isOpen={showDeletePopup}
+        type="confirm"
+        title="Delete PLO"
+        message="Are you sure you want to delete this university?"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setPloToDelete(null);
+        }}
+      />
     </div>
   );
 }

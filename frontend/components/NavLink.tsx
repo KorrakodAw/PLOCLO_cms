@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function NavLink({
-  href,
-  children,
-}: {
+interface NavLinkProps {
   href: string;
   children: React.ReactNode;
-}) {
+  // 💡 Add optional onClick handler
+  onClick?: () => void;
+}
+export default function NavLink({ href, children, onClick }: NavLinkProps) {
   const pathname = usePathname();
   const isActive = pathname === href;
 
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={`p-3 block font-normal transition-all duration-200 transform hover:translate-x-2
         ${
           isActive

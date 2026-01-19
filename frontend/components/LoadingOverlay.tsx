@@ -1,10 +1,24 @@
+// components/LoadingOverlay.tsx (or wherever it is defined)
+
 "use client";
 
 export default function LoadingOverlay() {
   return (
-    <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-gray-500/80">
-      <div className="w-16 h-16 mb-4 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
-      <h1 className="text-white text-lg font-semibold">Loading Data...</h1>
+    // FIX: Change 'fixed' to 'absolute' to contain it within the 'relative' parent
+    // and use 'h-full w-full' to cover that parent completely.
+    <div
+      className="fixed inset-0 z-[9999] h-full w-full flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm transition-opacity duration-300"
+      // Changed bg opacity slightly to ensure coverage of background
+    >
+      {/* Spinner and text content remain the same */}
+      <div
+        className="w-14 h-14 mb-4 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"
+        role="status"
+        aria-label="loading"
+      />
+      <h1 className="text-orange-600 text-lg font-bold tracking-wide">
+        Loading Data...
+      </h1>
     </div>
   );
 }

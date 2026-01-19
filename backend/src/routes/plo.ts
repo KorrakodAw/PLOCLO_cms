@@ -36,20 +36,31 @@ router.post("/", authenticateToken, async (req, res) => {
 
 // ดึงข้อมูล PLO ทั้งหมด
 // GET /api/plo
-router.get("/", authenticateToken, async (_req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
+    // FIX 1: Use req.query.programId instead of req.params.id
+    // The frontend sends: /plo?programId=123
+    const programId = parseInt(req.query.programId as string);
+
+    if (!programId) {
+      return res.status(400).json({ error: "Program ID is required" });
+    }
+
     const result = await pool.query(
       `SELECT 
-         plo.id, plo.code, plo.program_id, plo.name, plo.engname,
-         program.program_shortname_th, program.program_shortname_en, program.program_year
+          plo.id, plo.code, plo.program_id, plo.name, plo.engname,
+          program.program_shortname_th, program.program_shortname_en, program.program_year
        FROM plo
        JOIN program ON plo.program_id = program.id
-       ORDER BY plo.id`
+       WHERE plo.program_id = $1`, // FIX 2: Filter by program_id, not plo.id
+      [programId]
     );
+
+    // FIX 3: Return all rows (array), not just the first one
     res.json(result.rows);
-  } catch (err: any) {
+  } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "ไม่สามารถดึงข้อมูล PLO ได้" });
+    res.status(500).json({ error: "Unable to retrieve plo information" });
   }
 });
 
@@ -143,6 +154,37 @@ router.get("/paginate", authenticateToken, async (req, res) => {
     res.status(500).json({
       error: "Unable to retrieve paginated plos information",
     });
+  }
+});
+
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const { code, name, engname } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE plo SET code = $1, name = $2, engname = $3 WHERE id = $4 RETURNING *`,
+      [code, name, engname, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    console.error("Error updating PLO:", err);
+    res.status(500).json({ error: "Failed to update PLO" });
+  }
+});
+
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const ploId = parseInt(req.params.id);
+  if (!ploId) {
+    return res.status(400).json({ error: "PLO ID is required" });
+  }
+  try {
+    await pool.query(`DELETE FROM plo WHERE id = $1`, [ploId]);
+    res.status(204).send();
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "ไม่สามารถลบข้อมูล PLO ได้" });
   }
 });
 

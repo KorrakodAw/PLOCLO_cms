@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 
-type FieldType = "text" | "email" | "select";
+type FieldType = "text" | "email" | "select" | "number";
 
 interface FieldConfig<T> {
   label: string;
@@ -28,13 +28,29 @@ export default function FormEditPopup<T>({
   onSave,
   onClose,
 }: FormEditPopupProps<T>) {
+  // 1. Lock the background scroll when the popup opens
+  useEffect(() => {
+    // Disable scrolling on the body
+    document.body.style.overflow = "hidden";
+
+    // Re-enable scrolling when component unmounts (closes)
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, []);
+
+  const adjustHeight = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-lg p-6 w-96"
+        className="bg-white rounded-lg shadow-lg p-6 w-[700px] max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-4">{title}</h2>
@@ -45,29 +61,36 @@ export default function FormEditPopup<T>({
               {field.label}
             </label>
 
-            {/* TEXT / EMAIL INPUT */}
-            {(field.type === "text" || field.type === "email") && (
-              <input
-                type={field.type}
-                className="w-full border rounded px-3 py-2"
+            {/* TEXT / EMAIL / NUMBER INPUT */}
+            {(field.type === "text" ||
+              field.type === "email" ||
+              field.type === "number") && (
+              <textarea
+                rows={1}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500  outline-none transition-all resize-none overflow-hidden"
                 value={String(data[field.key] ?? "")}
-                onChange={(e) =>
-                  onChange({ ...data, [field.key]: e.target.value })
-                }
+                onChange={(e) => {
+                  onChange({ ...data, [field.key]: e.target.value });
+                  adjustHeight(e.target);
+                }}
+                // Adjust height on initial render
+                ref={(textarea) => {
+                  if (textarea) adjustHeight(textarea);
+                }}
               />
             )}
 
             {/* SELECT INPUT */}
             {field.type === "select" && (
               <select
-                className="w-full border rounded px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500  outline-none transition-all resize-none overflow-hidden"
                 value={String(data[field.key] ?? "")}
                 onChange={(e) =>
                   onChange({ ...data, [field.key]: e.target.value })
                 }
               >
                 {field.options?.map((opt) => (
-                  <option key={opt} value={opt}>
+                  <option key={opt} value={opt} >
                     {opt}
                   </option>
                 ))}

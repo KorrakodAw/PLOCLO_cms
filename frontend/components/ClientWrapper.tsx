@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation"; // 💡 Added useRouter
 import LoadingOverlay from "./LoadingOverlay";
 import Navbar from "./Navbar";
 import { useAuth } from "../app/context/AuthContext";
@@ -12,17 +12,21 @@ export default function ClientWrapper({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [loading, setLoading] = useState(false);
+  const router = useRouter(); // Initialize router
+  const [loading, setLoading] = useState(false); // Global loading state
   const { isLoggedIn, initialized } = useAuth();
 
-  useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, [pathname]);
+  // Keep track of the *previous* pathname to properly determine navigation end
+  const [currentPath, setCurrentPath] = useState(pathname);
 
-  // สมมติ: /dashboard ต้อง login, ส่วน / และ /about ไม่บังคับ
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // Only proceed if the pathname has definitively changed since the last render
+    if (pathname !== currentPath) {
+      setLoading(false);
+      setCurrentPath(pathname);
+    }
+  }, [pathname, currentPath, setLoading]); // Ensure setLoading is in dependency array
+
   const protectedRoutes = [
     "/editCourse",
     "/editProgram",
@@ -33,22 +37,21 @@ export default function ClientWrapper({
 
   useEffect(() => {
     if (initialized && !isLoggedIn && protectedRoutes.includes(pathname)) {
-      // Prevent infinite reloads by checking if already on /
       if (pathname !== "/") {
-        // Reload the page and redirect to login
-        window.location.replace("/");
+        // Use router.replace for client-side navigation (safer than window.location.replace)
+        router.replace("/");
       }
     }
-  }, [initialized, isLoggedIn, pathname, protectedRoutes]);
+  }, [initialized, isLoggedIn, pathname, protectedRoutes, router]);
 
   if (!initialized) return null;
 
   return (
     <div className="flex min-h-screen">
       {loading && <LoadingOverlay />}
-
       <aside className="w-52 min-h-screen bg-white shadow fixed top-0 left-0">
-        <Navbar isLoggedIn={isLoggedIn} />
+        {/* 💡 PASS SETLOADING PROP */}
+        <Navbar isLoggedIn={isLoggedIn} setLoading={setLoading} />
       </aside>
 
       <main className="flex-1 ml-52 p-6 bg-white overflow-x-auto">

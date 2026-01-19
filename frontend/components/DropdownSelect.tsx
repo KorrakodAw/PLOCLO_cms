@@ -22,13 +22,42 @@ const DropdownSelect: React.FC<DropdownSelectProps> = ({
 }) => {
   return (
     <div className="w-full">
-      <p className="mb-1">{label}</p>
+      <p className="mb-1 text-sm font-medium text-gray-700">{label}</p>
       <select
         value={value}
         onChange={onChange}
-        className={`bg-gray-500 p w-full max-w-md font-extralight text-white rounded text-center cursor-pointer ${
-          disabled ? "opacity-50 cursor-not-allowed" : ""
-        }`}
+        className={`
+      /* Layout & Sizing */
+      w-full 
+      py-2.5 px-3 
+      text-base 
+      font-normal 
+      rounded-md 
+      shadow-sm
+
+      /* Color & Appearance */
+      bg-white 
+      border 
+      border-gray-300 
+      text-gray-900 
+      cursor-pointer 
+      
+      /* Focus & Hover States */
+      focus:ring-2 
+      focus:ring-blue-500 
+      focus:border-blue-500 
+      outline-none 
+      transition 
+      duration-150 
+      ease-in-out
+      
+      /* Disabled State */
+      ${
+        disabled
+          ? "text-zinc-300 bg-gray-100 cursor-not-allowed border-gray-300 "
+          : ""
+      }
+    `}
         disabled={disabled}
       >
         {options.map((opt) => (

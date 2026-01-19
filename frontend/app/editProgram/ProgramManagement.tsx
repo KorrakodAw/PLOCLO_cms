@@ -1,37 +1,35 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   addProgram,
   bulkUploadPrograms,
   getProgramsPaginated,
+  Program,
 } from "../../utils/programApi";
 import { Column, Table } from "../../components/Table";
 import AddButton from "../../components/AddButton";
 import { useTranslation } from "react-i18next";
-import { getFaculties } from "../../utils/facultyApi";
-import { getUniversities } from "../../utils/universityApi";
+import { Faculty, getFaculties } from "../../utils/facultyApi";
+import { getUniversities, University } from "../../utils/universityApi";
 import PaginationControlButton from "../../components/PaignateControlButton";
 import { useToast } from "../../components/Toast";
 import LoadingOverlay from "../../components/LoadingOverlay";
+import axios from "axios";
+
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
+import { apiClient } from "../../utils/apiClient";
+
+import { useRouter } from "next/navigation";
 
 interface ProgramManagementProps {
   universityId?: string;
   facultyId?: string;
-  programId?: string; // Now this will be program_code instead of id
+  programId?: string;
   year?: string;
-}
-
-interface Program {
-  id: number;
-  program_code: number;
-  program_name_en: string;
-  program_name_th: string;
-  program_shortname_en: string;
-  program_shortname_th: string;
-  program_year: number;
 }
 
 export default function ProgramManagement({
@@ -43,6 +41,7 @@ export default function ProgramManagement({
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn } = useAuth();
+  const router = useRouter();
 
   const [programs, setPrograms] = useState<Program[]>([]);
   const [universityOptions, setUniversityOptions] = useState<
@@ -57,39 +56,39 @@ export default function ProgramManagement({
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("");
   const [selectedUniversity, setSelectedUniversity] = useState("");
+  const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
+  const [programToDelete, setProgramToDelete] = useState<Program | null>(null);
+  const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [limit] = useState(10); // You can make this configurable if needed
+  const limit = 10; // You can make this configurable if needed
 
   const { showToast, ToastElement } = useToast();
   // Fetch universities
   useEffect(() => {
     if (!isLoggedIn || !token) return;
 
-    const fetchUniversities = async () => {
+    const loadUniversities = async () => {
       try {
         const data = await getUniversities(token);
-
-        // Check if no universities were returned
         if (data.length === 0) {
+          setUniversityOptions([{ label: t("No data available"), value: "" }]);
+        } else {
           setUniversityOptions([
-            // Display "No data available" if the list is empty
-            { label: t("No data available"), value: "" },
+            { label: t("please select a university"), value: "" },
+            ...data.map((u: University) => ({
+              label: u.name,
+              value: String(u.id),
+            })),
           ]);
-          return;
         }
-
-        // If data exists, map it and prepend the default option
-        setUniversityOptions([
-          { label: t("please select a university"), value: "" },
-          ...data.map((u: any) => ({ label: u.name, value: String(u.id) })),
-        ]);
       } catch {
         showToast("API university error", "error");
       }
     };
-    fetchUniversities();
+    loadUniversities();
   }, [isLoggedIn, token, t, showToast]);
 
   // // Fetch faculties for selected university (use parent universityId)
@@ -105,7 +104,7 @@ export default function ProgramManagement({
         const data = await getFaculties(token, selectedUniversity);
 
         const filteredFaculties = data.filter(
-          (f: any) => String(f.university_id) === selectedUniversity
+          (f: Faculty) => String(f.university_id) === selectedUniversity
         );
 
         if (filteredFaculties.length === 0) {
@@ -115,7 +114,7 @@ export default function ProgramManagement({
 
         setFacultyOptions([
           { label: t("please select a faculty"), value: "" },
-          ...filteredFaculties.map((f: any) => ({
+          ...filteredFaculties.map((f: Faculty) => ({
             label: f.name,
             value: String(f.id),
           })),
@@ -140,52 +139,61 @@ export default function ProgramManagement({
     setYearOptions(years);
   }, [t]);
 
-  // ✅ Fetch programs (filtered + paginated)
-  useEffect(() => {
+  const fetchPrograms = useCallback(async () => {
     if (!isLoggedIn || !token) return;
 
-    // 1. Clear state before starting the new fetch
-    setSelectedFaculty("");
-    setPrograms([]);
-    setTotalPages(1); // Reset total pages to avoid display issues
     setLoading(true);
+    try {
+      const data = await getProgramsPaginated(token, page, limit, {
+        universityId,
+        facultyId,
+        programId,
+        year,
+      });
 
-    // Build query filters — only include filters with actual values
-    const filters: Record<string, string | undefined> = {};
+      const programData = data.data || data;
+      if (Array.isArray(programData)) {
+        // ใช้ Map เพื่อกรองโปรแกรมที่ซ้ำกัน
+        const uniqueProgramsMap = new Map();
+        programData.forEach((p: Program) => {
+          if (!uniqueProgramsMap.has(p.program_code)) {
+            uniqueProgramsMap.set(p.program_code, p);
+          }
+        });
 
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
-
-    getProgramsPaginated(token, page, limit, filters)
-      .then((res) => {
-        // Handle both { data, total } and plain array
-        const data = Array.isArray(res) ? res : res.data || [];
-        const total = res.total || data.length || 1;
-        setPrograms(data);
-        setTotalPages(Math.ceil(total / limit));
-      })
-      .catch((err) => {
-        showToast(err.message || "Failed to fetch programs", "error");
-      })
-      .finally(() => setLoading(false));
+        const uniqueList = Array.from(uniqueProgramsMap.values());
+        setPrograms(uniqueList);
+        setTotalPages(Math.ceil(uniqueList.length / limit) || 1);
+      } else {
+        setPrograms([]);
+        setTotalPages(1);
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      showToast(t("Error fetching programs"), "error");
+    } finally {
+      setLoading(false);
+    }
   }, [
     isLoggedIn,
     token,
     page,
-    limit,
     universityId,
     facultyId,
     programId,
     year,
+    t,
     showToast,
   ]);
 
+  const resetSelection = () => {
+    setSelectedFaculty("");
+    setSelectedUniversity("");
+    setSelectedYear("");
+  };
+
   // Add single program
   const handleAddProgram = async (data: Record<string, unknown>) => {
-    // Prefer faculty from the submitted payload (modal), then parent's
-    // selectedFaculty state, then the facultyId prop.
     const facultyToUse =
       (data && (data as any).faculty_id) || selectedFaculty || facultyId;
     const universityToUse =
@@ -209,50 +217,77 @@ export default function ProgramManagement({
       };
       if (universityToUse) payload.university_id = universityToUse;
       await addProgram(payload as any, token!);
+      resetSelection();
+      fetchPrograms();
       showToast(t("Program added successfully!"), "success");
       setPage(1);
-      window.location.reload();
-    } catch (err: any) {
-      if (err && err.status === 409) {
-        showToast(err.message || "Duplicate program code detected", "error");
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Failed to add program: " + err.message, "error");
+      } else if (typeof err === "string") {
+        showToast("Failed to add program: " + err, "error");
       } else {
-        showToast("Error: " + (err.message || err), "error");
+        showToast("Failed to add program: An unknown error occurred", "error");
       }
     }
   };
 
   // Bulk upload programs from Excel
+
+  // ... inside your component
+
   const handleFileUpload = async (mappedRows: any[]) => {
+    // 1. Determine Faculty
     const facultyToUse =
       mappedRows.length > 0
         ? mappedRows[0].faculty_id
         : selectedFaculty || facultyId;
+
     if (!facultyToUse) {
       showToast("Please select a faculty before uploading", "error");
-      setLoading(false);
       return;
     }
+
     setLoading(true);
+
     try {
-      const rowsWithFaculty = mappedRows.map((row) => ({
-        ...row,
-        faculty_id: row.faculty_id || facultyToUse,
+      // 2. DATA TRANSFORMATION (Crucial Step)
+      // We must ensure the keys match exactly what the backend expects.
+      // We also use String() and parseInt() to prevent type errors.
+
+      const formattedRows = mappedRows.map((row) => ({
+        program_code: String(
+          row.program_code || row["code"] || row["Program Code"]
+        ),
+        program_name_en: String(row.program_name_en || row["nameEn"]),
+        program_name_th: String(row.program_name_th || row["nameTh"]),
+        program_shortname_en: String(row.program_shortname_en || row["abbrEn"]),
+        program_shortname_th: String(row.program_shortname_th || row["abbrTh"]),
+        // Convert year to number safely
+        program_year: parseInt(String(row.program_year || row["year"]), 10),
+        faculty_id: facultyToUse,
       }));
-      await bulkUploadPrograms(rowsWithFaculty, token!);
+
+      // Debug: Check your console to see if the data looks correct before sending
+      console.log("Sending to API:", formattedRows);
+
+      await bulkUploadPrograms(formattedRows, token!);
+      resetSelection();
+      fetchPrograms();
       showToast("Programs uploaded successfully!", "success");
       setPage(1);
-      window.location.reload();
     } catch (err: any) {
-      if (err && err.status === 409) {
-        showToast(
-          err.message || "Duplicate program code detected in upload",
-          "error"
-        );
+      console.error("Full Error Object:", err);
+
+      if (axios.isAxiosError(err)) {
+        // Log the server response to see the REAL error message
+        console.log("Server Response Data:", err.response?.data);
+
+        const errorMsg = err.response?.data?.error || "Upload failed";
+        showToast(errorMsg, "error");
       } else {
-        showToast("Upload failed: " + (err.message || err), "error");
+        showToast("An unexpected error occurred", "error");
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -264,33 +299,131 @@ export default function ProgramManagement({
     lang === "en"
       ? { header: "Abbrev.", accessor: "program_shortname_en" }
       : { header: "ชื่อย่อ", accessor: "program_shortname_th" },
+    // {
+    //   header: t("year"),
+    //   accessor: "program_year",
+    //   render: (value: any) => (lang === "en" ? Number(value) - 543 : value),
+    // },
     {
-      header: t("year"),
-      accessor: "program_year",
-      render: (value: any) => (lang === "en" ? Number(value) - 543 : value),
+      header: t("actions"),
+      accessor: "program_code",
+      actions: [
+        {
+          label: t("view details"),
+          color: "blue",
+          hoverColor: "blue",
+          onClick: (row: Program) => {
+            router.push(`editProgram/${row.program_code}`);
+            setLoading(true);
+          },
+        },
+        // {
+        //   label: t("edit"),
+        //   color: "blue",
+        //   hoverColor: "blue",
+        //   onClick: (row: Program) => {
+        //     setSelectedProgram(row);
+        //     setShowEditPopup(true);
+        //   },
+        // },
+        // {
+        //   label: t("delete"),
+        //   color: "red",
+        //   hoverColor: "red",
+        //   onClick: (row: Program) => {
+        //     setProgramToDelete(row);
+        //     setShowDeletePopup(true);
+        //   },
+        // },
+      ],
     },
   ];
 
-  return (
-    <div className="mt-5 p-5">
-      {loading && <LoadingOverlay />}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-extralight">{t("program management")}</h1>
-        {/* University Dropdown */}
+  const saveEdit = async () => {
+    if (!selectedProgram || !token) return;
 
+    try {
+      const res = await apiClient.patch(
+        `/program/${selectedProgram.id}`,
+        {
+          program_code: selectedProgram.program_code,
+          program_name_en: selectedProgram.program_name_en,
+          program_name_th: selectedProgram.program_name_th,
+          program_shortname_en: selectedProgram.program_shortname_en,
+          program_shortname_th: selectedProgram.program_shortname_th,
+          program_year: selectedProgram.program_year,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setPrograms((prev) =>
+        prev.map((prog) => (prog.id === selectedProgram.id ? res.data : prog))
+      );
+      showToast("Program updated successfully", "success");
+    } catch {
+      showToast("Failed to update program", "error");
+    } finally {
+      setShowEditPopup(false);
+      setSelectedProgram(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!programToDelete || !token) return;
+
+    try {
+      await apiClient.delete(`/program/${programToDelete.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPrograms((prev) =>
+        prev.filter((prog) => prog.id !== programToDelete.id)
+      );
+      showToast("Program deleted successfully", "success");
+    } catch (err) {
+      if (err instanceof Error) {
+        showToast("Failed to delete program: " + err.message, "error");
+      } else if (typeof err === "string") {
+        showToast("Failed to delete program: " + err, "error");
+      } else {
+        showToast(
+          "Failed to delete program: An unknown error occurred",
+          "error"
+        );
+      }
+    } finally {
+      setShowDeletePopup(false);
+      setProgramToDelete(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchPrograms();
+  }, [fetchPrograms]);
+
+  return (
+    <div className="p-5 md:p-8 min-h-screen">
+      {loading && <LoadingOverlay />}
+      <ToastElement /> {/* Place Toast element at the top level */}
+      {/* HEADER & ACTIONS */}
+      <div className="mb-6 flex justify-between items-center border-b pb-4">
+        <h1 className="text-3xl font-extrabold text-gray-800">
+          {t("program management")}
+        </h1>
+        {/* The AddButton component handles all program creation/upload */}
         <AddButton
           buttonText={t("create new program")}
           placeholderText={{
-            code: "Program Code",
-            nameEn: "Program Name (EN)",
-            nameTh: "Program Name (TH)",
-            abbrEn: "Program abbreviation (EN)",
-            abbrTh: "Program abbreviation (TH)",
-            year: "Year",
+            code: t("program code"),
+            nameEn: t("program name (en)"),
+            nameTh: t("program name (th)"),
+            abbrEn: t("program abbreviation (en)"),
+            abbrTh: t("program abbreviation (th)"),
+            year: t("year"),
           }}
           submitButtonText={{
-            insert: "Insert Program",
-            upload: "Upload Program (Excel)",
+            insert: t("insert program"),
+            upload: t("upload program (excel)"),
           }}
           onSubmit={handleAddProgram}
           onSubmitExcel={handleFileUpload}
@@ -305,15 +438,72 @@ export default function ProgramManagement({
           onYearChange={(e) => setSelectedYear(e.target.value)}
         />
       </div>
-      <hr className="my-3" />
-      {/* Table Component for Programs */}
-      <Table<Program> columns={programColumns} data={programs} />
-      <PaginationControlButton
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
+      {/* FILTERING CONTROLS */}
+      {/* DATA TABLE SECTION */}
+      <div className="bg-white p-4 rounded-lg shadow-xl">
+        <Table<Program> columns={programColumns} data={programs} />
+        {/* Pagination Controls */}
+        <div className="pt-4 flex justify-end">
+          <PaginationControlButton
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
+      </div>
+      {/* POPUPS (Keep these at the bottom, they will overlay the main content) */}
+      {showEditPopup && selectedProgram && (
+        <FormEditPopup
+          title={t("Edit Program")}
+          data={selectedProgram}
+          fields={[
+            // ... your fields ...
+            { label: t("Program Code"), key: "program_code", type: "text" },
+            {
+              label: t("Program Name (EN)"),
+              key: "program_name_en",
+              type: "text",
+            },
+            {
+              label: t("Program Name (TH)"),
+              key: "program_name_th",
+              type: "text",
+            },
+            {
+              label: t("Abbreviation (EN)"),
+              key: "program_shortname_en",
+              type: "text",
+            },
+            {
+              label: t("Abbreviation (TH)"),
+              key: "program_shortname_th",
+              type: "text",
+            },
+            { label: t("Year"), key: "program_year", type: "number" },
+          ]}
+          onChange={(update) => {
+            setSelectedProgram(update);
+          }}
+          onClose={() => {
+            setShowEditPopup(false);
+            setSelectedProgram(null);
+          }}
+          onSave={saveEdit}
+        />
+      )}
+      <AlertPopup
+        title={t("confirm deletion")}
+        type="confirm"
+        message={`${t("Are you sure you want to delete the program")} "${
+          programToDelete?.program_shortname_en || ""
+        }" ${t("This action cannot be undone.")}`}
+        isOpen={showDeletePopup}
+        onCancel={() => {
+          setShowDeletePopup(false);
+          setProgramToDelete(null);
+        }}
+        onConfirm={confirmDelete}
       />
-      <ToastElement />
     </div>
   );
 }

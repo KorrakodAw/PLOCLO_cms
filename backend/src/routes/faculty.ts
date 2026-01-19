@@ -10,7 +10,19 @@ router.get("/", authenticateToken, async (req, res) => {
   try {
     const universityId = req.query.university_id as string | undefined;
 
-    let query = `SELECT id, name, university_id FROM faculty`;
+   let query = `
+      SELECT 
+        faculty.id, 
+        faculty.name, 
+        faculty.name_th, 
+        faculty.abbreviation, 
+        faculty.abbreviation_th, 
+        faculty.university_id,
+        university.name AS university_name,       -- English Name
+        university.name_th AS university_name_th  -- Thai Name (Optional)
+      FROM faculty
+      JOIN university ON faculty.university_id = university.id
+    `;
     const params: any[] = [];
 
     if (universityId) {
@@ -99,6 +111,69 @@ router.post("/", authenticateToken, async (req, res) => {
     );
 
     res.status(201).json(result.rows[0]);
+  } catch (err: any) {
+    console.error("Database error details:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const facultyId = parseInt(req.params.id);
+  const { name, name_th, abbreviation, abbreviation_th } = req.body;
+
+  if (!name || !name_th || !abbreviation || !abbreviation_th) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  try {
+    // Check if the faculty exists
+    const facultyCheck = await pool.query(
+      `SELECT id FROM faculty WHERE id = $1`,
+      [facultyId]
+    );
+
+    if (facultyCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Faculty not found" });
+    }
+
+    // Update the faculty
+    const result = await pool.query(
+      `UPDATE faculty 
+       SET name = $1, name_th = $2, abbreviation = $3, abbreviation_th = $4 
+       WHERE id = $5 
+       RETURNING id, university_id, name, name_th, abbreviation, abbreviation_th`,
+      [name, name_th, abbreviation, abbreviation_th, facultyId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Faculty not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    console.error("Database error details:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/:id", authenticateToken, async (req, res) => {
+  const facultyId = parseInt(req.params.id);
+
+  try {
+    // Check if the faculty exists
+    const facultyCheck = await pool.query(
+      `SELECT id FROM faculty WHERE id = $1`,
+      [facultyId]
+    );
+
+    if (facultyCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Faculty not found" });
+    }
+
+    // Delete the faculty
+    await pool.query(`DELETE FROM faculty WHERE id = $1`, [facultyId]);
+
+    res.status(204).send();
   } catch (err: any) {
     console.error("Database error details:", err.message);
     res.status(500).json({ error: err.message });
