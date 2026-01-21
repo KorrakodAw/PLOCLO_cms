@@ -34,7 +34,7 @@ export async function addPlo(
     code: string;
     name: string;
     engname: string;
-    program_id: string;
+    program_id: string | number;
   },
   token: string
 ) {

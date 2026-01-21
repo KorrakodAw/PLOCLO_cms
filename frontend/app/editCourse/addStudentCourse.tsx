@@ -3,8 +3,9 @@ import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "@/utils/apiClient";
 import { useToast } from "@/components/Toast";
 import { Column, Table } from "@/components/Table";
-import axios from "axios";
 import { useTranslation } from "react-i18next";
+import LoadingOverlay from "@/components/LoadingOverlay";
+import AlertPopup from "@/components/AlertPopup";
 
 interface Student {
   id: number;
@@ -16,23 +17,32 @@ interface Student {
 interface StudentCourse {
   id: number;
   student_code: string;
-  student_id: string | number;
+  student_id: number;
   first_name: string;
   last_name: string;
   assignedAt: string;
 }
 
 export default function AddStudentCourse({
-  courseId,
+  masterCourseId,
   programId,
+  sectionId,
 }: {
-  courseId: string | number;
+  masterCourseId: string | number;
   programId: string | number;
+  sectionId: string;
 }) {
-  const sectionId = courseId; // courseId represents a specific course section
   const [allProgramStudents, setAllProgramStudents] = useState<Student[]>([]);
   const [enrolledStudents, setEnrolledStudents] = useState<StudentCourse[]>([]);
-  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+  const [studentsInAnySection, setStudentsInAnySection] = useState<
+    { id: number }[]
+  >([]);
+  const [showAlertPopup, setShowAlertPopup] = useState(false);
+
+  // Selection states
+  const [selectedCandidates, setSelectedCandidates] = useState<number[]>([]); // For adding
+  const [selectedEnrolledIds, setSelectedEnrolledIds] = useState<number[]>([]); // For deleting
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -40,113 +50,164 @@ export default function AddStudentCourse({
   const { t } = useTranslation("common");
 
   const loadData = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const programRes = await apiClient.get(`/student?programId=${programId}`);
-      const enrolledRes = await apiClient.get(
-        `/studentOnCourse?sectionId=${sectionId}`
+      const sectionRes = await apiClient.get(
+        `/studentOnCourse?sectionId=${sectionId}`,
       );
+      const courseRes = await apiClient.get(
+        `/studentOnCourse?courseId=${masterCourseId}`,
+      );
+
       setAllProgramStudents(programRes.data);
-      setEnrolledStudents(enrolledRes.data);
-      setLoading(false);
+      setEnrolledStudents(sectionRes.data);
+      setStudentsInAnySection(courseRes.data);
+
+      // Clear selections on reload
+      setSelectedEnrolledIds([]);
     } catch (err) {
       console.error("Failed to fetch data", err);
+    } finally {
       setLoading(false);
     }
-  }, [programId, sectionId]);
+  }, [programId, sectionId, masterCourseId]);
 
   useEffect(() => {
-    if (programId && sectionId) loadData();
-  }, [programId, sectionId, loadData]);
+    if (programId && sectionId && masterCourseId) loadData();
+  }, [programId, sectionId, masterCourseId, loadData]);
 
-  // Filter: Hide students already in the course from the popup selection
-  const availableStudents = allProgramStudents.filter(
-    (student) =>
-      !enrolledStudents.some((enrolled) => enrolled.student_id === student.id)
-  );
+  // Filter Logic
+  const availableStudents = allProgramStudents.filter((student) => {
+    const isAlreadyInCourse = studentsInAnySection.some(
+      (enrolled) => enrolled.id === student.id,
+    );
+    return !isAlreadyInCourse;
+  });
 
+  // --- BULK ADD ---
   const handleAddSelected = async () => {
-    if (selectedStudentIds.length === 0) return;
+    if (selectedCandidates.length === 0) return;
     setLoading(true);
-
     try {
       const response = await apiClient.post("/studentOnCourse/bulk", {
         sectionId: parseInt(sectionId),
-        studentIds: selectedStudentIds,
+        studentIds: selectedCandidates,
       });
-
-      // Success Toast
       showToast(
         response.data.message || "Students added successfully",
-        "success"
+        "success",
       );
-
-      setSelectedStudentIds([]);
+      setSelectedCandidates([]);
       setIsModalOpen(false);
-      await loadData(); // Refresh your tables
-    } catch (err: unknown) {
-      setIsModalOpen(false);
-
-      let errorMessage = "Failed to add students";
-
-      // 1. Check if it's an Axios Error
-      if (axios.isAxiosError(err)) {
-        // 2. TypeScript now knows err.response.data follows ApiErrorResponse
-        errorMessage = err.response?.data?.error || errorMessage;
-      } else if (err instanceof Error) {
-        // 3. Handle standard JavaScript errors
-        errorMessage = err.message;
-      }
-
-      showToast(errorMessage, "error");
-      console.error("Error adding students:", err);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to add students", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Explicitly type the array so TS checks accessors against StudentCourse
-  const StudentColumns: Column<Student>[] = [
+  // --- BULK DELETE ---
+  const handleBulkDelete = async () => {
+    if (selectedEnrolledIds.length === 0) return;
+
+    setLoading(true);
+    try {
+      // Calls the new POST endpoint for bulk delete
+      await apiClient.post(`/studentOnCourse/bulk-delete`, {
+        sectionId: parseInt(sectionId),
+        studentIds: selectedEnrolledIds, // Array of student_ids to remove
+      });
+
+      showToast("Students removed successfully", "success");
+      await loadData();
+    } catch (err) {
+      console.error("Failed to remove students", err);
+      showToast("Failed to remove students", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- TABLE COLUMNS ---
+  const StudentColumns: Column<StudentCourse>[] = [
     {
-      header: t("Student ID"),
-      accessor: "student_code", // Must exist in StudentCourse
+      header: (
+        <input
+          type="checkbox"
+          checked={
+            enrolledStudents.length > 0 &&
+            selectedEnrolledIds.length === enrolledStudents.length
+          }
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedEnrolledIds(enrolledStudents.map((s) => s.student_id));
+            } else {
+              setSelectedEnrolledIds([]);
+            }
+          }}
+          className="cursor-pointer"
+        />
+      ),
+      accessor: "id", // Dummy accessor for checkbox column
+      render: (_, row) => (
+        <input
+          type="checkbox"
+          checked={selectedEnrolledIds.includes(row.student_id)}
+          onChange={() => {
+            setSelectedEnrolledIds((prev) =>
+              prev.includes(row.student_id)
+                ? prev.filter((id) => id !== row.student_id)
+                : [...prev, row.student_id],
+            );
+          }}
+          className="cursor-pointer"
+        />
+      ),
     },
-    {
-      header: t("First Name"),
-      accessor: "first_name",
-    },
-    {
-      header: t("Last Name"),
-      accessor: "last_name",
-    },
-    // {
-    //   header: "Enrolled Date",
-    //   accessor: "assignedAt",
-    //   Cell: ({ value }: { value: string }) => {
-    //     return (
-    //       <span>{value ? new Date(value).toLocaleDateString() : "-"}</span>
-    //     );
-    //   },
-    // },
+    { header: t("Student ID"), accessor: "student_code" },
+    { header: t("First Name"), accessor: "first_name" },
+    { header: t("Last Name"), accessor: "last_name" },
   ];
 
   return (
     <div className="p-4 space-y-6">
+      {loading && <LoadingOverlay />}
       <ToastElement />
-      {/* Main UI header */}
+
+      {/* Header Actions */}
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-        <h2 className="text-lg font-bold">{t("Students in this Course")}</h2>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition-colors"
-        >
-          + {t("Enroll Students")}
-        </button>
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          {t("Students in this Course")}
+          <span className="text-sm font-normal text-gray-500">
+            ({enrolledStudents.length})
+          </span>
+        </h2>
+
+        <div className="flex gap-2">
+          {selectedEnrolledIds.length > 0 && (
+            <button
+              onClick={() => setShowAlertPopup(true)}
+              className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition-colors animate-in fade-in"
+            >
+              {t("delete")} ({selectedEnrolledIds.length})
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition-colors"
+          >
+            + {t("Enroll Students")}
+          </button>
+        </div>
       </div>
 
       <Table columns={StudentColumns} data={enrolledStudents} />
 
-      {/* MODAL POPUP */}
+      {/* MODAL POPUP (Same as before, just mapped to selectedCandidates) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
@@ -154,7 +215,7 @@ export default function AddStudentCourse({
               <h3 className="text-xl font-bold">Select Students to Add</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
+                className="text-gray-400 text-2xl"
               >
                 &times;
               </button>
@@ -162,22 +223,21 @@ export default function AddStudentCourse({
 
             <div className="flex-1 overflow-y-auto p-4">
               <table className="w-full text-left">
-                <thead className="sticky top-0 bg-white border-b">
+                <thead className="sticky top-0 bg-white border-b z-10">
                   <tr>
                     <th className="p-2 w-10">
                       <input
                         type="checkbox"
                         checked={
-                          selectedStudentIds.length ===
-                            availableStudents.length &&
-                          availableStudents.length > 0
+                          availableStudents.length > 0 &&
+                          selectedCandidates.length === availableStudents.length
                         }
                         onChange={(e) => {
                           if (e.target.checked)
-                            setSelectedStudentIds(
-                              availableStudents.map((s) => s.id)
+                            setSelectedCandidates(
+                              availableStudents.map((s) => s.id),
                             );
-                          else setSelectedStudentIds([]);
+                          else setSelectedCandidates([]);
                         }}
                       />
                     </th>
@@ -195,12 +255,12 @@ export default function AddStudentCourse({
                       <td className="p-2">
                         <input
                           type="checkbox"
-                          checked={selectedStudentIds.includes(s.id)}
+                          checked={selectedCandidates.includes(s.id)}
                           onChange={() => {
-                            setSelectedStudentIds((prev) =>
+                            setSelectedCandidates((prev) =>
                               prev.includes(s.id)
                                 ? prev.filter((id) => id !== s.id)
-                                : [...prev, s.id]
+                                : [...prev, s.id],
                             );
                           }}
                         />
@@ -215,7 +275,7 @@ export default function AddStudentCourse({
               </table>
               {availableStudents.length === 0 && (
                 <div className="text-center py-10 text-gray-500 italic">
-                  All program students are already enrolled.
+                  No available students found.
                 </div>
               )}
             </div>
@@ -229,16 +289,35 @@ export default function AddStudentCourse({
               </button>
               <button
                 onClick={handleAddSelected}
-                disabled={loading || selectedStudentIds.length === 0}
+                disabled={loading || selectedCandidates.length === 0}
                 className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold disabled:bg-gray-300"
               >
                 {loading
                   ? "Adding..."
-                  : `Add ${selectedStudentIds.length} Students`}
+                  : `Add ${selectedCandidates.length} Students`}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* ALERT POPUP FOR DELETE CONFIRMATION */}
+      {showAlertPopup && (
+        <AlertPopup
+          isOpen={showAlertPopup}
+          type="confirm"
+          title={t("Confirm Deletion")}
+          message={t(
+            "Are you sure you want to delete the selected students from this section?",
+          )}
+          confirmText={t("Delete")}
+          cancelText={t("Cancel")}
+          onConfirm={() => {
+            setShowAlertPopup(false);
+            handleBulkDelete();
+          }}
+          onCancel={() => setShowAlertPopup(false)}
+        />
       )}
     </div>
   );

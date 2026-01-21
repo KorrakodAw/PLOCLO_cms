@@ -49,19 +49,19 @@ export default function AlertPopup({
   const getButtonClasses = (isPrimary: boolean) => {
     if (!isPrimary) {
       // Secondary/Cancel Button Style
-      return "bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium px-4 py-2 rounded-lg transition-colors duration-150";
+      return "bg-gray-200 hover:bg-gray-300 text-gray-800 font-light px-4 py-2 rounded-lg transition-colors duration-150";
     }
 
     // Primary/Confirm Button Style based on type
     switch (type) {
       case "success":
-        return "bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150";
+        return "bg-green-600 hover:bg-green-700 text-white font-light px-4 py-2 rounded-lg transition-colors duration-150";
       case "error":
       case "confirm":
-        return "bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150";
+        return "bg-red-600 hover:bg-red-700 text-white font-light px-4 py-2 rounded-lg transition-colors duration-150";
       case "info":
       default:
-        return "bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150";
+        return "bg-blue-600 hover:bg-blue-700 text-white font-light px-4 py-2 rounded-lg transition-colors duration-150";
     }
   };
   // ---------------------------------------------
@@ -84,12 +84,12 @@ export default function AlertPopup({
           <div className="mb-4">{getIcon()}</div>
 
           {/* TITLE */}
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
+          <h2 className="text-xl font-light text-gray-900 mb-2">
             {title || (type === "confirm" ? "Confirm Action" : "Notice")}
           </h2>
 
           {/* MESSAGE */}
-          <p className="text-gray-600 text-center mb-6 text-[16px]">
+          <p className="text-gray-600 font-light text-center mb-6 text-[16px]">
             {message}
           </p>
 

@@ -53,43 +53,31 @@ export default function UniversityDetailPage({
   const { t, i18n } = useTranslation("common");
   // const lang = i18n.language;
 
+  const fetchData = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      // Fetch specific university details
+      const uniData = await getUniversityById(token, universityId);
+      setUniversity(uniData);
+
+      // Fetch faculties associated with this university ID
+      // NOTE: Ensure getFaculties API accepts the universityId for filtering
+      const facultyData = await getFaculties(token, universityId);
+      setFaculties(facultyData);
+    } catch (err) {
+      showToast("Failed to load university details or faculties.", "error");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- 1. Fetch University Details and Faculties ---
   useEffect(() => {
     if (!token || !universityId) return;
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Fetch specific university details
-        const uniData = await getUniversityById(token, universityId);
-        setUniversity(uniData);
-
-        // Fetch faculties associated with this university ID
-        // NOTE: Ensure getFaculties API accepts the universityId for filtering
-        const facultyData = await getFaculties(token, universityId);
-        setFaculties(facultyData);
-      } catch (err) {
-        showToast("Failed to load university details or faculties.", "error");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, [token, universityId, showToast]);
-
-  const fetchFaculties = async () => {
-    if (!token) return;
-    try {
-      const data = await apiClient.get("/faculty", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setFaculties(data.data);
-      setLoading(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleFaculty = async (data: Record<string, unknown>) => {
     if (!token) return;
@@ -104,10 +92,23 @@ export default function UniversityDetailPage({
       };
       await createFaculty(token!, payload as CreateFacultyPayload);
       setLoading(true);
-      fetchFaculties();
+      fetchData();
       showToast("Faculty created successfully", "success");
-    } catch {
-      showToast("Failed to create faculty. Check backend.", "error");
+    } catch (err: any) {
+      console.error("Create Faculty Error:", err); // Always log the full error for debugging
+
+      // 1. Check if the server sent a specific error message (e.g., "Faculty code already exists")
+      if (err.response && err.response.data && err.response.data.error) {
+        showToast(err.response.data.error, "error");
+      }
+      // 2. Check if it's a standard JavaScript/Network error
+      else if (err instanceof Error) {
+        showToast(err.message, "error");
+      }
+      // 3. Fallback for unknown errors
+      else {
+        showToast("Failed to create faculty. Check backend logs.", "error");
+      }
     }
   };
 
@@ -125,12 +126,12 @@ export default function UniversityDetailPage({
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
+      fetchData();
       showToast("Faculty updated successfully", "success");
       setSelectedFaculty(null);
       setShowEditFacultyPopup(false);
-      fetchFaculties();
     } catch {
       showToast("Failed to update faculty. Check backend.", "error");
     }
@@ -142,7 +143,7 @@ export default function UniversityDetailPage({
       await apiClient.delete(`/faculty/${facultyToDelete.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      fetchFaculties();
+      fetchData();
       showToast("Faculty deleted successfully", "success");
     } catch {
       showToast("Failed to delete faculty. Check backend.", "error");
@@ -197,10 +198,10 @@ export default function UniversityDetailPage({
 
       {/* UNIVERSITY DETAILS SECTION (The "Top Data") */}
       <div className="bg-white p-6 rounded-xl shadow-xl mb-8 border-l-4 border-orange-500">
-        <h1 className="text-3xl font-extrabold text-gray-800 mb-2">
+        <h1 className="text-3xl font-light text-gray-800 mb-2">
           {university.name} ({university.abbreviation})
         </h1>
-        <p className="text-xl text-gray-600 mb-4">
+        <p className="text-xl font-light text-gray-600 mb-4">
           {university.name_th} ({university.abbreviation_th})
         </p>
         <hr className="my-4" />
@@ -212,7 +213,7 @@ export default function UniversityDetailPage({
       {/* FACULTY LIST SECTION */}
       <div className="mt-10">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+          <h2 className="text-2xl font-light text-gray-800 mb-4">
             Faculties ({faculties.length})
           </h2>
           <AddButton
@@ -236,7 +237,7 @@ export default function UniversityDetailPage({
         {faculties.length > 0 ? (
           <Table<Faculty> columns={facultyColumns} data={faculties} />
         ) : (
-          <div className="text-center p-6 border rounded-lg bg-gray-50 text-gray-500">
+          <div className="text-center p-6 border rounded-lg font-light bg-gray-50 text-gray-500">
             No faculties found for this university.
           </div>
         )}

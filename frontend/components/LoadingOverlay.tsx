@@ -16,7 +16,7 @@ export default function LoadingOverlay() {
         role="status"
         aria-label="loading"
       />
-      <h1 className="text-orange-600 text-lg font-bold tracking-wide">
+      <h1 className="text-orange-600 text-lg font-light tracking-wide">
         Loading Data...
       </h1>
     </div>

@@ -153,7 +153,7 @@ export default function EditCourse() {
     getPrograms(token, faculty) // ← ส่ง facultyId ไป
       .then((data) => {
         const uniquePrograms = Array.from(
-          new Map(data.map((p: Program) => [p.program_code, p])).values()
+          new Map(data.map((p: Program) => [p.program_code, p])).values(),
         );
 
         setProgramOptions([
@@ -170,46 +170,44 @@ export default function EditCourse() {
       });
   }, [faculty, t]);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token || !faculty || !program) {
-      setYear("");
-      setSemester("");
-      setSection("");
-      setYearOptions([{ label: t("all"), value: "" }]);
+  // useEffect(() => {
+  //   const token = localStorage.getItem("token");
+  //   if (!token || !faculty || !program) {
+  //     setYear("");
+  //     setSemester("");
+  //     setSection("");
+  //     setYearOptions([{ label: t("all"), value: "" }]);
 
-      return;
-    }
+  //     return;
+  //   }
 
-    getPrograms(token, faculty)
-      .then((data) => {
-        // Filter programs with the selected program_code
-        const years = (
-          Array.from(
-            new Set(
-              data
-                .filter(
-                  (p: Program) => String(p.program_code) === String(program)
-                )
-                .map((p: Program) => p.program_year)
-            )
-          ) as number[]
-        ).sort((a, b) => b - a);
+  //   getPrograms(token, faculty)
+  //     .then((data) => {
+  //       // Filter programs with the selected program_code
+  //       const years = (
+  //         Array.from(
+  //           new Set(
+  //             data
+  //               .filter((p: Program) => String(p.id) === String(program))
+  //               .map((p: Program) => p.program_year),
+  //           ),
+  //         ) as number[]
+  //       ).sort((a, b) => b - a);
 
-        if (years.length === 0) {
-          setYearOptions([{ label: t("all"), value: "" }]);
-        } else {
-          setYearOptions([
-            { label: t("all"), value: "" },
-            ...years.map((y) => {
-              const label = lang === "en" ? String(y - 543) : String(y);
-              return { label, value: String(y) }; // display converted label, keep real value
-            }),
-          ]);
-        }
-      })
-      .catch(() => setYearOptions([{ label: t("all"), value: "" }]));
-  }, [program, faculty, t, lang]);
+  //       if (years.length === 0) {
+  //         setYearOptions([{ label: t("all"), value: "" }]);
+  //       } else {
+  //         setYearOptions([
+  //           { label: t("all"), value: "" },
+  //           ...years.map((y) => {
+  //             const label = lang === "en" ? String(y - 543) : String(y);
+  //             return { label, value: String(y) }; // display converted label, keep real value
+  //           }),
+  //         ]);
+  //       }
+  //     })
+  //     .catch(() => setYearOptions([{ label: t("all"), value: "" }]));
+  // }, [program, faculty, t, lang]);
 
   // useEffect(() => {
   //   try {
@@ -222,15 +220,6 @@ export default function EditCourse() {
   //     // ignore localStorage/window errors
   //   }
   // }, [ACTIVE_TAB_KEY, activeTab]);
-
-  const clearFilters = () => {
-    setUniversity("");
-    setFaculty("");
-    setProgram("");
-    setYear("");
-    setSemester("");
-    setSection("");
-  };
 
   return (
     <ProtectedRoute roles={["system_admin", "instructor"]}>
@@ -256,41 +245,41 @@ export default function EditCourse() {
           <DropdownSelect
             label={t("university")}
             value={university}
-            onChange={(e) => setUniversity(e.target.value)}
+            onChange={(value) => setUniversity(String(value))}
             options={universityOptions}
           />
           <DropdownSelect
             label={t("faculty")}
             value={faculty}
-            onChange={(e) => setFaculty(e.target.value)}
+            onChange={(value) => setFaculty(String(value))}
             options={facultyOptions}
             disabled={!university}
           />
           <DropdownSelect
             label={t("program")}
             value={program}
-            onChange={(e) => setProgram(e.target.value)}
+            onChange={(value) => setProgram(String(value))}
             options={programOptions}
             disabled={!faculty}
           />
-          <DropdownSelect
+          {/* <DropdownSelect
             label={t("year")}
             value={year}
-            onChange={(e) => setYear(e.target.value)}
+            onChange={(value) => setYear(String(value))}
             options={yearOptions}
             disabled={!program}
-          />
+          /> */}
           {/* <DropdownSelect
             label={t("semester")}
             value={semester}
-            onChange={(e) => setSemester(e.target.value)}
+            onChange={(value) => setSemester(String(value))}
             options={semesterOptions}
             disabled={!year}
           />
           <DropdownSelect
             label={t("section")}
             value={section}
-            onChange={(e) => setSection(e.target.value)}
+            onChange={(value) => setSection(String(value))}
             options={sectionOptions}
             disabled={!semester}
           /> */}
@@ -312,9 +301,6 @@ export default function EditCourse() {
           facultyId={faculty}
           universityId={university}
           programId={program}
-          year={year}
-          semester={semester}
-          section={section}
         />
         {/* {activeTab === "general" && (
           <CourseManagement

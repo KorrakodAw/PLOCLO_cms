@@ -15,6 +15,7 @@ type CardData = {
 export default function AboutData() {
   const { t } = useTranslation("common");
 
+  // Mock data preserved from your example
   const cards: CardData[] = [
     {
       id: 1,
@@ -95,146 +96,190 @@ export default function AboutData() {
   const advisors = cards.filter((c) => c.role === "ADVISOR");
 
   return (
-    <div className="max-w-6xl h-full flex flex-col mx-auto px-4 sm:px-6">
-      {/* Added horizontal padding for smaller screens */}
-      {/* 1. Header */}
-      <motion.h1
-        className="text-3xl font-extrabold mb-8 text-center tracking-wide text-gray-800"
-        initial={{ opacity: 0, y: -20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        {t("about") || "About Our Team"}
-      </motion.h1>
-      {/* 2. 🔹 Advisors Section (NOW AT THE TOP) */}
-      <SectionTitle title="Advisors" />
-      <motion.div
-        className="flex flex-wrap justify-center gap-6 md:gap-8 mt-4 mb-10"
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7 }}
-        viewport={{ once: true, amount: 0.1 }}
-      >
-        {advisors.map((advisor) => (
-          <AdvisorCard key={advisor.id} data={advisor} />
-        ))}
-      </motion.div>
-      <hr className="my-6 border-gray-200" /> {/* Added a separator */}
-      {/* 3. 🔹 Team Section (VERSIONS IN A ROW) */}
-      <SectionTitle title={t("team_members") || "Development Teams"} />
-      {/* Container for all versions - using Flexbox to keep them on one line */}
-      <div className="flex flex-col md:flex-row gap-6 mt-6 justify-between">
-        {/* Map through all versions and treat each as a 'block' column */}
-        {[version1, version2, version3].map((version, index) => (
-          // Outer block for each version group (e.g., Version 1)
-          <div
-            key={index}
-            className="flex flex-col gap-4 p-4 rounded-xl shadow-sm md:w-1/3"
-          >
-            {/* Title for the individual version block */}
-            <h3 className="text-xl font-bold text-gray-700 border-b pb-2 mb-2">
-              Version {index + 1}
-            </h3>
+    <div className="min-h-screen bg-slate-50 py-16">
+      <div className="max-w-7xl h-full flex flex-col mx-auto px-4 sm:px-6">
+        {/* 1. Header */}
+        <motion.div
+          className="text-center mb-16"
+          initial={{ opacity: 0, y: -20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-800 tracking-tight">
+            {t("about") || "Meet Our Team"}
+          </h1>
+          <p className="mt-4 text-slate-500 max-w-2xl mx-auto">
+            The talented individuals behind the project.
+          </p>
+        </motion.div>
 
-            {/* Inner Container for PersonCards (maintains staggered animation) */}
-            <motion.div
-              className="flex flex-col gap-6 items-center w-full" /* Changed to flex-col for clean list */
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              variants={{
-                hidden: {},
-                visible: { transition: { staggerChildren: 0.15 } },
-              }}
-            >
-              {version.map((person) => (
-                <motion.div
-                  key={person.id}
-                  className="w-full justify-center flex" /* Center cards within the block */
-                  variants={{
-                    hidden: { opacity: 0, x: -20 }, // Changed y to x for horizontal effect within block
-                    visible: { opacity: 1, x: 0 },
-                  }}
-                >
-                  <PersonCard data={person} />
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        ))}
+        {/* 2. 🔹 Team Section (Stacked Rows) */}
+        <div className="flex flex-col gap-16 mb-20">
+          {[version1, version2, version3].map((version, index) => (
+            <div key={index} className="w-full">
+              {/* Version Header with modern styling */}
+              <motion.div
+                className="flex items-center gap-4 mb-8"
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+              >
+                <div className="h-10 w-1.5 bg-blue-600 rounded-full"></div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800">
+                    Version {index + 1}
+                  </h3>
+                  <span className="text-sm text-slate-400 font-medium tracking-wider uppercase">
+                    Development Team
+                  </span>
+                </div>
+              </motion.div>
+
+              {/* Grid of People */}
+              <motion.div
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 place-items-center sm:place-items-start"
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.2 }}
+                variants={{
+                  hidden: {},
+                  visible: { transition: { staggerChildren: 0.1 } },
+                }}
+              >
+                {version.map((person) => (
+                  <motion.div
+                    key={person.id}
+                    className="w-full max-w-[280px]" // Consistent max width
+                    variants={{
+                      hidden: { opacity: 0, y: 30 },
+                      visible: { opacity: 1, y: 0 },
+                    }}
+                  >
+                    <PersonCard data={person} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            </div>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="relative flex py-5 items-center mb-16">
+          <div className="flex-grow border-t border-slate-200"></div>
+          <span className="flex-shrink-0 mx-4 text-slate-400 text-sm uppercase tracking-widest font-semibold">
+            Mentorship
+          </span>
+          <div className="flex-grow border-t border-slate-200"></div>
+        </div>
+
+        {/* 3. 🔹 Advisors Section */}
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-slate-800">
+            Project Advisors
+          </h2>
+        </div>
+
+        <motion.div
+          className="flex flex-wrap justify-center gap-8 md:gap-12"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
+          viewport={{ once: true, amount: 0.1 }}
+        >
+          {advisors.map((advisor) => (
+            <AdvisorCard key={advisor.id} data={advisor} />
+          ))}
+        </motion.div>
       </div>
     </div>
   );
 }
 
-// 🧱 Helper: Section Header
-function SectionTitle({ title }: { title: string }) {
-  return (
-    // Reduced size
-    <div className="mt-8 mb-3 text-center">
-      <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
-      <div className="w-16 h-0.5 bg-blue-500 mx-auto mt-2 rounded-full"></div>
-    </div>
-  );
-}
-
-// 🧱 Member Card
+// 🧱 Member Card (Updated UI)
 function PersonCard({ data }: { data: CardData }) {
   return (
     <motion.div
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.98 }}
-      // Reduced card size
-      className="w-43 bg-linear-to-br from-white/80 to-blue-50/50 
-                 backdrop-blur-md border border-blue-100 rounded-2xl 
-                 shadow-md hover:shadow-blue-200 transition-all duration-300 p-4 text-center"
+      whileHover={{ y: -8 }}
+      className="group relative bg-white rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 
+                 border border-slate-100 hover:shadow-xl hover:shadow-blue-500/10 
+                 transition-all duration-300 flex flex-col items-center p-6 text-center h-full"
     >
-      {/* Reduced image size */}
-      <div className="relative w-20 h-24 mx-auto rounded-xl overflow-hidden shadow-lg">
-        <Image
-          src={data.image || "/images/default-avatar.png"}
-          alt={data.name_th}
-          fill
-          className="object-cover"
-        />
+      {/* Gradient Background Decoration */}
+      <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-br from-blue-50 to-indigo-50/50 -z-10" />
+
+      {/* Image Container */}
+      <div className="relative w-28 h-28 mb-4 rounded-full p-1 bg-white shadow-sm ring-1 ring-slate-100">
+        <div className="relative w-full h-full rounded-full overflow-hidden">
+          <Image
+            src={data.image || "/images/default-avatar.png"}
+            alt={data.name_th}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        </div>
       </div>
 
-      {/* Reduced text size */}
-      <h3 className="mt-3 text-base font-semibold text-gray-800">
-        {data.name_th}
-      </h3>
-      <p className="text-xs text-gray-500">{data.name_eng}</p>
-      <p className="mt-2 text-blue-600 font-medium text-xs">{data.role}</p>
+      {/* Content */}
+      <div className="flex flex-col flex-grow items-center">
+        <h3 className="text-lg font-light text-slate-800 mb-1 leading-tight">
+          {data.name_th}
+        </h3>
+        <p className="text-[11px] font-extralight text-slate-400 uppercase tracking-wide mb-3">
+          {data.name_eng.replace(/[()]/g, "")}
+        </p>
+
+        {/* Role Badge */}
+        <div className="mt-auto">
+          <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-xs font-light rounded-full border border-blue-100">
+            {data.role}
+          </span>
+        </div>
+      </div>
     </motion.div>
   );
 }
 
-// 🧱 Advisor Card
+// 🧱 Advisor Card (Fixed UI with 150x200 image)
 function AdvisorCard({ data }: { data: CardData }) {
   return (
     <motion.div
-      whileHover={{ y: -6, scale: 1.05 }}
-      // Reduced card size
-      className="w-80 h-80 bg-linear-to-br from-blue-50 to-white/70 
-                 border border-blue-200 rounded-2xl shadow-md 
-                 p-4 text-center transition-all duration-300"
+      whileHover={{ y: -8 }}
+      className="flex flex-col items-center bg-white rounded-2xl shadow-lg shadow-slate-200/50 
+                 border border-slate-100 p-6 text-center w-full max-w-[260px] transition-all duration-300"
     >
-      {/* Reduced image size */}
-      <div className="relative w-28 h-36 mx-auto rounded-xl overflow-hidden shadow-lg ring-4 ring-blue-300/30">
-        <Image
-          src={data.image || "/images/default-avatar.png"}
-          alt={data.name_th}
-          fill
-          className="object-cover"
-        />
+      {/* Image Area - Fixed Size 150x200 */}
+      <div className="relative w-[150px] h-[200px] mb-4">
+        {/* Decorative Shadow/Ring behind the image */}
+        <div className="absolute inset-0 rounded-lg shadow-md bg-slate-200 translate-y-2 translate-x-2" />
+
+        {/* Main Image Container */}
+        <div className="relative w-full h-full rounded-lg overflow-hidden ring-4 ring-white shadow-sm z-10 bg-slate-100">
+          <Image
+            src={data.image || "/images/default-avatar.png"}
+            alt={data.name_th}
+            fill
+            className="object-cover"
+          />
+        </div>
       </div>
 
-      {/* Reduced text size */}
-      <h3 className="mt-3 text-lg font-semibold text-blue-700">
-        {data.name_th}
-      </h3>
-      <p className="text-xs text-blue-500">{data.name_eng}</p>
-      <p className="mt-2 text-blue-400 font-medium text-xs">{data.role}</p>
+      {/* Text Content (Moved below image for better fit) */}
+      <div className="flex flex-col items-center z-20">
+        {/* Role Badge */}
+        <span className="inline-block px-3 py-1 mb-2 text-[10px] font-light tracking-wider text-blue-600 uppercase bg-blue-50 rounded-full border border-blue-100">
+          {data.role}
+        </span>
+
+        {/* Name TH */}
+        <h3 className="text-lg font-light text-slate-800 leading-tight mb-1">
+          {data.name_th}
+        </h3>
+
+        {/* Name ENG */}
+        <p className="text-[10px] font-light text-slate-400 uppercase tracking-wide">
+          {data.name_eng.replace(/[()]/g, "")}
+        </p>
+      </div>
     </motion.div>
   );
 }

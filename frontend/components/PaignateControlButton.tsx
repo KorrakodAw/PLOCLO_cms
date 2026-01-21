@@ -21,7 +21,7 @@ const PaginationControlButton: React.FC<PaginationProps> = ({
         className={`
                 px-4 py-2 
                 border border-gray-300 rounded-lg 
-                text-sm font-medium 
+                text-sm font-light
                 transition-all duration-200 
                 shadow-sm 
                 
@@ -38,9 +38,9 @@ const PaginationControlButton: React.FC<PaginationProps> = ({
       </button>
 
       {/* Page Indicator */}
-      <span className="flex items-center text-sm text-gray-600 font-medium whitespace-nowrap">
+      <span className="flex items-center text-sm text-gray-600 font-light whitespace-nowrap">
         {t("page")} {/* Current Page Number - Highlighted */}
-        <span className="px-2 font-bold text-lg text-orange-600 mx-1">
+        <span className="px-2 font-light text-lg text-orange-600 mx-1">
           {page}
         </span>
         {t("of")} {totalPages}
@@ -51,7 +51,7 @@ const PaginationControlButton: React.FC<PaginationProps> = ({
         className={`
                 px-4 py-2 
                 border border-gray-300 rounded-lg 
-                text-sm font-medium 
+                text-sm font-light
                 transition-all duration-200 
                 shadow-sm 
                 

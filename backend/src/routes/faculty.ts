@@ -118,7 +118,7 @@ router.post("/", authenticateToken, async (req, res) => {
 });
 
 router.patch("/:id", authenticateToken, async (req, res) => {
-  const facultyId = parseInt(req.params.id);
+  const facultyId = parseInt(req.params.id as string); ;
   const { name, name_th, abbreviation, abbreviation_th } = req.body;
 
   if (!name || !name_th || !abbreviation || !abbreviation_th) {
@@ -157,7 +157,7 @@ router.patch("/:id", authenticateToken, async (req, res) => {
 });
 
 router.delete("/:id", authenticateToken, async (req, res) => {
-  const facultyId = parseInt(req.params.id);
+  const facultyId = parseInt(req.params.id as string);
 
   try {
     // Check if the faculty exists

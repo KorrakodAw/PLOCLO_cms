@@ -4,11 +4,9 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { Table, Column } from "../../components/Table";
 import { useEffect, useState } from "react";
-import { addPlo, getPlosPaginated } from "../../utils/ploApi";
+import { addPlo } from "../../utils/ploApi";
 import PaginationControlButton from "../../components/PaignateControlButton";
-import { getUniversities } from "../../utils/universityApi";
-import { getFaculties } from "../../utils/facultyApi";
-import { getPrograms } from "../../utils/programApi";
+
 import { useToast } from "../../components/Toast";
 import FormEditPopup from "../../components/EditPopup";
 import AlertPopup from "../../components/AlertPopup";
@@ -16,10 +14,7 @@ import { apiClient } from "../../utils/apiClient";
 import LoadingOverlay from "../../components/LoadingOverlay";
 
 interface AddPloProps {
-  universityId?: string;
-  facultyId?: string;
   programId?: string;
-  year?: string;
 }
 
 interface Plo {
@@ -34,12 +29,7 @@ interface Plo {
   year: string;
 }
 
-export default function AddPlo({
-  universityId,
-  facultyId,
-  programId,
-  year,
-}: AddPloProps) {
+export default function AddPlo({ programId }: AddPloProps) {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn, initialized } = useAuth();
@@ -50,24 +40,6 @@ export default function AddPlo({
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(10);
 
-  const [universityOptions, setUniversityOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [facultyOptions, setFacultyOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [programOptions, setProgramOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [yearOptions, setYearOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [selectedUniversity, setSelectedUniversity] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
-
   const [selectedPlo, setSelectedPlo] = useState<Plo | null>(null);
   const [ploToDelete, setPloToDelete] = useState<Plo | null>(null);
   const [showEditPopup, setShowEditPopup] = useState(false);
@@ -75,144 +47,28 @@ export default function AddPlo({
 
   const { showToast, ToastElement } = useToast();
 
-  // Sync internal state with parent props for AddButton
-
-  // useEffect(() => {
-  //   if (universityId) setSelectedUniversity(universityId);
-  //   if (facultyId) setSelectedFaculty(facultyId);
-  //   if (programId) setSelectedProgram(programId);
-  //   if (year) setSelectedYear(String(year));
-  // }, [universityId, facultyId, programId, year]);
-
-  // Fetch universities for dropdown
-  useEffect(() => {
-    if (!isLoggedIn || !token) return;
-    getUniversities(token)
-      .then((data) => {
-        setUniversityOptions([
-          { label: t("please select a university"), value: "" },
-          ...data.map((u: any) => ({ label: u.name, value: String(u.id) })),
-        ]);
-      })
-      .catch((err) => console.error(err));
-  }, [isLoggedIn, token, t, universityId]);
-
-  // Fetch faculties when university changes
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedUniversity) {
-      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
-      setPage(1);
-      return;
-    }
-
-    // Fetch faculties for the selected university
-    getFaculties(token, selectedUniversity)
-      .then((data) => {
-        setFacultyOptions([
-          { label: t("please select a faculty"), value: "" },
-          ...data
-            .filter((f: any) => String(f.university_id) === selectedUniversity)
-            .map((f: any) => ({ label: f.name, value: String(f.id) })),
-        ]);
-      })
-      .catch((err) => showToast("API faculty error: " + err.message, "error"));
-  }, [isLoggedIn, token, selectedUniversity, t, showToast]);
-
-  // Fetch years and programs when faculty or year changes
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedFaculty) {
-      setYearOptions([{ label: t("please select a year"), value: "" }]);
-      return;
-    }
-
-    getPrograms(token, selectedFaculty)
-      .then((data) => {
-        // Explicitly tell TypeScript that these are numbers
-        const years = Array.from(
-          new Set<number>(
-            data.map((p: any) => Number(p.program_year)) // ensure numeric
-          )
-        ).sort((a, b) => b - a); // optional: sort descending
-
-        if (years.length === 0) {
-          setYearOptions([{ label: t("no years available"), value: "" }]);
-          return;
-        } else {
-          setYearOptions([
-            { label: t("please select a year"), value: "" },
-            ...years.map((y) => {
-              const label = lang === "en" ? String(y - 543) : String(y);
-              return { label, value: String(y) }; // display converted label, keep real value
-            }),
-          ]);
-        }
-      })
-      .catch((err) => showToast("API program error: " + err.message, "error"));
-  }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
-
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
-      setProgramOptions([{ label: t("please select a program"), value: "" }]);
-      return;
-    }
-
-    // Fetch programs for the selected faculty
-    getPrograms(token, selectedFaculty)
-      .then((data) => {
-        // Filter programs by the selected year
-        const programs = data.filter(
-          (p: any) => String(p.program_year) === selectedYear
-        );
-
-        if (programs.length === 0) {
-          setProgramOptions([{ label: t("no programs available"), value: "" }]);
-        } else {
-          setProgramOptions([
-            { label: t("please select a program"), value: "" },
-            ...programs.map((p: any) => ({
-              label: p.program_shortname_en,
-              value: String(p.id),
-            })),
-          ]);
-        }
-      })
-      .catch((err: unknown) => {
-        if (err instanceof Error) {
-          showToast("API program error: " + err.message, "error");
-        } else {
-          showToast("API program error: unknown error", "error");
-        }
-      });
-  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
-
   const fetchPlos = async () => {
-    if (!isLoggedIn || !token) return;
-    setLoadingPlos(true);
-    const filters: Record<string, string | undefined> = {};
+    if (!initialized) return; // wait for auth context to load
 
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
+    try {
+      setLoadingPlos(true);
 
-    getPlosPaginated(token, page, limit, filters)
-      .then((res) => {
-        const data = Array.isArray(res) ? res : res.data || [];
-        const total = res.total || data.length || 1;
-        setPlos(data);
-        setTotalPages(Math.ceil(total / limit));
-      })
-      .catch((err) => {
-        showToast("API program error: " + err.message, "error");
-      })
-      .finally(() => setLoadingPlos(false));
-  };
+      const res = await apiClient.get("/plo/paginate", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          page,
+          limit,
+          programId: programId || "",
+        },
+      });
 
-  const resetSelection = () => {
-    setSelectedUniversity("");
-    setSelectedFaculty("");
-    setSelectedProgram("");
-    setSelectedYear("");
+      setPlos(res.data.data);
+      setTotalPages(res.data.pagination.totalPages);
+    } catch {
+      showToast("Failed to fetch PLOs", "error");
+    } finally {
+      setLoadingPlos(false);
+    }
   };
 
   // ฟังก์ชันสำหรับเพิ่ม PLO จาก Excel
@@ -224,14 +80,13 @@ export default function AddPlo({
     if (!isLoggedIn || !token) {
       showToast(
         "You are logged out or token expired. Please log in again.",
-        "error"
+        "error",
       );
       return;
     }
-    if (!selectedProgram) {
-      showToast("Please select the program from the filters above", "error");
-      return;
-    }
+
+    setLoadingPlos(true);
+
     let successCount = 0;
     let failCount = 0;
     const errorDetails = [];
@@ -255,7 +110,7 @@ export default function AddPlo({
         code: String(code),
         name: String(nameTh),
         engname: String(nameEn),
-        program_id: selectedProgram,
+        program_id: String(programId),
       };
 
       try {
@@ -281,12 +136,11 @@ export default function AddPlo({
     showToast(summary, failCount > 0 ? "error" : "success");
     // รีเฟรชรายการ PLO หลังเพิ่ม
     try {
-      resetSelection();
       fetchPlos();
       setPage(1);
     } catch {
       showToast("Failed to refresh PLO list after Excel upload.", "error");
-    }
+    } 
   };
 
   // ฟังก์ชันสำหรับเพิ่ม PLO
@@ -295,24 +149,8 @@ export default function AddPlo({
     if (!isLoggedIn || !token) {
       showToast(
         "You are logged out or token expired. Please log in again.",
-        "error"
+        "error",
       );
-      return;
-    }
-    if (!selectedUniversity) {
-      showToast("Please select the university from the filters above", "error");
-      return;
-    }
-    if (!selectedFaculty) {
-      showToast("Please select the faculty from the filters above", "error");
-      return;
-    }
-    if (!selectedYear) {
-      showToast("Please select the year from the filters above", "error");
-      return;
-    }
-    if (!selectedProgram) {
-      showToast("Please select the program from the filters above", "error");
       return;
     }
 
@@ -327,11 +165,11 @@ export default function AddPlo({
           code: String(data.code),
           name: String(data.nameTh), // Thai name
           engname: String(data.nameEn), // English name
-          program_id: selectedProgram, // Use the modal-selected program
+          program_id: String(programId), // Use the modal-selected program
         },
-        token
+        token,
       );
-      resetSelection();
+
       fetchPlos();
       showToast(t("PLO added successfully!"), "success");
       setPage(1);
@@ -374,7 +212,7 @@ export default function AddPlo({
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       fetchPlos();
       showToast("PLO updated successfully", "success");
@@ -390,17 +228,17 @@ export default function AddPlo({
     lang === "en"
       ? { header: "Description", accessor: "engname" }
       : { header: "รายละเอียด", accessor: "name" },
-    lang === "en"
-      ? {
-          header: "Program",
-          accessor: "program_shortname_en",
-          render: (v) => v || "-",
-        }
-      : {
-          header: "ชื่อโปรแกรม",
-          accessor: "program_shortname_th",
-          render: (v) => v || "-",
-        },
+    // lang === "en"
+    //   ? {
+    //       header: "Program",
+    //       accessor: "program_shortname_en",
+    //       render: (v) => v || "-",
+    //     }
+    //   : {
+    //       header: "ชื่อโปรแกรม",
+    //       accessor: "program_shortname_th",
+    //       render: (v) => v || "-",
+    //     },
     {
       header: t("year"),
       accessor: "program_year",
@@ -435,14 +273,14 @@ export default function AddPlo({
   useEffect(() => {
     fetchPlos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
+  }, [isLoggedIn, token, page, programId]);
 
   return (
     <div className="p-5 md:p-8 min-h-screen">
       {loadingPlos && <LoadingOverlay />}
       <ToastElement />
       <div className="mb-6 flex justify-between items-center border-b pb-4">
-        <h1 className="text-3xl font-extrabold text-gray-800">
+        <h1 className="text-3xl font-light text-gray-800">
           {t("plo management")}
         </h1>
         <AddButton
@@ -459,23 +297,6 @@ export default function AddPlo({
           }}
           onSubmit={handleAddPlo}
           onSubmitExcel={handleAddPloExcel}
-          facultyOptions={facultyOptions}
-          universityOptions={universityOptions}
-          programOptions={programOptions}
-          yearOptions={yearOptions}
-          selectedFaculty={selectedFaculty}
-          selectedUniversity={selectedUniversity}
-          selectedProgram={selectedProgram}
-          selectedYear={selectedYear}
-          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
-          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
-          onProgramChange={(e) => {
-            setSelectedProgram(e.target.value);
-          }}
-          onYearChange={(e) => {
-            const selectedYear = e.target.value;
-            setSelectedYear(selectedYear);
-          }}
         />
       </div>
 

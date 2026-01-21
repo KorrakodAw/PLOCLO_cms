@@ -167,5 +167,18 @@
   "you are logged in": "You are logged in",
   "Edit Course": "Edit Course",
   "Course Name (EN)": "Course Name (EN)",
-  "Course Name (TH)": "Course Name (TH)"
+  "Course Name (TH)": "Course Name (TH)",
+  "delete student": "Delete Student",
+  "are you sure you want to delete this student?": "Are you sure you want to delete this student?",
+  "Please select a semester": "Please select a semester",
+  "Please select a section": "Please select a section",
+  "No data available": "No data available",
+  "Save": "Save",
+  "Cancel": "Cancel",
+  "Confirm Deletion": "Confirm Deletion",
+  "Are you sure you want to delete the selected students from this section?": "Are you sure you want to delete the selected students from this section?",
+  "clo manage": "CLO Management",
+  "Course Setup": "Course Setup",
+  "Grading & Scores": "Grading & Scores",
+  "add new clo": "Add New CLO"
 }

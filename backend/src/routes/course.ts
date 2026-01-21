@@ -35,8 +35,8 @@ router.get("/", authenticateToken, async (req, res) => {
       id: s.id, // Section ID (Unique per offering)
       code: s.course.code,
       name: s.course.name,
-      name_th: s.course.name_th,
-      program_id: s.course.program_id,
+      nameTh: s.course.name_th,
+      programId: s.course.program_id,
       section: s.section,
       semester: s.semester,
       year: s.year,
@@ -52,61 +52,100 @@ router.get("/", authenticateToken, async (req, res) => {
 // GET paginated courses
 router.get("/paginate", authenticateToken, async (req, res) => {
   try {
-    // ... (Your existing paginate logic is fine, keep it as is) ...
-    // Just ensure you select from prisma.courseSection, NOT prisma.course
-    const universityId = req.query.universityId
-      ? parseInt(req.query.universityId as string)
-      : undefined;
-    const facultyId = req.query.facultyId
-      ? parseInt(req.query.facultyId as string)
-      : undefined;
-    const programId = req.query.programId
-      ? parseInt(req.query.programId as string)
-      : undefined;
-    const year = req.query.year
-      ? parseInt(req.query.year as string)
-      : undefined;
-    const semester = req.query.semester
-      ? parseInt(req.query.semester as string)
-      : undefined;
-    const section = req.query.section
-      ? parseInt(req.query.section as string)
-      : undefined;
-    const courseCode = req.query.courseCode as string;
+    const parseIntSafe = (value: any) => {
+      if (!value) return undefined;
+      const parsed = parseInt(value as string);
+      return isNaN(parsed) ? undefined : parsed;
+    };
 
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    // 1. Capture the raw input string
+    const programParam = req.query.programId as string | undefined;
+
+    const universityId = parseIntSafe(req.query.universityId);
+    const facultyId = parseIntSafe(req.query.facultyId);
+    const year = parseIntSafe(req.query.year);
+    const semester = parseIntSafe(req.query.semester);
+    const section = parseIntSafe(req.query.section);
+    const courseCode = req.query.courseCode as string | undefined;
+
+    const page = parseIntSafe(req.query.page) || 1;
+    const limit = parseIntSafe(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
+    // --- Build Filters ---
     const where: any = {};
+
+    // Section Filters
     if (year) where.year = year;
     if (semester) where.semester = semester;
     if (section) where.section = section;
 
-    // Search on the relation (Master Course)
+    // Course Filters
+    const courseWhere: any = {};
+
     if (courseCode) {
-      where.course = { code: { contains: courseCode, mode: "insensitive" } };
+      courseWhere.code = { contains: courseCode, mode: "insensitive" };
     }
 
-    if (programId || facultyId || universityId) {
-      where.course = {
-        ...where.course,
-        program: {
-          id: programId || undefined,
-          faculty: {
-            id: facultyId || undefined,
-            university: { id: universityId || undefined },
-          },
-        },
+    // --- SMART PROGRAM FILTERING (Prevents Error 500) ---
+    // We construct a filter object for the 'program' relation
+    const programRelationFilter: any = {};
+
+    if (programParam) {
+      const asInt = parseInt(programParam);
+      // PostgreSQL Integer Max is 2,147,483,647.
+      // If the input is larger (like your code 25370201100238), we MUST NOT query the 'id' column with it.
+      const isSafeId = !isNaN(asInt) && asInt > 0 && asInt < 2147483647;
+
+      if (isSafeId) {
+        // It's small enough to potentially be an ID, so we check both
+        programRelationFilter.OR = [
+          { id: asInt },
+          { program_code: programParam },
+        ];
+      } else {
+        // It's huge or alphanumeric, so it MUST be a code. DO NOT check 'id'.
+        programRelationFilter.program_code = programParam;
+      }
+    }
+
+    // Add Faculty/University hierarchy filters to the same relation object
+    if (facultyId) {
+      programRelationFilter.faculty = { id: facultyId };
+    }
+
+    if (universityId) {
+      // Merge into existing faculty filter or create new one
+      programRelationFilter.faculty = {
+        ...(programRelationFilter.faculty || {}),
+        university: { id: universityId },
       };
     }
 
+    // Attach the smart program filter to the course query
+    if (Object.keys(programRelationFilter).length > 0) {
+      courseWhere.program = programRelationFilter;
+    }
+
+    // Attach course filters to main where clause
+    if (Object.keys(courseWhere).length > 0) {
+      where.course = courseWhere;
+    }
+
+    // --- Execute Query ---
     const [total, sections] = await prisma.$transaction([
       prisma.courseSection.count({ where }),
       prisma.courseSection.findMany({
         where,
-        include: { course: true },
-        orderBy: { id: "desc" },
+        include: {
+          course: true, // Needed for mapping
+        },
+        orderBy: [
+          { year: "desc" },
+          { semester: "desc" },
+          { course: { code: "asc" } },
+          { section: "asc" },
+        ],
         skip,
         take: limit,
       }),
@@ -185,7 +224,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
       if (existingSection) {
         throw new Error(
-          `Section ${section} already exists for ${code} in this semester.`
+          `Section ${section} already exists for ${code} in this semester.`,
         );
       }
 
@@ -223,7 +262,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
     await prisma.courseSection.delete({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id as string) },
     });
     res.json({ success: true, id });
   } catch (err: any) {
@@ -243,7 +282,7 @@ router.patch("/:id", authenticateToken, async (req, res) => {
     await prisma.$transaction(async (tx) => {
       // 1. Get current section
       const currentSection = await tx.courseSection.findUnique({
-        where: { id: parseInt(id) },
+        where: { id: parseInt(id as string) },
         include: { course: true },
       });
 
@@ -268,7 +307,7 @@ router.patch("/:id", authenticateToken, async (req, res) => {
 
       // 3. Update Section specific details
       const updated = await tx.courseSection.update({
-        where: { id: parseInt(id) },
+        where: { id: parseInt(id as string) },
         data: {
           section: parseInt(section),
           semester: parseInt(semester),

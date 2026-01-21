@@ -16,7 +16,7 @@ interface UpdateItem {
 // Fetches mappings for the Master Course
 router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
   try {
-    const courseId = parseInt(req.params.courseId);
+    const courseId = parseInt(req.params.courseId as string);
 
     if (isNaN(courseId)) {
       return res.status(400).json({ error: "Invalid Course ID" });
@@ -183,7 +183,7 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
 // GET /api/mapping/assignment-clo/:courseId
 router.get("/assignment-clo/:courseId", authenticateToken, async (req, res) => {
   try {
-    const courseId = parseInt(req.params.courseId);
+    const courseId = parseInt(req.params.courseId as string);
 
     if (isNaN(courseId)) {
       return res.status(400).json({ error: "Invalid Course ID" });

@@ -16,10 +16,10 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 export default function EditProgram() {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
-  const [university, setUniversity] = useState("");
-  const [faculty, setFaculty] = useState("");
-  const [program, setProgram] = useState("");
-  const [year, setYear] = useState("");
+  const [university, setUniversity] = useState<string >("");
+  const [faculty, setFaculty] = useState<string>("");
+  const [program, setProgram] = useState<string>("");
+  const [year, setYear] = useState<string>("");
 
   // const ACTIVE_TAB_KEY = "editProgramActiveTab";
   // const ACTIVE_TAB_KEY = `activeTab_${location.pathname}`;
@@ -227,7 +227,7 @@ export default function EditProgram() {
   return (
     <ProtectedRoute roles={["system_admin", "instructor"]}>
       <div className="max-w-[1400px] flex flex-col mx-auto ">
-        <p className="font-extralight text-2xl ">{t("program information")}</p>
+        <p className="font-light text-2xl ">{t("program information")}</p>
 
         {/* Tabs */}
         {/* <div className="flex gap-3 mt-5 px-3 py-2 ">
@@ -250,14 +250,14 @@ export default function EditProgram() {
           <DropdownSelect
             label={t("university")}
             value={university}
-            onChange={(e) => setUniversity(e.target.value)}
+            onChange={(value) => setUniversity(String(value))}
             options={universityOptions}
           />
 
           <DropdownSelect
             label={t("faculty")}
             value={faculty}
-            onChange={(e) => setFaculty(e.target.value)}
+            onChange={(value) => setFaculty(String(value))}
             options={facultyOptions}
             disabled={!university}
           />
@@ -265,7 +265,7 @@ export default function EditProgram() {
           <DropdownSelect
             label={t("program")}
             value={program}
-            onChange={(e) => setProgram(e.target.value)}
+            onChange={(value) => setProgram(String(value))}
             options={programOptions}
             disabled={!faculty}
           />

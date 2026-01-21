@@ -171,5 +171,18 @@
   "you are logged in": "คุณเข้าสู่ระบบแล้ว",
   "Edit Course": "แก้ไขรายวิชา",
   "Course Name (EN)": "ชื่อรายวิชา (อังกฤษ)",
-  "Course Name (TH)": "ชื่อรายวิชา (ไทย)"
+  "Course Name (TH)": "ชื่อรายวิชา (ไทย)",
+  "delete student": "ลบนักศึกษา",
+  "are you sure you want to delete this student?": "คุณแน่ใจหรือไม่ว่าต้องการลบนักศึกษาคนนี้?",
+  "Please select a semester": "กรุณาเลือกภาคเรียน",
+  "Please select a section": "กรุณาเลือกกลุ่มเรียน",
+  "No data available": "ไม่มีข้อมูลที่ใช้ได้",
+  "Save": "บันทึก",
+  "Cancel": "ยกเลิก",
+  "Confirm Deletion": "ยืนยันการลบ",
+  "Are you sure you want to delete the selected students from this section?": "คุณแน่ใจหรือไม่ว่าต้องการลบนักศึกษาที่เลือกจากกลุ่มเรียนนี้?",
+  "clo manage": "การจัดการ CLO",
+  "Course Setup": "การตั้งค่ารายวิชา",
+  "Grading & Scores": "การให้เกรดและคะแนน",
+  "add new clo": "เพิ่ม CLO ใหม่"
 }

@@ -63,13 +63,13 @@ export default function LoginForm() {
           handleSubmit();
         }}
       >
-        <h2 className="text-3xl font-extrabold text-center text-orange-600 mb-8">
+        <h2 className="text-3xl font-light text-center text-orange-600 mb-8">
           {t("login")}
         </h2>
 
         {/* Email Field */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-light text-gray-700 mb-1">
             {t("email")}
           </label>
           <input
@@ -78,13 +78,13 @@ export default function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder={t("enter_email")}
             required
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
+            className="w-full px-4 py-2.5 border font-light border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
           />
         </div>
 
         {/* Password Field */}
         <div className="mb-8 relative">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-light text-gray-700 mb-1">
             {t("password")}
           </label>
           <input
@@ -93,7 +93,7 @@ export default function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder={t("enter_password")}
             required
-            className="w-full px-4 py-2.5 pr-12 border border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
+            className="w-full px-4 py-2.5 pr-12 border font-light border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
           />
           <button
             type="button"
@@ -107,7 +107,7 @@ export default function LoginForm() {
         {/* Standard Login Button */}
         <button
           type="submit"
-          className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-all shadow-md mb-6"
+          className="w-full py-3 bg-orange-500 font-light text-white rounded-xl hover:bg-orange-600 transition-all shadow-md mb-6"
         >
           {t("sign_in")}
         </button>

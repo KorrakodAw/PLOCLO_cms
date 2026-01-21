@@ -8,7 +8,7 @@ const router = Router();
 // GET /api/grade/settings/:course
 router.get("/settings/:courseId", authenticateToken, async (req, res) => {
   try {
-    const courseId = parseInt(req.params.courseId);
+    const courseId = parseInt(req.params.courseId as string);
 
     if (isNaN(courseId)) {
       return res.status(400).json({ error: "Invalid Section ID" });

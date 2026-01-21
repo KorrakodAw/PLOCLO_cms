@@ -54,7 +54,7 @@ router.post("/", authenticateToken, async (req, res) => {
 });
 
 router.delete("/:id", authenticateToken, async (req, res) => {
-  const universityId = parseInt(req.params.id, 10);
+  const universityId = parseInt(req.params.id as string, 10);
 
   if (isNaN(universityId)) {
     return res.status(400).json({ error: "Invalid university ID" });
@@ -81,7 +81,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 });
 
 router.patch("/:id", authenticateToken, async (req, res) => {
-  const universityId = parseInt(req.params.id, 10);
+  const universityId = parseInt(req.params.id as string, 10);
 
   if (isNaN(universityId)) {
     return res.status(400).json({ error: "Invalid university ID" });
@@ -123,7 +123,7 @@ router.patch("/:id", authenticateToken, async (req, res) => {
 });
 
 router.get("/:id", authenticateToken, async (req, res) => {
-  const universityId = parseInt(req.params.id, 10);
+  const universityId = parseInt(req.params.id as string, 10);
 
   if (isNaN(universityId)) {
     return res.status(400).json({ error: "Invalid university ID" });

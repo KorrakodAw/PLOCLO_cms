@@ -25,13 +25,13 @@ interface AddButtonProps<T> {
   selectedCourse?: string;
 
   // Handlers
-  onUniversityChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onFacultyChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onProgramChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onYearChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onSemesterChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onSectionChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onCourseChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onUniversityChange?: (value: string | number) => void;
+  onFacultyChange?: (value: string | number) => void;
+  onProgramChange?: (value: string | number) => void;
+  onYearChange?: (value: string | number) => void;
+  onSemesterChange?: (value: string | number) => void;
+  onSectionChange?: (value: string | number) => void;
+  onCourseChange?: (value: string | number) => void;
 
   // Button / Labels
   buttonText?: string;
@@ -126,7 +126,7 @@ export default function AddButton<T>({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="bg-orange-300 text-white px-4 py-2 rounded hover:bg-orange-400 transition cursor-pointer"
+        className="bg-orange-300 font-light text-white px-4 py-2 rounded hover:bg-orange-400 transition cursor-pointer"
         type="button"
       >
         {buttonText}

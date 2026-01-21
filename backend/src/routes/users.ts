@@ -23,30 +23,51 @@ router.post("/auth/google/verify", async (req, res) => {
     if (!payload || !payload.email)
       return res.status(400).json({ error: "Invalid Google Token" });
 
-    // 2. ใช้ Logic เดียวกับ Passport (Pool) เพื่อหาหรือสร้าง User
     const email = payload.email;
+    const googleName = payload.name; // Full name from Google (e.g. "John Doe")
+
+    // 2. หา User ในระบบ
     let result = await pool.query("SELECT * FROM users WHERE email = $1", [
       email,
     ]);
     let user = result.rows[0];
 
+    // 3. ถ้ายังไม่มี User ให้สร้างใหม่ (พร้อมเช็ค Role)
     if (!user) {
+      let role = "guest"; // Default role
+
+      // --- NEW LOGIC: Check if Google Name matches a Student ---
+      // We assume Google Name is "FirstName LastName"
+      // We compare it against the concatenation of first_name and last_name in DB
+      const studentCheck = await pool.query(
+        `SELECT id FROM student 
+         WHERE LOWER(email) = $1 
+         LIMIT 1`,
+        [email.toLowerCase()],
+      );
+
+      if (studentCheck.rows.length > 0) {
+        role = "student"; // Found a match!
+      }
+      // ---------------------------------------------------------
+
       const newUser = await pool.query(
         "INSERT INTO users (username, email, role) VALUES ($1, $2, $3) RETURNING *",
-        [payload.name, email, "guest"]
+        [googleName, email, role],
       );
       user = newUser.rows[0];
     }
 
-    // 3. สร้าง JWT ของระบบเราส่งกลับไป
+    // 4. สร้าง JWT ของระบบเราส่งกลับไป
     const jwtToken = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: "1hr" }
+      process.env.JWT_SECRET!, // Don't forget to handle undefined in TS usually
+      { expiresIn: "2hr" },
     );
 
-    res.json({ token: jwtToken });
+    res.json({ token: jwtToken, role: user.role });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Google verification failed" });
   }
 });
@@ -93,7 +114,7 @@ router.post("/register", async (req, res) => {
     const jwtToken = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: "1hr" }
+      { expiresIn: "1hr" },
     );
 
     res.status(201).json({
@@ -123,7 +144,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: "1hr" }
+      { expiresIn: "1hr" },
     );
 
     // ✅ ส่งทั้ง token และ user ข้อมูลหลัก
@@ -150,7 +171,7 @@ router.get("/me", authenticateToken, async (req: AuthRequest, res) => {
 
   const result = await pool.query(
     "SELECT id, username, email, role, created_at FROM users WHERE id=$1",
-    [userId]
+    [userId],
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "User not found" });
@@ -163,7 +184,7 @@ router.get("/me", authenticateToken, async (req: AuthRequest, res) => {
 // Get all users
 router.get("/", authenticateToken, async (_req, res) => {
   const result = await pool.query(
-    "SELECT id, username, email, role, created_at FROM users ORDER BY id"
+    "SELECT id, username, email, role, created_at FROM users ORDER BY id",
   );
   res.json(result.rows);
 });
@@ -173,7 +194,7 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.params.id;
   const result = await pool.query(
     "SELECT id, username, email, role, created_at FROM users WHERE id=$1",
-    [userId]
+    [userId],
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "User not found" });
@@ -219,7 +240,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
         hashedPassword, // จะเป็นค่าเดิม, ค่าใหม่ หรือ null (กรณี Google User)
         role || current.role,
         id,
-      ]
+      ],
     );
 
     res.json({ message: "User updated successfully", user: result.rows[0] });
@@ -235,7 +256,7 @@ router.get(
   authorizeRoles("admin", "instructor"),
   (req, res) => {
     res.json({ message: "Welcome instructor/admin" });
-  }
+  },
 );
 
 // Delete user
@@ -243,7 +264,7 @@ router.delete("/:id", authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.params.id;
   const result = await pool.query(
     "DELETE FROM users WHERE id=$1 RETURNING id, username",
-    [userId]
+    [userId],
   );
   if (result.rows.length === 0)
     return res.status(404).json({ error: "User not found" });
@@ -289,7 +310,7 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
         email || current.email,
         role || current.role,
         id,
-      ]
+      ],
     );
 
     res.json({

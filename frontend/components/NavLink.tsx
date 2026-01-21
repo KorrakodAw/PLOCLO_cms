@@ -15,7 +15,7 @@ export default function NavLink({ href, children, onClick }: NavLinkProps) {
     <Link
       href={href}
       onClick={onClick}
-      className={`p-3 block font-normal transition-all duration-200 transform hover:translate-x-2
+      className={`p-3 block font-extralight transition-all duration-200 transform hover:translate-x-2
         ${
           isActive
             ? "text-orange-400 shadow-xl rounded-b-md translate-x-2"

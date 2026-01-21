@@ -2,13 +2,10 @@ import AddButton from "../../components/AddButton";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useState, useEffect } from "react";
-import { addStudent, getStudentsPaginated } from "../../utils/studentApi";
+import { addStudent } from "../../utils/studentApi";
 
 import { Column, Table } from "../../components/Table";
-import PaginationControlButton from "../../components/PaignateControlButton";
-import { Faculty, getFaculties } from "../../utils/facultyApi";
-import { getUniversities, University } from "../../utils/universityApi";
-import { getPrograms, Program } from "../../utils/programApi";
+
 import { useToast } from "../../components/Toast";
 
 import FormEditPopup from "../../components/EditPopup";
@@ -18,55 +15,31 @@ import { apiClient } from "../../utils/apiClient";
 import LoadingOverlay from "../../components/LoadingOverlay";
 
 interface AddStudentProps {
-  universityId?: string;
-  facultyId?: string;
-  programId?: string;
-  year?: string;
+  programId?: string | number;
 }
 
 interface Student {
+  student_id: number | string;
   id: number;
-  student_code: string;
+  student_code: string | number;
   name: string;
   first_name: string;
   last_name: string;
+  email: string;
   program_shortname_en: string;
   program_shortname_th: string;
   year_of_admission?: number;
   year?: number;
 }
 
-export default function AddStudent({
-  universityId,
-  facultyId,
-  programId,
-  year,
-}: AddStudentProps) {
+export default function AddStudent({ programId }: AddStudentProps) {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn, initialized } = useAuth();
 
-  const [selectedProgram, setSelectedProgram] = useState("");
-  const [selectedUniversity, setSelectedUniversity] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
-  const [programOptions, setProgramOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [facultyOptions, setFacultyOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [universityOptions, setUniversityOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [yearOptions, setYearOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
   const [loadingStudent, setLoadingStudent] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 10;
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
@@ -75,148 +48,56 @@ export default function AddStudent({
 
   const { showToast, ToastElement } = useToast();
 
-  // Fetch universities
-  useEffect(() => {
-    if (!isLoggedIn || !token) return;
-    const fetchUniversities = async () => {
-      try {
-        const data = await getUniversities(token);
-        setUniversityOptions([
-          { label: t("please select a university"), value: "" },
-          ...data.map((u: University) => ({
-            label: u.name,
-            value: String(u.id),
-          })),
-        ]);
-      } catch {
-        showToast("Failed to fetch universities", "error");
-      }
-    };
-    fetchUniversities();
-  }, [isLoggedIn, token, t, showToast]);
-
-  // Fetch faculties for selected university
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedUniversity) {
-      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
-      return;
-    }
-    const fetchFaculties = async () => {
-      try {
-        const data = await getFaculties(token);
-        setFacultyOptions([
-          { label: t("please select a faculty"), value: "" },
-          ...data
-            .filter(
-              (f: Faculty) => String(f.university_id) === selectedUniversity
-            )
-            .map((f: Faculty) => ({ label: f.name, value: String(f.id) })),
-        ]);
-      } catch {
-        showToast("Failed to fetch faculties", "error");
-      }
-    };
-    fetchFaculties();
-  }, [isLoggedIn, token, t, selectedUniversity, showToast]);
-
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedFaculty) {
-      setYearOptions([{ label: t("please select a year"), value: "" }]);
-      return;
-    }
-
-    getPrograms(token, selectedFaculty)
-      .then((data) => {
-        // Explicitly tell TypeScript that these are numbers
-        const years = Array.from(
-          new Set<number>(
-            data.map((p: Program) => Number(p.program_year)) // ensure numeric
-          )
-        ).sort((a, b) => b - a); // optional: sort descending
-
-        setYearOptions([
-          { label: t("please select a year"), value: "" },
-          ...years.map((y) => {
-            const label = lang === "en" ? String(y - 543) : String(y);
-            return { label, value: String(y) }; // display converted label, keep real value
-          }),
-        ]);
-      })
-      .catch(() => showToast("Failed to fetch years", "error"));
-  }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
-
-  // 🧩 Load all programs
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
-      setProgramOptions([{ label: t("please select a program"), value: "" }]);
-      return;
-    }
-
-    // Fetch programs for the selected faculty
-    getPrograms(token, selectedFaculty)
-      .then((data) => {
-        // Filter programs by the selected year
-        const programs = data.filter(
-          (p: Program) => String(p.program_year) === selectedYear
-        );
-
-        if (programs.length === 0) {
-          setProgramOptions([{ label: t("no programs available"), value: "" }]);
-        } else {
-          setProgramOptions([
-            { label: t("please select a program"), value: "" },
-            ...programs.map((p: Program) => ({
-              label: p.program_shortname_en,
-              value: String(p.id),
-            })),
-          ]);
-        }
-      })
-      .catch((err: unknown) => {
-        if (err instanceof Error) {
-          showToast("Failed to fetch programs by year", "error");
-        } else {
-          showToast(
-            "Unexpected error occurred while fetching programs",
-            "error"
-          );
-        }
-      });
-  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, showToast]);
-
   const fetchStudents = async () => {
-    if (!isLoggedIn || !token) return;
-    setLoadingStudent(true);
-    const filters: Record<string, string | undefined> = {};
+    // 1. Guard Clause: Don't fetch if crucial data is missing
+    if (!initialized || !isLoggedIn || !token || !programId) {
+      // Optional: console.log("Waiting for programId or auth...");
+      return;
+    }
 
-    if (universityId) filters.universityId = universityId;
-    if (facultyId) filters.facultyId = facultyId;
-    if (programId) filters.programId = programId;
-    if (year) filters.year = year;
+    try {
+      setLoadingStudent(true);
 
-    getStudentsPaginated(token, page, 10, filters)
-      .then((res) => {
-        const data = Array.isArray(res) ? res : res.data || [];
-        const total = res.total || data.length || 1;
-        setStudents(data);
-        setTotalPages(Math.ceil(total / limit));
-      })
-      .catch((err) => {
-        showToast("API student error: " + err.message, "error");
-      })
-      .finally(() => setLoadingStudent(false));
+      // 2. Use 'params' object for cleaner query strings
+      const res = await apiClient.get("/student", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { programId: programId },
+      });
+
+      // 3. Robust Data Extraction (Fixes the "No Data" issue)
+      // Checks if the response IS the array, or if the array is nested inside .data
+      let studentData: Student[] = [];
+
+      if (Array.isArray(res.data)) {
+        studentData = res.data;
+      } else if (res.data && Array.isArray(res.data.data)) {
+        studentData = res.data.data;
+      }
+
+      setStudents(studentData);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      showToast(t("Failed to load student data."), "error");
+    } finally {
+      setLoadingStudent(false);
+    }
   };
 
   const studentColumns: Column<Student>[] = [
-    { header: t("student code"), accessor: "student_code" },
+    { header: "student code", accessor: "student_code" },
     {
       header: "full name",
       accessor: "name",
       render: (value, row) => `${row.first_name} ${row.last_name}`,
     },
+    // {
+    //   header: t("program"),
+    //   accessor: lang === "en" ? "program_shortname_en" : "program_shortname_th",
+    //   render: (v) => v || "-",
+    // },
     {
-      header: t("program"),
-      accessor: lang === "en" ? "program_shortname_en" : "program_shortname_th",
+      header: t("email"),
+      accessor: "email",
       render: (v) => v || "-",
     },
     {
@@ -255,10 +136,11 @@ export default function AddStudent({
           student_code: selectedStudent.student_code,
           first_name: selectedStudent.first_name,
           last_name: selectedStudent.last_name,
+          email: selectedStudent.email,
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       showToast("Student updated successfully!", "success");
       setShowEditPopup(false);
@@ -271,7 +153,7 @@ export default function AddStudent({
       } else {
         showToast(
           "Failed to update student: An unknown error occurred",
-          "error"
+          "error",
         );
       }
     }
@@ -296,39 +178,41 @@ export default function AddStudent({
       } else {
         showToast(
           "Failed to delete student: An unknown error occurred",
-          "error"
+          "error",
         );
       }
     }
   };
 
-  const resetSelection = () => {
-    setSelectedUniversity("");
-    setSelectedFaculty("");
-    setSelectedProgram("");
-    setSelectedYear("");
-  };
-
   // 🧩 Add single student manually
   const handleAddStudent = async (data: Record<string, unknown>) => {
-    if (!initialized) return;
+    if (!initialized || !programId) return;
     if (!isLoggedIn || !token)
       return showToast("Please log in again.", "error");
-    if (!selectedProgram) return showToast("Please select a program.", "error");
+    if (!programId) return showToast("Please select a program.", "error");
 
     // Map form fields to backend payload
+    // 1. Logic to split "FirstName LastName"
+    const fullName = String(data.nameEn || "").trim();
+    const nameParts = fullName.split(" "); // Split by space
+
+    const firstName = nameParts[0] || ""; // Take the first chunk
+    const lastName = nameParts.slice(1).join(" ") || ""; // Join the rest as Last Name
+
+    // 2. Construct the Payload
     const payload = {
-      student_code: String(data.code), // code → student_code
-      first_name: String(data.nameEn), // nameEn → first_name
-      last_name: String(data.nameTh), // nameTh → last_name
-      program_id: selectedProgram,
+      student_code: String(data.code),
+      first_name: firstName, // Derived from nameEn
+      last_name: lastName, // Derived from nameEn
+      email: String(data.nameTh), // Using nameTh as Email
+      program_id: programId,
     };
 
     console.log("PAYLOAD IN COMPONENT:", payload);
 
     try {
       await addStudent(payload, token);
-      resetSelection();
+
       fetchStudents();
       showToast("Student added successfully!", "success");
       setPage(1); // Reset to first page to see new entries
@@ -344,29 +228,33 @@ export default function AddStudent({
   };
 
   // 🧩 Add from Excel
+  // 🧩 Add from Excel
   const handleAddStudentExcel = async (rows: Student[]) => {
     if (!initialized) return alert("Auth not initialized.");
     if (!isLoggedIn || !token) return alert("Please log in again.");
-    if (!selectedProgram) return alert("Please select a program first.");
+    if (!programId) return alert("Please select a program first.");
+
+    // 1. Start Loading UI (Prevents interaction while processing)
+    setLoadingStudent(true);
 
     let successCount = 0;
     let failCount = 0;
     const errorDetails: string[] = [];
 
-    // Inject selectedProgram as program_id for every row
     const rowsWithProgram = rows.map((row) => ({
       ...row,
-      program_id: selectedProgram,
+      program_id: programId,
       year_of_admission: Number(row.year_of_admission ?? row.year),
     }));
 
+    // 2. Process all rows
     for (const [i, row] of rowsWithProgram.entries()) {
-      const student_code= row.student_code;
+      const student_code = row.student_id || row.student_code;
       const first_name = row.first_name;
       const last_name = row.last_name;
-      const program_id = row.program_id;
+      const email = row.email || "";
+      const program_id = row.program_id || programId;
 
-      // ✅ Validate
       if (!student_code || !first_name || !last_name || !program_id) {
         failCount++;
         errorDetails.push(`Row ${i + 1}: missing required fields`);
@@ -377,44 +265,45 @@ export default function AddStudent({
         student_code: String(student_code),
         first_name: String(first_name),
         last_name: String(last_name),
-        program_id,
+        email: String(email) || "",
+        program_id: programId,
       };
 
       try {
         await addStudent(payload, token);
         successCount++;
-        resetSelection();
-        fetchStudents();
-        setPage(1); // Reset to first page to see new entries
+        // ❌ REMOVED fetchStudents() from here to stop blinking
       } catch (err) {
         failCount++;
         if (err instanceof Error) {
           errorDetails.push(`Row ${i + 1}: ${err.message}`);
-        } else if (typeof err === "string") {
-          // Handle cases where a string might be thrown
-          errorDetails.push(`Row ${i + 1}: ${err}`);
         } else {
-          // Fallback for non-Error, non-string throws
           errorDetails.push(`Row ${i + 1}: An unknown error occurred`);
         }
       }
     }
 
+    // 3. Update UI ONCE after loop finishes
+    await fetchStudents();
+    setPage(1);
+    setLoadingStudent(false); // Stop loading
+
     showToast(
       `Excel upload completed: ${successCount} succeeded, ${failCount} failed.`,
-      failCount > 0 ? "error" : "success"
+      failCount > 0 ? "error" : "success",
     );
+
     if (failCount > 0) {
       showToast(
         `Some rows failed to add:\n${errorDetails.join("\n")}`,
-        "error"
+        "error",
       );
     }
   };
 
   useEffect(() => {
     fetchStudents();
-  }, [isLoggedIn, token, page, universityId, facultyId, programId, year]);
+  }, [isLoggedIn, token, page, programId]);
 
   return (
     <div className="p-5 md:p-8 min-h-screen">
@@ -429,31 +318,14 @@ export default function AddStudent({
           buttonText={t("create new student")}
           placeholderText={{
             code: t("student id"),
-            nameEn: t("first name"),
-            nameTh: t("last name"),
-            abbrEn: t("year of admission"),
-            abbrTh: t("email"),
+            nameEn: "full name",
+            nameTh: t("email"),
           }}
           submitButtonText={{
             insert: t("insert student"),
             upload: t("upload student (excel)"),
           }}
           showAbbreviationInputs={false}
-          programOptions={programOptions}
-          universityOptions={universityOptions}
-          facultyOptions={facultyOptions}
-          yearOptions={yearOptions}
-          selectedProgram={selectedProgram}
-          selectedUniversity={selectedUniversity}
-          selectedFaculty={selectedFaculty}
-          selectedYear={selectedYear}
-          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
-          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
-          onProgramChange={(e) => setSelectedProgram(e.target.value)}
-          onYearChange={(e) => {
-            const selectedYear = e.target.value;
-            setSelectedYear(selectedYear);
-          }}
           onSubmit={handleAddStudent}
           onSubmitExcel={handleAddStudentExcel}
         />
@@ -462,11 +334,11 @@ export default function AddStudent({
       <div className="bg-white p-4 rounded-lg shadow-xl">
         <Table<Student> columns={studentColumns} data={students} />
         <div className="pt-4 flex justify-end">
-          <PaginationControlButton
+          {/* <PaginationControlButton
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
-          />
+          /> */}
         </div>
       </div>
 
@@ -478,6 +350,7 @@ export default function AddStudent({
             { label: "student id", key: "student_code", type: "number" },
             { label: "first name", key: "first_name", type: "text" },
             { label: "last name", key: "last_name", type: "text" },
+            { label: "email", key: "email", type: "text" },
           ]}
           onChange={(update) => {
             setSelectedStudent(update);

@@ -13,7 +13,6 @@ import { addCourse, getCoursePaginate, Course } from "@/utils/courseApi";
 import { useAuth } from "../context/AuthContext";
 import { getPrograms, Program } from "@/utils/programApi";
 
-import FormEditPopup from "@/components/EditPopup";
 import AlertPopup from "@/components/AlertPopup";
 import { apiClient } from "@/utils/apiClient";
 
@@ -34,7 +33,7 @@ interface ExcelCourseRow {
   code?: string | number;
   Code?: string | number;
   course_id?: string | number;
-  nameTh?: string;
+  name_th?: string;
   course_name?: string;
   ชื่อไทย?: string;
   nameEn?: string;
@@ -48,9 +47,6 @@ export default function CourseManagement({
   universityId,
   facultyId,
   programId,
-  year,
-  semester,
-  section,
 }: CourseManagementProps) {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
@@ -102,10 +98,9 @@ export default function CourseManagement({
   const [selectedSection, setSelectedSection] = useState("");
 
   // --- Action State ---
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
-  const [showEditPopup, setShowEditPopup] = useState(false);
 
   // 1. Fetch Universities
   useEffect(() => {
@@ -166,7 +161,7 @@ export default function CourseManagement({
     getPrograms(token, selectedFaculty)
       .then((data) => {
         const years = Array.from(
-          new Set<number>(data.map((p: Program) => Number(p.program_year)))
+          new Set<number>(data.map((p: Program) => Number(p.program_year))),
         ).sort((a, b) => b - a);
 
         if (years.length === 0) {
@@ -195,7 +190,7 @@ export default function CourseManagement({
     getPrograms(token, selectedFaculty)
       .then((data) => {
         const programs = data.filter(
-          (p: Program) => String(p.program_year) === selectedYear
+          (p: Program) => String(p.program_year) === selectedYear,
         );
 
         if (programs.length === 0) {
@@ -230,11 +225,7 @@ export default function CourseManagement({
         universityId,
         facultyId,
         programId,
-        year,
-        semester,
-        section,
       });
-
       const courseData = data.data || [];
 
       // Store ALL data (so pagination works correctly)
@@ -244,23 +235,12 @@ export default function CourseManagement({
       // Note: If you group items, total pages logic might need adjustment depending on if you paginate "Groups" or "Items"
       // For now, we paginate based on raw items returned from backend.
       setTotalPages(Math.ceil(totalItems / limit));
-    } catch (err) {
+    } catch {
       showToast("Error fetching courses", "error");
     } finally {
       setLoadingCourse(false);
     }
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    universityId,
-    facultyId,
-    programId,
-    year,
-    semester,
-    section,
-    showToast,
-  ]);
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, showToast]);
 
   useEffect(() => {
     fetchCourses();
@@ -301,6 +281,7 @@ export default function CourseManagement({
       showToast("Please select a Section.", "error");
       return;
     }
+    setLoadingCourse(true);
 
     try {
       await addCourse(
@@ -313,7 +294,7 @@ export default function CourseManagement({
           semester: selectedSemester,
           section: selectedSection,
         },
-        token
+        token,
       );
       fetchCourses();
       setPage(1);
@@ -333,7 +314,7 @@ export default function CourseManagement({
     if (!selectedProgram || !selectedYear) {
       showToast(
         "Please select Program and Year from the dropdowns first.",
-        "error"
+        "error",
       );
       return;
     }
@@ -440,24 +421,24 @@ export default function CourseManagement({
     }
   };
 
-  const saveEdit = async () => {
-    if (!selectedCourse || !token) return;
-    try {
-      await apiClient.patch(`/course/${selectedCourse.id}`, selectedCourse, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      showToast(t("Course updated successfully!"), "success");
-      fetchCourses();
-    } catch (err: any) {
-      showToast(
-        err.response?.data?.error || t("Failed to update course"),
-        "error"
-      );
-    } finally {
-      setShowEditPopup(false);
-      setSelectedCourse(null);
-    }
-  };
+  // const saveEdit = async () => {
+  //   if (!selectedCourse || !token) return;
+  //   try {
+  //     await apiClient.patch(`/course/${selectedCourse.id}`, selectedCourse, {
+  //       headers: { Authorization: `Bearer ${token}` },
+  //     });
+  //     showToast(t("Course updated successfully!"), "success");
+  //     fetchCourses();
+  //   } catch (err: any) {
+  //     showToast(
+  //       err.response?.data?.error || t("Failed to update course"),
+  //       "error",
+  //     );
+  //   } finally {
+  //     setShowEditPopup(false);
+  //     setSelectedCourse(null);
+  //   }
+  // };
 
   return (
     <div className="mt-5 p-5">
@@ -468,7 +449,7 @@ export default function CourseManagement({
         <AddButton
           buttonText={t("create new course")}
           placeholderText={{
-            code: "Course Id (e.g. CS101)",
+            code: "Course Id (value.g. CS101)",
             nameEn: "Course Name (EN)",
             nameTh: "Course Name (TH)",
           }}
@@ -489,12 +470,12 @@ export default function CourseManagement({
           selectedYear={selectedYear}
           selectedSemester={selectedSemester}
           selectedSection={selectedSection}
-          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
-          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
-          onProgramChange={(e) => setSelectedProgram(e.target.value)}
-          onYearChange={(e) => setSelectedYear(e.target.value)}
-          onSemesterChange={(e) => setSelectedSemester(e.target.value)}
-          onSectionChange={(e) => setSelectedSection(e.target.value)}
+          onUniversityChange={(value) => setSelectedUniversity(String(value))}
+          onFacultyChange={(value) => setSelectedFaculty(String(value))}
+          onProgramChange={(value) => setSelectedProgram(String(value))}
+          onYearChange={(value) => setSelectedYear(String(value))}
+          onSemesterChange={(value) => setSelectedSemester(String(value))}
+          onSectionChange={(value) => setSelectedSection(String(value))}
           onSubmit={handleAddCourse}
           onSubmitExcel={handleAddCourseExcel}
         />

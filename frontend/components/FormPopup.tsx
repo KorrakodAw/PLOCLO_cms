@@ -37,13 +37,13 @@ interface FormPopupProps<T> {
   selectedSection?: number | string;
   selectedCourse?: string;
 
-  onUniversityChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onFacultyChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onProgramChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onYearChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onSemesterChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onSectionChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  onCourseChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onUniversityChange?: (value: string | number) => void;
+  onFacultyChange?: (value: string | number) => void;
+  onProgramChange?: (value: string | number) => void;
+  onYearChange?: (value: string | number) => void;
+  onSemesterChange?: (value: string | number) => void;
+  onSectionChange?: (value: string | number) => void;
+  onCourseChange?: (value: string | number) => void;
 
   onClose: () => void;
   onSubmit: (data: FormData) => Promise<void> | void;
@@ -303,7 +303,7 @@ export default function FormPopup<T>({
                       placeholder={placeholder}
                       value={formData[name]}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                      className={`w-full px-4 py-2.5 rounded-lg border font-light ${
                         errors[name] ? "border-red-500" : "border-gray-300"
                       } focus:outline-none focus:ring-2 focus:ring-blue-400`}
                     />
@@ -313,7 +313,7 @@ export default function FormPopup<T>({
                       </p>
                     )}
                   </div>
-                )
+                ),
               )}
             </div>
           )}
@@ -331,7 +331,7 @@ export default function FormPopup<T>({
                   placeholder={placeholder}
                   value={formData[name]}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2.5 rounded-lg border ${
+                  className={`w-full px-4 py-2.5 rounded-lg border font-light ${
                     errors[name] ? "border-red-500" : "border-gray-300"
                   } focus:outline-none focus:ring-2 focus:ring-blue-400`}
                 />
@@ -356,7 +356,7 @@ export default function FormPopup<T>({
                     placeholder={placeholder}
                     value={formData[name]}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                    className={`w-full px-4 py-2.5 rounded-lg border font-light ${
                       errors[name] ? "border-red-500" : "border-gray-300"
                     } focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   />
@@ -373,14 +373,14 @@ export default function FormPopup<T>({
             <button
               type="submit"
               disabled={loading}
-              className="w-full md:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition cursor-pointer disabled:opacity-50"
+              className="w-full md:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-lg font-light hover:bg-blue-600 transition cursor-pointer disabled:opacity-50"
             >
               {loading ? "Submitting..." : insert}
             </button>
 
             {/* Excel Upload Button */}
             {onSubmitExcel && (
-              <label className="w-full md:w-auto px-5 py-2.5 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 cursor-pointer text-center transition">
+              <label className="w-full md:w-auto px-5 py-2.5 bg-green-500 text-white rounded-lg font-light hover:bg-green-600 cursor-pointer text-center transition">
                 {upload}
                 <input
                   type="file"

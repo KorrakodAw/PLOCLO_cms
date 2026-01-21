@@ -44,7 +44,7 @@ export default function LanguageSwitcher() {
       {/* --- 1. Display Button (Now at the bottom of its parent using mt-auto) --- */}
       <button
         type="button"
-        className="inline-flex justify-center items-center w-[140px] px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-100 mt-auto focus:outline-none cursor-pointer"
+        className="inline-flex justify-center items-center w-[140px] px-4 py-2 text-sm font-light text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-100 mt-auto focus:outline-none cursor-pointer"
         onClick={() => setIsOpen(!isOpen)}
       >
         <Image
@@ -70,7 +70,7 @@ export default function LanguageSwitcher() {
               <li
                 key={lang.code}
                 className={`flex items-center px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 ${
-                  i18n.language === lang.code ? "bg-gray-200 font-bold" : ""
+                  i18n.language === lang.code ? "bg-gray-200 font-light" : ""
                 }`}
                 onClick={() => changeLanguage(lang.code)}
               >

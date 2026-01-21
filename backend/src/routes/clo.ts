@@ -166,7 +166,7 @@ router.post("/", authenticateToken, async (req, res) => {
 });
 
 router.delete("/:id", authenticateToken, async (req, res) => {
-  const cloId = parseInt(req.params.id);
+  const cloId = parseInt(req.params.id as string);
 
   try {
     const result = await pool.query(`DELETE FROM clo WHERE id = $1`, [cloId]);
@@ -183,7 +183,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 });
 
 router.patch("/:id", authenticateToken, async (req, res) => {
-  const cloId = parseInt(req.params.id);
+  const cloId = parseInt(req.params.id as string);
   const { code, name, name_th } = req.body;
 
   try {

@@ -55,8 +55,7 @@ export async function getCoursePaginate(
       acc[key] = value;
     }
     return acc;
-  }, {} as Record<string, any>);
-
+  }, {} as Record<string, string | number>);
   const res = await apiClient.get<PaginatedResponse>("/course/paginate", {
     headers: { Authorization: `Bearer ${token}` },
     params: {

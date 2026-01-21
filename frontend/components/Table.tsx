@@ -9,7 +9,7 @@ export interface TableAction<T> {
 }
 
 export interface Column<T> {
-  header: string;
+  header: string | React.ReactNode;
   accessor: Extract<keyof T, string>;
   className?: string;
   render?: (value: T[keyof T], row: T) => React.ReactNode;
@@ -30,8 +30,10 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
     const handleResize = () => {
       const width = window.innerWidth;
       // Define breakpoints more clearly
-      if (width < 640) setFontSize("text-xs"); // Extra Small screens
-      else if (width < 1024) setFontSize("text-sm"); // Medium screens
+      if (width < 640)
+        setFontSize("text-xs"); // Extra Small screens
+      else if (width < 1024)
+        setFontSize("text-sm"); // Medium screens
       else setFontSize("text-base"); // Large screens and up
     };
 
@@ -43,39 +45,39 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
   // Tailwind Color Mapping Utility
   const getColorClasses = (
     color?: string,
-    type: "bg" | "hoverBg" | "text" = "bg"
+    type: "bg" | "hoverBg" | "text" = "bg",
   ) => {
     switch (color) {
       case "red":
         return type === "bg"
           ? "bg-red-500"
           : type === "hoverBg"
-          ? "hover:bg-red-600"
-          : "text-red-500";
+            ? "hover:bg-red-600"
+            : "text-red-500";
       case "blue":
         return type === "bg"
           ? "bg-blue-500"
           : type === "hoverBg"
-          ? "hover:bg-blue-600"
-          : "text-blue-500";
+            ? "hover:bg-blue-600"
+            : "text-blue-500";
       case "green":
         return type === "bg"
           ? "bg-green-500"
           : type === "hoverBg"
-          ? "hover:bg-green-600"
-          : "text-green-500";
+            ? "hover:bg-green-600"
+            : "text-green-500";
       case "gray":
         return type === "bg"
           ? "bg-gray-400"
           : type === "hoverBg"
-          ? "hover:bg-gray-500"
-          : "text-gray-700";
+            ? "hover:bg-gray-500"
+            : "text-gray-700";
       default:
         return type === "bg"
           ? "bg-gray-400"
           : type === "hoverBg"
-          ? "hover:bg-gray-500"
-          : "text-gray-700";
+            ? "hover:bg-gray-500"
+            : "text-gray-700";
     }
   };
 
@@ -97,7 +99,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                 className={`
                   text-left 
                   px-5 py-3 
-                  font-semibold 
+                  font-light 
                   text-gray-600 
                   uppercase 
                   tracking-wider 
@@ -120,7 +122,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
             <tr>
               <td
                 colSpan={columns.length}
-                className="text-center py-8 text-gray-500 border-t"
+                className="text-center py-8 text-gray-500 border-t font-light"
               >
                 {t("no data available")}
               </td>
@@ -149,7 +151,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                             // These getColorClasses functions should be defined outside the return
                             const colorText = getColorClasses(
                               action.color,
-                              "text"
+                              "text",
                             );
                             const hoverText = action.hoverColor
                               ? getColorClasses(action.hoverColor, "text")
@@ -161,7 +163,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                                 onClick={() => action.onClick(row)}
                                 className={`
                                   ${colorText} ${hoverText} 
-                                  font-medium 
+                                  font-light 
                                   text-sm 
                                                       p-0.5 
                                   cursor-pointer 
@@ -184,7 +186,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                     <td
                       key={colIndex}
                       // Data Cell: Adjusted padding, clean text color
-                      className={`px-5 py-3 text-gray-700 align-middle ${
+                      className={`px-5 py-3 text-gray-700 align-middle font-light ${
                         col.className ?? ""
                       }`}
                     >

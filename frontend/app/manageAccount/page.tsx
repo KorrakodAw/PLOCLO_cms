@@ -215,10 +215,10 @@ export default function ManageAccount() {
         <div className="p-5 md:p-8 min-h-screen">
           <div className="flex justify-between items-center mb-8 border-b pb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">
+              <h1 className="text-3xl font-light text-gray-800">
                 Manage Account
               </h1>
-              <p className="text-sm text-gray-500 mt-1 uppercase tracking-wider">
+              <p className="text-sm font-light text-gray-500 mt-1 uppercase tracking-wider">
                 User Administration
               </p>
             </div>
@@ -243,7 +243,7 @@ export default function ManageAccount() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2 rounded-xl transition-all text-sm font-bold flex items-center gap-2 whitespace-nowrap
+                className={`px-5 py-2 rounded-xl transition-all text-sm font-light flex items-center gap-2 whitespace-nowrap
               ${
                 activeTab === tab.id
                   ? `bg-white ${tab.color} shadow-sm border border-gray-200`

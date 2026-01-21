@@ -104,7 +104,7 @@ export default function ProgramManagement({
         const data = await getFaculties(token, selectedUniversity);
 
         const filteredFaculties = data.filter(
-          (f: Faculty) => String(f.university_id) === selectedUniversity
+          (f: Faculty) => String(f.university_id) === selectedUniversity,
         );
 
         if (filteredFaculties.length === 0) {
@@ -257,7 +257,7 @@ export default function ProgramManagement({
 
       const formattedRows = mappedRows.map((row) => ({
         program_code: String(
-          row.program_code || row["code"] || row["Program Code"]
+          row.program_code || row["code"] || row["Program Code"],
         ),
         program_name_en: String(row.program_name_en || row["nameEn"]),
         program_name_th: String(row.program_name_th || row["nameTh"]),
@@ -269,7 +269,6 @@ export default function ProgramManagement({
       }));
 
       // Debug: Check your console to see if the data looks correct before sending
-      console.log("Sending to API:", formattedRows);
 
       await bulkUploadPrograms(formattedRows, token!);
       resetSelection();
@@ -355,10 +354,10 @@ export default function ProgramManagement({
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       setPrograms((prev) =>
-        prev.map((prog) => (prog.id === selectedProgram.id ? res.data : prog))
+        prev.map((prog) => (prog.id === selectedProgram.id ? res.data : prog)),
       );
       showToast("Program updated successfully", "success");
     } catch {
@@ -377,7 +376,7 @@ export default function ProgramManagement({
         headers: { Authorization: `Bearer ${token}` },
       });
       setPrograms((prev) =>
-        prev.filter((prog) => prog.id !== programToDelete.id)
+        prev.filter((prog) => prog.id !== programToDelete.id),
       );
       showToast("Program deleted successfully", "success");
     } catch (err) {
@@ -388,7 +387,7 @@ export default function ProgramManagement({
       } else {
         showToast(
           "Failed to delete program: An unknown error occurred",
-          "error"
+          "error",
         );
       }
     } finally {
@@ -407,7 +406,7 @@ export default function ProgramManagement({
       <ToastElement /> {/* Place Toast element at the top level */}
       {/* HEADER & ACTIONS */}
       <div className="mb-6 flex justify-between items-center border-b pb-4">
-        <h1 className="text-3xl font-extrabold text-gray-800">
+        <h1 className="text-3xl font-light text-gray-800">
           {t("program management")}
         </h1>
         {/* The AddButton component handles all program creation/upload */}
@@ -433,9 +432,9 @@ export default function ProgramManagement({
           selectedFaculty={selectedFaculty}
           selectedUniversity={selectedUniversity}
           selectedYear={selectedYear}
-          onFacultyChange={(e) => setSelectedFaculty(e.target.value)}
-          onUniversityChange={(e) => setSelectedUniversity(e.target.value)}
-          onYearChange={(e) => setSelectedYear(e.target.value)}
+          onFacultyChange={(value) => setSelectedFaculty(String(value))}
+          onUniversityChange={(value) => setSelectedUniversity(String(value))}
+          onYearChange={(value) => setSelectedYear(String(value))}
         />
       </div>
       {/* FILTERING CONTROLS */}

@@ -4,15 +4,76 @@ import { authenticateToken } from "../middleware/authMiddleware";
 
 const router = Router();
 
-// --- GET: Fetch students for a specific section ---
-router.get("/", authenticateToken, async (_req, res) => {
+// --- GET: Fetch students ---
+// 1. If sectionId is provided: Fetch students in THAT specific section (for table display)
+// 2. If courseId is provided: Fetch students in ANY section of that course (for filtering popup)
+router.get("/", authenticateToken, async (req, res) => {
   try {
-    const { sectionId } = _req.query;
+    const { sectionId, courseId } = req.query;
 
-    if (!sectionId) {
-      return res.status(400).json({ error: "sectionId is required" });
+    if (!sectionId && !courseId) {
+      return res
+        .status(400)
+        .json({ error: "Either sectionId or courseId is required" });
     }
 
+    // CASE A: Fetch by Master Course ID (Used for filtering "Available Students")
+    // We want to find students enrolled in ANY section belonging to this courseId
+    if (courseId) {
+      const result = await pool.query(
+        `
+        SELECT DISTINCT
+          s.id,
+          s.student_code,
+          s.first_name,
+          s.last_name
+        FROM student_on_section sos
+        JOIN course_section cs ON sos.section_id = cs.id
+        JOIN student s ON sos.student_id = s.id
+        WHERE cs.course_id = $1
+        `,
+        [courseId],
+      );
+      return res.json(result.rows);
+    }
+
+    // CASE B: Fetch by Specific Section ID (Used for the main table)
+    if (sectionId) {
+      const result = await pool.query(
+        `
+        SELECT 
+          sos.student_id,
+          sos.section_id,
+          sos."assignedAt", 
+          c.name AS course_name,
+          c.code AS course_code,
+          cs.section,
+          cs.semester,
+          cs.year,
+          s.student_code,
+          s.first_name,
+          s.last_name
+        FROM student_on_section sos
+        JOIN course_section cs ON sos.section_id = cs.id
+        JOIN course c ON cs.course_id = c.id
+        JOIN student s ON sos.student_id = s.id
+        WHERE sos.section_id = $1
+        ORDER BY s.id ASC
+        `,
+        [sectionId],
+      );
+      return res.json(result.rows);
+    }
+  } catch (err: any) {
+    console.error("DATABASE ERROR:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch records", details: err.message });
+  }
+});
+
+router.get("/all", authenticateToken, async (_req, res) => {
+  try {
     const result = await pool.query(
       `
       SELECT 
@@ -31,10 +92,8 @@ router.get("/", authenticateToken, async (_req, res) => {
       JOIN course_section cs ON sos.section_id = cs.id
       JOIN course c ON cs.course_id = c.id
       JOIN student s ON sos.student_id = s.id
-      WHERE sos.section_id = $1
       ORDER BY s.id ASC
       `,
-      [sectionId]
     );
 
     res.json(result.rows);
@@ -62,7 +121,7 @@ router.post("/bulk", authenticateToken, async (req, res) => {
       `SELECT c.code FROM course_section cs
        JOIN course c ON cs.course_id = c.id
        WHERE cs.id = $1`,
-      [sectionId]
+      [sectionId],
     );
 
     if (sectionInfo.rowCount === 0) {
@@ -72,22 +131,23 @@ router.post("/bulk", authenticateToken, async (req, res) => {
     const courseCode = sectionInfo.rows[0].code;
 
     // 2. Identify students already enrolled in ANY section of this course code
+    // (This prevents a student from being in Sec 1 AND Sec 2 of the same course)
     const existingEnrollments = await pool.query(
       `SELECT sos.student_id 
        FROM student_on_section sos
        JOIN course_section cs ON sos.section_id = cs.id
        JOIN course c ON cs.course_id = c.id
        WHERE c.code = $1 AND sos.student_id = ANY($2)`,
-      [courseCode, studentIds]
+      [courseCode, studentIds],
     );
 
     const alreadyEnrolledIds = existingEnrollments.rows.map(
-      (row) => row.student_id
+      (row) => row.student_id,
     );
 
     // 3. Filter the list to only include students NOT already in this course code
     const studentsToAdd = studentIds.filter(
-      (id) => !alreadyEnrolledIds.includes(id)
+      (id) => !alreadyEnrolledIds.includes(id),
     );
 
     if (studentsToAdd.length === 0) {
@@ -101,8 +161,8 @@ router.post("/bulk", authenticateToken, async (req, res) => {
     const queries = studentsToAdd.map((sId: number) =>
       pool.query(
         "INSERT INTO student_on_section (student_id, section_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        [sId, sectionId]
-      )
+        [sId, sectionId],
+      ),
     );
 
     await Promise.all(queries);
@@ -120,25 +180,35 @@ router.post("/bulk", authenticateToken, async (req, res) => {
 });
 
 // --- DELETE: Remove a student from a section ---
-router.delete("/:sectionId/:studentId", authenticateToken, async (req, res) => {
-  const { sectionId, studentId } = req.params;
+// Bulk Delete: Remove multiple students from a specific section
+router.post("/bulk-delete", authenticateToken, async (req, res) => {
+  const { sectionId, studentIds } = req.body; // Expecting { sectionId: 1, studentIds: [5, 12, 15] }
+
+  if (!sectionId || !Array.isArray(studentIds) || studentIds.length === 0) {
+    return res.status(400).json({ error: "Invalid sectionId or studentIds" });
+  }
 
   try {
+    // Use Postgres ANY() for efficient bulk deletion
     const result = await pool.query(
       `DELETE FROM student_on_section 
-       WHERE section_id = $1 AND student_id = $2 
+       WHERE section_id = $1 AND student_id = ANY($2::int[]) 
        RETURNING *`,
-      [sectionId, studentId]
+      [sectionId, studentIds]
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Record not found" });
+      return res.status(404).json({ error: "No matching records found to delete" });
     }
 
-    res.json({ message: "Student removed from section successfully" });
+    res.json({ 
+      message: `Successfully removed ${result.rowCount} students`, 
+      removedCount: result.rowCount 
+    });
+
   } catch (err) {
-    console.error("Error deleting record:", err);
-    res.status(500).json({ error: "Failed to delete record" });
+    console.error("Error bulk deleting:", err);
+    res.status(500).json({ error: "Failed to delete records" });
   }
 });
 

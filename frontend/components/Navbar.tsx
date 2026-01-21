@@ -125,7 +125,7 @@ export default function Navbar({
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
                 // Removed mt-auto and ml-3 for clarity based on your fixed parent
-                className={`p-3 mt-3 font-normal flex justify-center items-center gap-2 cursor-pointer w-[140px] h-[40px] text-sm 
+                className={`p-3 mt-3 font-light flex justify-center items-center gap-2 cursor-pointer w-[140px] h-[40px] text-sm 
         ${
           isHovered
             ? "text-red-500 " // Use the hover state to apply the hover text color
