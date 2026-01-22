@@ -180,5 +180,9 @@
   "clo manage": "CLO Management",
   "Course Setup": "Course Setup",
   "Grading & Scores": "Grading & Scores",
-  "add new clo": "Add New CLO"
+  "add new clo": "Add New CLO",
+  "instructor": "Instructor",
+  "manage universities": "Manage Universities",
+  "manage programs": "Manage Programs",
+  "manage courses": "Manage Courses"
 }

@@ -16,6 +16,8 @@ import FormEditPopup from "@/components/EditPopup";
 import { apiClient } from "@/utils/apiClient";
 import AddButton from "@/components/AddButton";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { useRouter } from "next/navigation";
+import BreadCrumb from "@/components/BreadCrumb";
 
 import { useTranslation } from "next-i18next";
 
@@ -37,6 +39,7 @@ export default function UniversityDetailPage({
   // This will suspend the component until the route parameters are fully resolved.
   const resolvedParams = use(params as unknown as Promise<ResolvedParams>);
   const { universityId } = resolvedParams;
+  const router = useRouter();
 
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
@@ -51,7 +54,7 @@ export default function UniversityDetailPage({
   const [showDeletePopup, setShowDeletePopup] = useState(false);
 
   const { t, i18n } = useTranslation("common");
-  // const lang = i18n.language;
+  const lang = i18n.language;
 
   const fetchData = async () => {
     if (!token) return;
@@ -95,7 +98,7 @@ export default function UniversityDetailPage({
       fetchData();
       showToast("Faculty created successfully", "success");
     } catch (err: any) {
-      console.error("Create Faculty Error:", err); // Always log the full error for debugging
+      console.error("Create Faculty Error:", err);
 
       // 1. Check if the server sent a specific error message (e.g., "Faculty code already exists")
       if (err.response && err.response.data && err.response.data.error) {
@@ -164,6 +167,18 @@ export default function UniversityDetailPage({
       accessor: "id",
       actions: [
         {
+          label: t("instructor"),
+          color: "green",
+          hoverColor: "green",
+          // 3. Update the OnClick to match your folder structure
+          onClick: (row: Faculty) => {
+            // NOTE: matches 'manageUniversity/[id]/faculty/[id]/instructor'
+            router.push(
+              `/manageUniversity/${universityId}/faculty/${row.id}/instructor`,
+            );
+          },
+        },
+        {
           label: t("edit"),
           color: "blue",
           hoverColor: "blue",
@@ -194,6 +209,17 @@ export default function UniversityDetailPage({
   // --- 3. Render the Page ---
   return (
     <div className="p-8">
+      <BreadCrumb
+        items={[
+          { label: t("manage universities"), href: "/manageUniversity" },
+          {
+            label:
+              lang === "th"
+                ? university.name_th || university.name
+                : university.name,
+          },
+        ]}
+      />
       <ToastElement />
 
       {/* UNIVERSITY DETAILS SECTION (The "Top Data") */}

@@ -7,9 +7,18 @@ const prisma = new PrismaClient();
 
 router.get("/", authenticateToken, async (req, res) => {
   try {
+    const { facultyId } = req.query;
+
+    // Build the filter
+    const whereClause = facultyId
+      ? { faculty_id: parseInt(facultyId as string) }
+      : {};
+
     const instructors = await prisma.instructor.findMany({
+      where: whereClause,
       orderBy: { id: "desc" },
     });
+
     res.json(instructors);
   } catch (err: any) {
     console.error(err);
@@ -19,18 +28,20 @@ router.get("/", authenticateToken, async (req, res) => {
 
 router.post("/", authenticateToken, async (req, res) => {
   try {
-    const { first_name, last_name, email, faculty_id } = req.body;
+    const { full_thai_name, full_eng_name, email, phoneNum, faculty_id } =
+      req.body;
 
-    if (!first_name || !last_name || !email || !faculty_id) {
+    if (!full_thai_name || !full_eng_name || !email || !faculty_id) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     const newInstructor = await prisma.instructor.create({
       data: {
-        first_name,
-        last_name,
+        full_thai_name,
+        full_eng_name,
         email,
-        faculty_id
+        phoneNum,
+        faculty_id,
       },
     });
 
@@ -38,6 +49,45 @@ router.post("/", authenticateToken, async (req, res) => {
   } catch (err: any) {
     console.error(err);
     res.status(500).json({ error: "Failed to create instructor" });
+  }
+});
+
+router.patch("/:id", authenticateToken, async (req, res) => {
+  try {
+    const instructorId = parseInt(req.params.id as string);
+    const { full_thai_name, full_eng_name, email, phoneNum, faculty_id } =
+      req.body;
+
+    const updatedInstructor = await prisma.instructor.update({
+      where: { id: instructorId },
+      data: {
+        full_thai_name,
+        full_eng_name,
+        email,
+        phoneNum,
+        faculty_id,
+      },
+    });
+
+    res.json(updatedInstructor);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update instructor" });
+  }
+});
+
+router.delete("/:id", authenticateToken, async (req, res) => {
+  try {
+    const instructorId = parseInt(req.params.id as string);
+
+    await prisma.instructor.delete({
+      where: { id: instructorId },
+    });
+
+    res.status(204).send();
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete instructor" });
   }
 });
 

@@ -16,7 +16,7 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 export default function EditProgram() {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
-  const [university, setUniversity] = useState<string >("");
+  const [university, setUniversity] = useState<string>("");
   const [faculty, setFaculty] = useState<string>("");
   const [program, setProgram] = useState<string>("");
   const [year, setYear] = useState<string>("");
@@ -157,7 +157,7 @@ export default function EditProgram() {
     getPrograms(token, faculty) // ← ส่ง facultyId ไป
       .then((data) => {
         const uniquePrograms = Array.from(
-          new Map(data.map((p: Program) => [p.program_code, p])).values()
+          new Map(data.map((p: Program) => [p.program_code, p])).values(),
         );
 
         setProgramOptions([
@@ -226,7 +226,7 @@ export default function EditProgram() {
 
   return (
     <ProtectedRoute roles={["system_admin", "instructor"]}>
-      <div className="max-w-[1400px] flex flex-col mx-auto ">
+      <div className="max-w-[1400px] flex flex-col mx-auto">
         <p className="font-light text-2xl ">{t("program information")}</p>
 
         {/* Tabs */}

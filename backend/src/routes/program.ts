@@ -363,4 +363,41 @@ router.delete(
   }
 );
 
+router.get("/:id", authenticateToken, async (req, res) => {
+  try {
+    const programId = req.params.id;
+
+    const result = await pool.query(
+      `
+      SELECT 
+         p.id,
+         p.program_code,
+         p.program_name_en,
+         p.program_name_th,
+         p.program_shortname_en,
+         p.program_shortname_th,
+         p.program_year,
+         f.id AS faculty_id,
+         f.name AS faculty_name,
+         u.id AS university_id,
+         u.name AS university_name
+       FROM program p
+       JOIN faculty f ON p.faculty_id = f.id
+       JOIN university u ON f.university_id = u.id
+       WHERE p.id = $1
+    `,
+      [programId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch program details" });
+  }
+});
+
 export default router;

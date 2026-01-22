@@ -401,7 +401,7 @@ export default function ProgramManagement({
   }, [fetchPrograms]);
 
   return (
-    <div className="p-5 md:p-8 min-h-screen">
+    <div className="p-5 md:p-8">
       {loading && <LoadingOverlay />}
       <ToastElement /> {/* Place Toast element at the top level */}
       {/* HEADER & ACTIONS */}

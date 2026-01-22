@@ -184,5 +184,9 @@
   "clo manage": "การจัดการ CLO",
   "Course Setup": "การตั้งค่ารายวิชา",
   "Grading & Scores": "การให้เกรดและคะแนน",
-  "add new clo": "เพิ่ม CLO ใหม่"
+  "add new clo": "เพิ่ม CLO ใหม่",
+  "instructor": "อาจารย์ผู้สอน",
+  "manage universities": "จัดการมหาวิทยาลัย",
+  "manage programs": "จัดการแผนการเรียน",
+  "manage courses": "จัดการรายวิชา"
 }

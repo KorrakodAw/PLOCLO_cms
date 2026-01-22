@@ -11,6 +11,7 @@ import { apiClient } from "@/utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import DropdownSelect from "@/components/DropdownSelect";
 import FormEditPopup from "@/components/EditPopup";
+import BreadCrumb from "@/components/BreadCrumb";
 
 // Import Child Components
 import AddPlo from "../AddPlo";
@@ -238,6 +239,18 @@ export default function EditProgramClient({
 
   return (
     <div className="p-5 md:p-8 min-h-screen">
+      <BreadCrumb
+        items={[
+          { label: t("manage programs"), href: "/editProgram" },
+          {
+            label:
+              lang === "en"
+                ? formData.program_shortname_en
+                : formData.program_shortname_th,
+            href: `/editProgram/${programCode}`,
+          },
+        ]}
+      />
       {loading && <LoadingOverlay />}
       <ToastElement />
 
@@ -315,11 +328,15 @@ export default function EditProgramClient({
           </div>
 
           {/* Lower Row: Selectors (Both Dropdowns) */}
-          <div className="grid grid-cols-1 md:flex md:items-center md:justify-between gap-6 pt-4 border-t border-gray-50">
+          {/* Filter Toolbar */}
+          <div className="mt-6 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4">
             {/* Year Dropdown */}
-            <div className="w-full md:w-64">
+            <div className="w-full sm:w-64">
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
+                {t("Program Year")}
+              </label>
               <DropdownSelect
-                label={t("Select Program Year")}
+                // Remove the internal label prop if you use the external label above for better styling
                 value={selectedProgramId}
                 options={programOptions}
                 onChange={(value) => setSelectedProgramId(value)}
@@ -327,8 +344,11 @@ export default function EditProgramClient({
               />
             </div>
 
-            {/* View Mode Dropdown (Replaces Tabs) */}
-            <div className="w-full md:w-64 mt-6 md:mt-0">
+            {/* View Mode Dropdown */}
+            <div className="w-full sm:w-50">
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
+                {t("View Mode")}
+              </label>
               <DropdownSelect
                 value={activeTab}
                 options={viewModeOptions}

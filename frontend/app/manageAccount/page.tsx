@@ -96,11 +96,11 @@ export default function ManageAccount() {
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       setUsers((prev) =>
-        prev.map((u) => (u.id === selectedUser.id ? res.data : u))
+        prev.map((u) => (u.id === selectedUser.id ? res.data : u)),
       );
       fetchUsers();
       showToast("User updated successfully", "success");
@@ -209,10 +209,10 @@ export default function ManageAccount() {
 
   return (
     <ProtectedRoute roles={["system_admin", "instructor"]}>
-      <div className="max-w-[1400px] h-full flex flex-col mx-auto">
+      <div className="max-w-[1400px] flex flex-col mx-auto">
         <ToastElement />
         {loading && <LoadingOverlay />}
-        <div className="p-5 md:p-8 min-h-screen">
+        <div className="p-5 md:p-8">
           <div className="flex justify-between items-center mb-8 border-b pb-4">
             <div>
               <h1 className="text-3xl font-light text-gray-800">

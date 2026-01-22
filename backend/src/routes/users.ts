@@ -46,6 +46,17 @@ router.post("/auth/google/verify", async (req, res) => {
         [email.toLowerCase()],
       );
 
+      const instructorCheck = await pool.query(
+        `SELECT id FROM instructor 
+         WHERE LOWER(email) = $1 
+         LIMIT 1`,
+        [email.toLowerCase()],
+      );
+
+      if (instructorCheck.rows.length > 0) {
+        role = "instructor"; // Found a match!
+      }
+
       if (studentCheck.rows.length > 0) {
         role = "student"; // Found a match!
       }

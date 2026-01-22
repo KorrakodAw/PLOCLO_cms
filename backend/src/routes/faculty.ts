@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
+import { PrismaClient } from "@prisma/client";
 
+const prisma = new PrismaClient();
 const router = Router();
 
 // ดึงข้อมูลคณะทั้งหมด (faculty) สำหรับ dropdown
@@ -77,6 +79,31 @@ router.get("/paginate", authenticateToken, async (req, res) => {
     res
       .status(500)
       .json({ error: "Unable to retrieve paginated faculty information" });
+  }
+});
+
+// src/routes/faculty.ts
+
+router.get("/:id", authenticateToken, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id as string);
+    
+    const faculty = await prisma.faculty.findUnique({
+      where: { id: id },
+      // ✅ ADD THIS: Include the related University data
+      include: {
+        university: true 
+      }
+    });
+
+    if (!faculty) {
+      return res.status(404).json({ error: "Faculty not found" });
+    }
+
+    res.json(faculty);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch faculty" });
   }
 });
 

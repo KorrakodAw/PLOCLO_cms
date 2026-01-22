@@ -72,7 +72,7 @@ export default function ManageUniversity() {
       });
       showToast("University deleted successfully", "success");
       setUniversities((prev) =>
-        prev.filter((uni) => uni.id !== universityToDelete.id)
+        prev.filter((uni) => uni.id !== universityToDelete.id),
       );
     } catch {
       showToast("Failed to delete university", "error");
@@ -96,10 +96,10 @@ export default function ManageUniversity() {
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       setUniversities((prev) =>
-        prev.map((uni) => (uni.id === selectedUniversity.id ? res.data : uni))
+        prev.map((uni) => (uni.id === selectedUniversity.id ? res.data : uni)),
       );
       showToast("University updated successfully", "success");
     } catch {
@@ -170,7 +170,7 @@ export default function ManageUniversity() {
 
   return (
     // 1. Relative Container for Local Loading Overlay
-    <div className="p-5 md:p-8 min-h-screen">
+    <div className="p-5 md:p-8">
       {/* 2. Loading Overlay (Rendered conditionally on local component data fetch) */}
       {loading && <LoadingOverlay />}
 

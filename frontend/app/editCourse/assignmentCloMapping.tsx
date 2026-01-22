@@ -408,7 +408,7 @@ export default function AssignmentCloMapping({
                         {assign.name}
                       </td>
                       <td className="p-4 text-center font-bold text-blue-600 border-r bg-blue-50/10">
-                        {Number(assign.weight).toFixed(0)}
+                        {Number(assign.weight).toFixed(2)}
                       </td>
                       {clos.map((clo) => {
                         const weight =
