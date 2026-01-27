@@ -86,13 +86,13 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
 
         // 1. Fetch Assignment (Now directly linked to Course)
         const assignment = await tx.assignment.findUnique({
-          where: { id: item.assignment_id },
+          where: { id: Number(item.assignment_id) },
           select: { course_id: true }, // Direct relation
         });
 
         // 2. Fetch CLO (Linked to Course)
         const clo = await tx.clo.findUnique({
-          where: { id: item.clo_id },
+          where: { id: Number(item.clo_id) },
           select: { course_id: true },
         });
 
@@ -109,8 +109,8 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
         //
         const existingMappings = await tx.assignmentCloMapping.findMany({
           where: {
-            assId: item.assignment_id,
-            cloId: { not: item.clo_id }, // Exclude current CLO being updated
+            assId: Number(item.assignment_id),
+            cloId: { not: Number(item.clo_id) }, // Exclude current CLO being updated
           },
           select: { weight: true },
         });
@@ -132,8 +132,8 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
           await tx.assignmentCloMapping.upsert({
             where: {
               assId_cloId: {
-                assId: item.assignment_id,
-                cloId: item.clo_id,
+                assId: Number(item.assignment_id),
+                cloId: Number(item.clo_id),
               },
             },
             update: {
@@ -141,8 +141,8 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
               updatedAt: new Date(),
             },
             create: {
-              assId: item.assignment_id,
-              cloId: item.clo_id,
+              assId: Number(item.assignment_id),
+              cloId: Number(item.clo_id),
               weight,
               updatedAt: new Date(),
             },
@@ -150,8 +150,8 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
         } else {
           await tx.assignmentCloMapping.deleteMany({
             where: {
-              assId: item.assignment_id,
-              cloId: item.clo_id,
+              assId: Number(item.assignment_id),
+              cloId: Number(item.clo_id),
             },
           });
         }

@@ -26,6 +26,119 @@ export async function getCloScorePerStudentPerCourse(
         assignment: {
           select: {
             maxScore: true,
+            weight: true,
+            category: true,
+            assignment_clo_mappings: {
+              select: {
+                cloId: true,
+                weight: true,
+                clo: { select: { code: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // 2. Get all assignments for this course to calculate category totals
+    const courseAssignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) }, // ✅ Fixed: Direct link to course
+      select: { category: true, weight: true },
+    });
+
+    const categoryTotals: Record<string, number> = {};
+    courseAssignments.forEach((a: any) => {
+      const cat = a.category;
+      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + Number(a.weight);
+    });
+
+    // 3. Group by CLO Code
+    const cloGroups = studentClo.reduce(
+      (acc: Record<string, any[]>, row: any) => {
+        row.assignment.assignment_clo_mappings.forEach((mapping: any) => {
+          const cloCode = mapping.clo.code;
+          if (!acc[cloCode]) acc[cloCode] = [];
+          acc[cloCode].push({
+            student_id: row.student_id,
+            score: row.score,
+            assignment_id: row.assignment_id,
+            category: row.assignment.category,
+            maxScore: row.assignment.maxScore,
+            assignmentWeight: row.assignment.weight, // ✅ จาก assignment
+            weight: mapping.weight, // ✅ จาก mapping
+          });
+        });
+        return acc;
+      },
+      {}
+    );
+
+    // 4. Calculate Scores
+    const cloScores = Object.entries(cloGroups).map(
+      ([cloCode, assignments]) => {
+        let cloTotal = 0;
+
+        const byCategory = assignments.reduce(
+          (acc: Record<string, any[]>, row) => {
+            (acc[row.category] ??= []).push(row);
+            return acc;
+          },
+          {}
+        );
+
+        Object.entries(byCategory).forEach(([category, group]) => {
+          const totalMaxWeightForCategory = categoryTotals[category] ?? 0;
+
+          const totalWeightForCategory = group.reduce(
+            (sum, r) => sum + (Number(r.score) / (Number(r.maxScore) / Number(r.assignmentWeight))),
+            0
+          );
+
+          if (totalMaxWeightForCategory <= 0) return;
+
+          group.forEach((row) => {
+            const realScore = Number(row.score) / (Number(row.maxScore) / Number(row.assignmentWeight));
+            const normalized = totalWeightForCategory / totalMaxWeightForCategory;
+            const weighted = (Number(row.weight) / 100) * normalized;
+            cloTotal += realScore * weighted;
+          });
+        });
+
+        return { cloCode, cloScore: cloTotal };
+      }
+    );
+
+    return { cloScores };
+  });
+
+  return resultCloStudent;
+}
+
+/*
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ clo แต่ละตัว ของ student 1 คน ใน 1 course
+/////////////////////////////////////////////////////////////////////////
+export async function getCloScorePerStudentPerCourse(
+  tx: any,
+  studentId: number,
+  courseId: number
+) {
+  const resultCloStudent = await prisma.$transaction(async (tx) => {
+    // 1. Get Student Scores filtering by Assignment -> Course
+    const studentClo = await tx.studentScore.findMany({
+      where: {
+        student_id: Number(studentId),
+        assignment: {
+          course_id: Number(courseId), // ✅ Fixed: Direct link to course
+        },
+      },
+      select: {
+        student_id: true,
+        score: true,
+        assignment_id: true,
+        assignment: {
+          select: {
+            maxScore: true,
             category: true,
             assignment_clo_mappings: {
               select: {
@@ -110,6 +223,7 @@ export async function getCloScorePerStudentPerCourse(
 
   return resultCloStudent;
 }
+  */
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ใน 1 course (รวมคะแนนของนักศึกษาทุกคนใน course)
@@ -130,6 +244,7 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
         assignment: {
           select: {
             maxScore: true,
+            weight: true,
             category: true,
             assignment_clo_mappings: {
               select: {
@@ -146,13 +261,13 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
     // 2) รวม maxScore ของทุก assignment ตาม category
     const courseAssignments = await tx.assignment.findMany({
       where: { course_id: Number(courseId) }, // ✅ Fixed
-      select: { category: true, maxScore: true },
+      select: { category: true, weight: true },
     });
 
     const categoryTotals: Record<string, number> = {};
     courseAssignments.forEach((a: any) => {
       categoryTotals[a.category] =
-        (categoryTotals[a.category] ?? 0) + Number(a.maxScore);
+        (categoryTotals[a.category] ?? 0) + Number(a.weight);
     });
 
     // 3) Group ตาม student
@@ -177,6 +292,7 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
                 score: row.score,
                 category: row.assignment.category,
                 maxScore: row.assignment.maxScore,
+                assignmentWeight: row.assignment.weight,
                 weight: mapping.weight,
               });
             });
@@ -199,22 +315,23 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
             );
 
             Object.entries(byCategory).forEach(([category, group]) => {
-              const totalMaxScoreForCategory = categoryTotals[category] ?? 0;
-              const totalScoreForCategory = group.reduce(
-                (sum, r) => sum + Number(r.score),
+              const totalMaxWeightForCategory = categoryTotals[category] ?? 0;
+              const totalWeightForCategory = group.reduce(
+                (sum, r) => sum + (Number(r.score) / (Number(r.maxScore) / Number(r.assignmentWeight))),
                 0
               );
 
-              if (totalMaxScoreForCategory <= 0) return;
+              if (totalMaxWeightForCategory <= 0) return;
 
               group.forEach((row) => {
+                const realScore = Number(row.score) / (Number(row.maxScore) / Number(row.assignmentWeight));
                 const normalized =
-                  totalScoreForCategory / totalMaxScoreForCategory;
+                  totalWeightForCategory / totalMaxWeightForCategory;
                 const weighted = (Number(row.weight) / 100) * normalized;
-                cloTotal += Number(row.score) * weighted;
+                cloTotal += realScore * weighted;
 
                 const weightedMax = (Number(row.weight) / 100) * 1;
-                cloMaxPossible += Number(row.maxScore) * weightedMax;
+                cloMaxPossible += Number(row.assignmentWeight) * weightedMax;
               });
             });
 
@@ -275,6 +392,7 @@ export async function getCloScoreAllStudentPerCourse(
         assignment: {
           select: {
             maxScore: true,
+            weight: true,
             category: true,
             assignment_clo_mappings: {
               select: {
@@ -291,13 +409,13 @@ export async function getCloScoreAllStudentPerCourse(
     // 2) รวม maxScore ต่อ category ของทั้ง course
     const courseAssignments = await tx.assignment.findMany({
       where: { course_id: Number(courseId) }, // ✅ Fixed
-      select: { category: true, maxScore: true },
+      select: { category: true, weight: true },
     });
 
     const categoryTotals: Record<string, number> = {};
     courseAssignments.forEach((a: any) => {
       const cat = a.category;
-      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + Number(a.maxScore);
+      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + Number(a.weight);
     });
 
     // 3) Group ตาม student_id -> cloCode
@@ -312,6 +430,7 @@ export async function getCloScoreAllStudentPerCourse(
             assignment_id: row.assignment_id,
             category: row.assignment.category,
             maxScore: row.assignment.maxScore,
+            assignmentWeight: row.assignment.weight,
             weight: mapping.weight,
           });
         });
@@ -341,18 +460,19 @@ export async function getCloScoreAllStudentPerCourse(
         );
 
         Object.entries(byCategory).forEach(([category, group]) => {
-          const totalMaxScoreForCategory = categoryTotals[category] ?? 0;
-          if (totalMaxScoreForCategory <= 0) return;
+          const totalMaxWeightForCategory = categoryTotals[category] ?? 0;
+          if (totalMaxWeightForCategory <= 0) return;
 
-          const totalScoreForCategory = group.reduce(
-            (sum, r) => sum + Number(r.score),
+          const totalWeightForCategory = group.reduce(
+            (sum, r) => sum + (Number(r.score) / (Number(r.maxScore) / Number(r.assignmentWeight))),
             0
           );
 
           group.forEach((row) => {
-            const normalized = totalScoreForCategory / totalMaxScoreForCategory;
+            const realScore = Number(row.score) / (Number(row.maxScore) / Number(row.assignmentWeight));
+            const normalized = totalWeightForCategory / totalMaxWeightForCategory;
             const weighted = (Number(row.weight) / 100) * normalized;
-            cloTotal += Number(row.score) * weighted;
+            cloTotal += realScore * weighted;
           });
         });
 

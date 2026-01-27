@@ -33,7 +33,7 @@ const router = Router();
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ของ student 1 คน ใน 1 course
-// GET http://localhost:3001/api/calculation/ass-clo/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/studentCourse", authenticateToken, async (req, res) => {
@@ -56,7 +56,7 @@ router.get("/ass-clo/studentCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ใน 1 course (รวมคะแนนของนักศึกษาทุกคนใน course)
-// GET http://localhost:3001/api/calculation/ass-clo/course?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/course?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/course", authenticateToken, async (req, res) => {
@@ -76,7 +76,7 @@ router.get("/ass-clo/course", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ของ student แต่ละคน ใน 1 course (ส่งกลับค่า clo ของนักเรียนแต่ละคนทุกคนทีเดียว)
-// GET http://localhost:3001/api/calculation/ass-clo/allStudentCourse?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/allStudentCourse?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
@@ -95,7 +95,7 @@ router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ min, max, mean ของ clo แต่ละตัว ใน 1 course
-// GET http://localhost:3001/api/calculation/ass-clo/course/stats?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
@@ -114,7 +114,7 @@ router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student 1 คนใน 1 course
-// GET http://localhost:3001/api/calculation/clo-plo/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/studentCourse", authenticateToken, async (req, res) => {
@@ -138,7 +138,7 @@ router.get("/clo-plo/studentCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 course
-// GET http://localhost:3001/api/calculation/clo-plo/course?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/course?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/course", authenticateToken, async (req, res) => {
@@ -158,7 +158,7 @@ router.get("/clo-plo/course", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student ทุกคนใน 1 course
-// GET http://localhost:3001/api/calculation/clo-plo/allStudentCourse?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/allStudentCourse?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/allStudentCourse", authenticateToken, async (req, res) => {
@@ -178,7 +178,7 @@ router.get("/clo-plo/allStudentCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 program
-// GET http://localhost:3001/api/calculation/clo-plo/program?programId=ไอดีหลักสูตร
+// GET http://localhost:9771/api/calculation/clo-plo/program?programId=ไอดีหลักสูตร
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/program", authenticateToken, async (req, res) => {
@@ -197,7 +197,7 @@ router.get("/clo-plo/program", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////
 // คำนวณ PLO แต่ละตัว ของ student 1 คน (รวมทุก course ที่เรียน)
-// GET http://localhost:3001/api/calculation/clo-plo/studentAllCourse?studentId=ไอดีนักศึกษา
+// GET http://localhost:9771/api/calculation/clo-plo/studentAllCourse?studentId=ไอดีนักศึกษา
 // Test result: OK
 /////////////////////////////////////////////////////////////
 router.get("/clo-plo/studentAllCourse", authenticateToken, async (req, res) => {
@@ -216,7 +216,7 @@ router.get("/clo-plo/studentAllCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า PLO แต่ละตัวได้คะแนนมาจาก course ไหนบ้าง และ course ละเท่าไหร่
-// GET http://localhost:3001/api/calculation/clo-plo/wherePloComeFrom?programId=ไอดีหลักสูตร
+// GET http://localhost:9771/api/calculation/clo-plo/wherePloComeFrom?programId=ไอดีหลักสูตร
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/wherePloComeFrom", authenticateToken, async (req, res) => {
@@ -235,7 +235,7 @@ router.get("/clo-plo/wherePloComeFrom", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 course
-// GET http://localhost:3001/api/calculation/clo-plo/course/stats?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////
 router.get("/clo-plo/course/stats", authenticateToken, async (req, res) => {
@@ -254,7 +254,7 @@ router.get("/clo-plo/course/stats", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 program
-// GET http://localhost:3001/api/calculation/clo-plo/program/stats?programId=ไอดีหลักสูตร
+// GET http://localhost:9771/api/calculation/clo-plo/program/stats?programId=ไอดีหลักสูตร
 // Test result: OK
 /////////////////////////////////////////////////////////////
 router.get("/clo-plo/program/stats", authenticateToken, async (req, res) => {
@@ -277,7 +277,7 @@ router.get("/clo-plo/program/stats", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า Min และ Max คือ clo ตัวไหน และ Mean จาก clo ทุกตัวคือเท่าไหร่ ใน 1 student 1 course
-// GET http://localhost:3001/api/calculation/ass-clo/studentCourse/bestWorstMean?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/studentCourse/bestWorstMean?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get(
@@ -304,7 +304,7 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า Min และ Max คือ clo ตัวไหน และ Mean จาก clo ทุกตัวคือเท่าไหร่ ใน 1 course
-// GET http://localhost:3001/api/calculation/ass-clo/course/bestWorstMean?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/course/bestWorstMean?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get(
@@ -327,7 +327,7 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า Min และ Max คือ clo ตัวไหน และ Mean จาก clo ทุกตัวคือเท่าไหร่ ใน 1 course แบบ percentage
-// GET http://localhost:3001/api/calculation/ass-clo/course/bestWorstMean/percentage?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/course/bestWorstMean/percentage?courseId=ไอดีวิชา
 //
 /////////////////////////////////////////////////////////////////////////
 /*router.get("/ass-clo/course/bestWorstMean/percentage", authenticateToken, async (req, res) => {
@@ -347,7 +347,7 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า Min และ Max คือ plo ตัวไหน และ Mean จาก plo ทุกตัวคือเท่าไหร่ ใน 1 student 1 course
-// GET http://localhost:3001/api/calculation/clo-plo/studentCourse/bestWorstMean?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/studentCourse/bestWorstMean?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get(
@@ -374,7 +374,7 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า Min และ Max คือ clo ตัวไหน และ Mean จาก clo ทุกตัวคือเท่าไหร่ ใน 1 course
-// GET http://localhost:3001/api/calculation/clo-plo/course/bestWorstMean?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/course/bestWorstMean?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get(
@@ -397,7 +397,7 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า Min และ Max คือ clo ตัวไหน และ Mean จาก clo ทุกตัวคือเท่าไหร่ ใน 1 program
-// GET http://localhost:3001/api/calculation/clo-plo/program/bestWorstMean?programId=ไอดีหลักสูตร
+// GET http://localhost:9771/api/calculation/clo-plo/program/bestWorstMean?programId=ไอดีหลักสูตร
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 
