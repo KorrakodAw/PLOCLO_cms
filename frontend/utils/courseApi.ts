@@ -11,6 +11,7 @@ export interface Course {
   section: number; // Now included
   semester: number; // Now included
   year: number; // Now included
+  program_year: number; // Now included
 }
 
 export interface PaginatedResponse {

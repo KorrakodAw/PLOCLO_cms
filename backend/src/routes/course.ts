@@ -325,4 +325,53 @@ router.patch("/:id", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/forSummary", async (_req, res) => {
+  try {
+    const programId = _req.query.programId
+      ? parseInt(_req.query.programId as string)
+      : undefined;
+
+    // 1. Define your selection once to stay DRY (Don't Repeat Yourself)
+    const courseSelect = {
+      id: true,
+      code: true,
+      name: true,
+      name_th: true,
+      program: {
+        select: {
+          id: true,
+          program_code: true,
+          program_year: true,
+        },
+      },
+    };
+
+    // 2. Build the query options safely
+    const result = await prisma.course.findMany({
+      where: programId ? { program_id: programId } : {},
+      select: courseSelect,
+      orderBy: { code: "asc" },
+    });
+
+    // 3. Mapping will now recognize 'program'
+    const formatted = result.map((course) => ({
+      id: course.id,
+      code: course.code,
+      name: course.name,
+      name_th: course.name_th,
+      program_id: course.program.id,
+      program_code: course.program.program_code,
+      program_year: course.program.program_year,
+    }));
+
+    res.json(formatted);
+  } catch (err: any) {
+    console.error("DATABASE ERROR:", err);
+    res.status(500).json({
+      error: "Failed to fetch records",
+      details: err.message,
+    });
+  }
+});
+
 export default router;

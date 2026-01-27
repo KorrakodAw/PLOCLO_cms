@@ -37,7 +37,7 @@ router.get("/", authenticateToken, async (req, res) => {
       params.push(facultyId);
     }
 
-    query += ` ORDER BY p.program_code ASC`; // Sorted by code usually better for dropdowns
+    query += ` ORDER BY p.program_year DESC`; // Sorted by code usually better for dropdowns
 
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -168,7 +168,7 @@ router.post(
           throw new Error(
             `Missing required fields for program code: ${
               program_code || "UNKNOWN"
-            }`
+            }`,
           );
         }
 
@@ -193,7 +193,7 @@ router.post(
             program_shortname_en,
             program_shortname_th,
             program_year,
-          ]
+          ],
         );
 
         insertedPrograms.push(result.rows[0]);
@@ -224,7 +224,7 @@ router.post(
     } finally {
       client.release();
     }
-  }
+  },
 );
 
 // =========================================
@@ -272,7 +272,7 @@ router.post(
           program_shortname_en || null,
           program_shortname_th || null,
           Number(program_year),
-        ]
+        ],
       );
       res.status(201).json(result.rows[0]);
     } catch (err: any) {
@@ -284,7 +284,7 @@ router.post(
       }
       res.status(500).json({ error: "Failed to create program" });
     }
-  }
+  },
 );
 
 router.patch(
@@ -322,7 +322,7 @@ router.patch(
           program_shortname_th,
           Number(program_year),
           programId,
-        ]
+        ],
       );
       res.status(200).json(result.rows[0]);
     } catch (err: any) {
@@ -334,7 +334,7 @@ router.patch(
       }
       res.status(500).json({ error: "Failed to update program" });
     }
-  }
+  },
 );
 
 router.delete(
@@ -347,7 +347,7 @@ router.delete(
     try {
       const result = await pool.query(
         `DELETE FROM program WHERE id = $1 RETURNING id, program_code`,
-        [programId]
+        [programId],
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Program not found" });
@@ -360,7 +360,7 @@ router.delete(
       console.error(err);
       res.status(500).json({ error: "Failed to delete program" });
     }
-  }
+  },
 );
 
 router.get("/:id", authenticateToken, async (req, res) => {
@@ -386,7 +386,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
        JOIN university u ON f.university_id = u.id
        WHERE p.id = $1
     `,
-      [programId]
+      [programId],
     );
 
     if (result.rows.length === 0) {

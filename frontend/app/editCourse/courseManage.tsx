@@ -396,6 +396,7 @@ export default function CourseManagement({
             // When clicking, we go to details.
             // Note: Since we have multiple sections for this code,
             // the details page should probably list all available sections for this Master Course Code.
+            setLoadingCourse(true);
             router.push(`/editCourse/${row.code}`);
           },
         },

@@ -171,7 +171,7 @@ export default function ScoreMapping({
             student_id: Number(studentId),
             assignment_id: Number(assignId),
             course_id: Number(masterCourseId),
-            score: val,
+            score: val || 0,
           };
         }
         return null;

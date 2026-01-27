@@ -8,6 +8,7 @@ import { apiClient } from "../../utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import FormEditPopup from "@/components/EditPopup";
 import AlertPopup from "@/components/AlertPopup";
+import DropdownSelect from "@/components/DropdownSelect";
 
 interface Assignment {
   id: number;
@@ -33,7 +34,9 @@ export default function AssignmentMapping({
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [newAssignName, setNewAssignName] = useState("");
-  const [newAssignCategory, setNewAssignCategory] = useState("");
+  const [newAssignCategory, setNewAssignCategory] = useState<string | number>(
+    "",
+  );
   const [newAssignWeight, setNewAssignWeight] = useState<string>("");
   const [newAssignMaxScore, setNewAssignMaxScore] = useState<string>("");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -43,7 +46,7 @@ export default function AssignmentMapping({
 
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<number | null>(
-    null
+    null,
   );
 
   // 🟢 NEW STATE: For Delete All Confirmation
@@ -78,7 +81,7 @@ export default function AssignmentMapping({
     }
 
     const isDuplicate = assignments.some(
-      (a) => a.name.trim().toLowerCase() === newAssignName.trim().toLowerCase()
+      (a) => a.name.trim().toLowerCase() === newAssignName.trim().toLowerCase(),
     );
 
     if (isDuplicate) {
@@ -149,7 +152,7 @@ export default function AssignmentMapping({
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       showToast("Assignment updated successfully", "success");
@@ -198,7 +201,7 @@ export default function AssignmentMapping({
       const deletePromises = assignments.map((a) =>
         apiClient.delete(`/assignment/${a.id}`, {
           headers: { Authorization: `Bearer ${token}` },
-        })
+        }),
       );
       await Promise.all(deletePromises);
 
@@ -237,12 +240,12 @@ export default function AssignmentMapping({
       data = assignments.filter(
         (a) =>
           !["midterm", "final", "presentation", "assignment"].some((k) =>
-            a.name.toLowerCase().includes(k)
-          )
+            a.name.toLowerCase().includes(k),
+          ),
       );
     } else if (activeFilter !== "all") {
       data = assignments.filter((a) =>
-        a.name.toLowerCase().includes(activeFilter)
+        a.name.toLowerCase().includes(activeFilter),
       );
     }
 
@@ -252,7 +255,7 @@ export default function AssignmentMapping({
     const getSortScore = (name: string) => {
       const lowerName = name.toLowerCase();
       const index = sortOrder.findIndex((keyword) =>
-        lowerName.includes(keyword)
+        lowerName.includes(keyword),
       );
       return index === -1 ? 999 : index;
     };
@@ -306,6 +309,15 @@ export default function AssignmentMapping({
       return normA.localeCompare(normB, undefined, { numeric: true });
     });
   }, [assignments, activeFilter]);
+
+  const assignmentOptions = [
+    { value: "quiz", label: t("Quiz") },
+    { value: "presentation", label: t("Presentation") },
+    { value: "midtermExam", label: t("Midterm") },
+    { value: "finalExam", label: t("Final") },
+    { value: "assignment", label: t("Assignments") },
+    { value: "project", label: t("Project") },
+  ];
 
   return (
     <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-8">
@@ -381,37 +393,11 @@ export default function AssignmentMapping({
             <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
               Category
             </label>
-            <div className="relative">
-              <select
-                value={newAssignCategory}
-                onChange={(e) => setNewAssignCategory(e.target.value)}
-                className="w-full border border-gray-200 p-3 rounded-2xl outline-none focus:ring-2 focus:ring-blue-100 appearance-none bg-white cursor-pointer"
-              >
-                <option value="">{t("Select Category")}</option>
-                <option value="assignment">{t("assignment")}</option>
-                <option value="quiz">{t("Quiz")}</option>
-                <option value="project">{t("Project")}</option>
-                <option value="presentation">{t("Presentation")}</option>
-                <option value="midtermExam">{t("Midterm")}</option>
-                <option value="finalExam">{t("Final")}</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
-            </div>
+            <DropdownSelect
+              options={assignmentOptions}
+              value={newAssignCategory}
+              onChange={(value) => setNewAssignCategory(value)}
+            />
           </div>
 
           {/* 2. Name: flex-1 makes this expand to fill remaining space (Longer) */}
@@ -510,7 +496,7 @@ export default function AssignmentMapping({
                 >
                   {f}
                 </button>
-              )
+              ),
             )}
           </div>
         </div>
@@ -618,7 +604,7 @@ export default function AssignmentMapping({
           data={editFormData}
           fields={[
             { label: "Name", key: "name", type: "text" },
-            { label: "Max Score", key: "max_score", type: "number" },
+            { label: "Max Score", key: "maxScore", type: "number" },
             { label: "Weight", key: "weight", type: "number" },
           ]}
           onSave={handleSaveEdit}
@@ -647,7 +633,7 @@ export default function AssignmentMapping({
         title={t("Delete All Assignments")}
         type="confirm"
         message={t(
-          "Are you absolutely sure? This will delete ALL assignments for this course. This action cannot be undone."
+          "Are you absolutely sure? This will delete ALL assignments for this course. This action cannot be undone.",
         )}
         isOpen={showDeleteAllPopup}
         onCancel={() => setShowDeleteAllPopup(false)}

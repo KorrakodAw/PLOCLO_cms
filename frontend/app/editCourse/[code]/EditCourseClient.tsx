@@ -1,18 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  BookOpen, 
-  Calculator, 
-  UserPlus, 
-  Trash2, 
-  MoreHorizontal, 
-  Edit3, 
+import {
+  BookOpen,
+  Calculator,
+  UserPlus,
+  Trash2,
+  MoreHorizontal,
+  Edit3,
   Copy,
   X,
   ChevronRight,
-  School
-} from 'lucide-react'; // Assuming you use lucide-react based on your icons
+  School,
+} from "lucide-react"; // Assuming you use lucide-react based on your icons
 import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/components/Toast";
 import { useTranslation } from "react-i18next";
@@ -171,8 +171,23 @@ export default function EditCourseClient({
     const selected = duplicateCourses.find(
       (c) => String(c.id) === selectedSectionId,
     );
+    setLoading(false);
     setFormData(selected || null);
   }, [selectedSectionId, duplicateCourses]);
+
+  // Add this near your other useEffects
+  useEffect(() => {
+    if (showInstructorPopup) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+
+    // Cleanup when component unmounts
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [showInstructorPopup]);
 
   // ... [Keep SETUP_TABS, GRADING_TABS, handleTabChange, handleModeChange] ...
   const SETUP_TABS = [
@@ -368,11 +383,10 @@ export default function EditCourseClient({
       // 1. Fetch Instructors already assigned to this course (Current List)
       // Note: Ensure your backend has this endpoint: GET /course/:id/instructors
       const courseInstRes = await apiClient.get(
-        `/instructorOnCourse/${formData.id}`,
+        `/instructorOnCourse/${formData.course_id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setCurrentInstructors(courseInstRes.data || []);
-      
 
       // 2. Fetch Faculty ID using the Program ID
       let facultyId: number | null = null;
@@ -394,7 +408,6 @@ export default function EditCourseClient({
         );
         setAllInstructors(allInstRes.data || []);
         console.log(allInstructors);
-        
       } else {
         console.warn("Could not find faculty ID for this program");
         setAllInstructors([]);
@@ -416,16 +429,21 @@ export default function EditCourseClient({
     try {
       await apiClient.post(
         `/instructorOnCourse`,
-        { courseId : formData.id,
-          instructorId: Number(selectedInstructorToAdd) },
+        {
+          courseId: formData.course_id,
+          instructorId: Number(selectedInstructorToAdd),
+        },
         { headers: { Authorization: `Bearer ${token}` } },
       );
       showToast(t("Instructor added to course successfully"), "success");
 
       // Refresh the list inside the popup
-      const res = await apiClient.get(`/instructorOnCourse/${formData.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiClient.get(
+        `/instructorOnCourse/${formData.course_id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setCurrentInstructors(res.data || []);
       setSelectedInstructorToAdd(""); // Reset selection
     } catch {
@@ -445,7 +463,7 @@ export default function EditCourseClient({
       // Assuming there is an endpoint to remove. If not, you might need to adjust.
       // Often it's DELETE /course/:id/instructor/:instructorId
       await apiClient.delete(
-        `/instructorOnCourse/${formData.id}/${instructorId}`,
+        `/instructorOnCourse/${formData.course_id}/${instructorId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -453,9 +471,12 @@ export default function EditCourseClient({
       showToast(t("Instructor removed"), "success");
 
       // Refresh list
-      const res = await apiClient.get(`/instructorOnCourse/${formData.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiClient.get(
+        `/instructorOnCourse/${formData.course_id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setCurrentInstructors(res.data || []);
     } catch {
       showToast(t("Failed to remove instructor"), "error");
@@ -466,8 +487,7 @@ export default function EditCourseClient({
 
   // --- Render ---
   if (loading && !formData && !showInstructorPopup) return <LoadingOverlay />;
-  if (error || !formData)
-    return <div className="p-8 text-red-500">{error || "Error"}</div>;
+  if (error || !formData) return <LoadingOverlay />;
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20">
@@ -490,7 +510,7 @@ export default function EditCourseClient({
         <ToastElement />
 
         {/* --- MAIN HEADER CARD --- */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
           {/* Top Row: Title & Context Switcher */}
           <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             {/* Title Section */}
@@ -499,13 +519,19 @@ export default function EditCourseClient({
                 <span className="px-2.5 py-0.5 rounded-md bg-orange-100 text-orange-700 text-xs font-bold tracking-wide uppercase">
                   {formData.course_id}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold tracking-wide uppercase">
-                  {t("Sec")} {formData.section}
-                </span>
+                {/* <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold tracking-wide uppercase">
+                  {t("Sec")}
+                </span> */}
               </div>
-              <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 tracking-tight">
-                {lang === "en" ? formData.name : formData.name_th}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 tracking-tight">
+                  {lang === "en" ? formData.name : formData.name_th}
+                </h1>
+                <h1 className="text-2xl font-medium text-orange-500 tracking-tight mt-1">
+                  {formData.code && ` (${formData.code})`}
+                </h1>
+              </div>
+
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500 mt-2">
                 <span className="flex items-center gap-1.5">
                   <School size={16} />
@@ -519,7 +545,7 @@ export default function EditCourseClient({
             </div>
 
             {/* Context Switcher (Year/Sem/Sec) */}
-            <div className="w-full lg:w-72">
+            <div className="w-full lg:w-72 relative z-[60]">
               <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase">
                 {t("Switch Section")}
               </label>
@@ -692,9 +718,9 @@ export default function EditCourseClient({
                 <h3 className="text-lg font-bold text-gray-900">
                   {t("Manage Instructors")}
                 </h3>
-                <p className="text-sm text-gray-500">
+                {/* <p className="text-sm text-gray-500">
                   Section {formData.section}
-                </p>
+                </p> */}
               </div>
               <button
                 onClick={() => setShowInstructorPopup(false)}

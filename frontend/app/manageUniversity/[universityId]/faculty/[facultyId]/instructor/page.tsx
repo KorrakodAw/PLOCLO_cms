@@ -148,6 +148,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
     { header: t("First Name"), accessor: "full_thai_name" },
     { header: t("Last Name"), accessor: "full_eng_name" },
     { header: t("Email"), accessor: "email" },
+    { header: t("Phone"), accessor: "phoneNum" },
     {
       header: t("Actions"),
       accessor: "id",
@@ -207,12 +208,12 @@ export default function FacultyInstructorPage({ params }: PageProps) {
       {/* Header Card */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
+          <h1 className="text-2xl font-light text-gray-800 tracking-tight">
             {"Instructor Management"}
           </h1>
           <p className="text-gray-500 mt-1">
             Faculty:{" "}
-            <span className="font-semibold text-orange-600">
+            <span className="font-light text-orange-600">
               {faculty?.name}
             </span>
           </p>
@@ -228,7 +229,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
       {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-700">
+          <h2 className="text-lg font-light text-gray-700">
             Instructors List ({instructors.length})
           </h2>
 

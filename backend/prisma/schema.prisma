@@ -163,7 +163,7 @@ model CloPloMapping {
   id        Int      @id @default(autoincrement())
   cloId     Int      @map("clo_id")
   ploId     Int      @map("plo_id")
-  weight    Int?     @default(0)
+  weight    Decimal?     @default(0)  @db.Decimal(7, 4)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -185,8 +185,8 @@ model Assignment {
   name        String
   category    AssCategory @default(assignment) 
   description String?
-  maxScore    Decimal     @default(100) @map("max_score")
-  weight      Decimal     @default(0)
+  maxScore    Decimal     @default(100) @map("max_score") @db.Decimal(7, 4)
+  weight      Decimal     @default(0) @db.Decimal(7, 4)
   createdAt   DateTime    @default(now()) @map("created_at")
 
   assignment_clo_mappings AssignmentCloMapping[]
@@ -198,7 +198,7 @@ model Assignment {
 model AssignmentCloMapping {
   assId     Int      @map("assignment_id")
   cloId     Int      @map("clo_id")
-  weight    Int?     @default(0)
+  weight    Decimal?    @default(0) @db.Decimal(7, 4)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -214,7 +214,7 @@ model StudentScore {
   id            Int      @id @default(autoincrement())
   student_id    Int
   assignment_id Int
-  score         Decimal  @default(0)
+  score         Decimal  @default(0) @db.Decimal(7, 4)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -231,7 +231,7 @@ model StudentScore {
 model GradeSetting {
   id         Int      @id @default(autoincrement())
   grade      String
-  score      Decimal  @db.Decimal(5, 2)
+  score      Decimal  @db.Decimal(7, 4)
   course_id Int      @map("course_id") 
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")

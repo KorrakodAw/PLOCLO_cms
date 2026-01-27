@@ -1,42 +1,17 @@
-import { useEffect, useState, useMemo } from "react";
-import React from "react";
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
 import { apiClient } from "@/utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useToast } from "@/components/Toast";
 import { Calculator } from "lucide-react";
 
 // --- Interfaces ---
-interface Student {
-  id: number;
-  student_id: number; // Handle nested vs flat response structure
+interface StudentResult {
+  student_id: number;
+  student_code: string;
   first_name: string;
   last_name: string;
-  student_code: string;
-}
-
-interface Assignment {
-  id: number;
-  name: string;
-  category: string;
-  maxScore: number; // 🟢 FIX: Changed from max_score to maxScore (matches Prisma default)
-  weight: number;
-}
-
-interface StudentScore {
-  student_id: number;
-  assignment_id: number;
-  score: number;
-}
-
-interface GradeSetting {
-  id: number;
-  grade: string;
-  score: number; // Minimum score required
-}
-
-// Result structure for display
-interface StudentResult {
-  student: Student;
   categoryScores: Record<string, number>;
   totalScore: number;
   grade: string;
@@ -51,119 +26,45 @@ export default function ScoreCalculated({
 }) {
   const [loading, setLoading] = useState(true);
   const { ToastElement, showToast } = useToast();
+  const [processedData, setProcessedData] = useState<StudentResult[]>([]);
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [scores, setScores] = useState<StudentScore[]>([]);
-  const [gradeSettings, setGradeSettings] = useState<GradeSetting[]>([]);
-
-  // 1. Fetch Data
+  // 1. Fetch Summary Data
   useEffect(() => {
     if (!masterCourseId || !sectionId) return;
 
-    const fetchData = async () => {
+    const fetchSummary = async () => {
       setLoading(true);
       try {
-        const [studentRes, assignRes, scoreRes, gradeRes] = await Promise.all([
-          // Students belong to the SECTION
-          apiClient.get(`/studentOnCourse?sectionId=${sectionId}`),
-
-          // Assignments belong to the MASTER COURSE
-          apiClient.get(`/assignment?courseId=${masterCourseId}`),
-
-          // Scores belong to the SECTION (via students)
-          apiClient.get(`/score?sectionId=${sectionId}`),
-
-          // 🟢 FIX: Grades belong to the SECTION (GradeSetting -> CourseSection)
-          apiClient.get(`/grade/settings/${masterCourseId}`),
-        ]);
-
-        setStudents(studentRes.data);
-        setAssignments(assignRes.data);
-        setScores(scoreRes.data);
-
-        // Ensure grades are sorted High -> Low (A -> F) for correct finding logic
-        const rawGrades = Array.isArray(gradeRes.data) ? gradeRes.data : [];
-        setGradeSettings(
-          (rawGrades as GradeSetting[]).sort((a, b) => b.score - a.score)
+        const res = await apiClient.get(
+          `/reports/summary?sectionId=${sectionId}&masterCourseId=${masterCourseId}`,
         );
+        setProcessedData(res.data);
       } catch (err) {
         console.error(err);
-        showToast("Failed to load calculation data", "error");
+        showToast("Failed to load grade summary", "error");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchSummary();
   }, [masterCourseId, sectionId, showToast]);
 
-  // 2. Process & Calculate Scores + Map Grades
-  const processedData: StudentResult[] = useMemo(() => {
-    if (!students.length || !assignments.length) return [];
-
-    const assignMap = new Map<number, Assignment>();
-    assignments.forEach((a) => assignMap.set(a.id, a));
-
-    // Map scores for O(1) access
-    const scoreMap = new Map<string, number>();
-    scores.forEach((s) =>
-      scoreMap.set(`${s.student_id}_${s.assignment_id}`, Number(s.score))
+  // 🟢 2. Sort Data by Student Code
+  const sortedData = useMemo(() => {
+    return [...processedData].sort((a, b) =>
+      (a.student_code || "").localeCompare(b.student_code || "", undefined, {
+        numeric: true, // Handles codes like "1", "2", "10" correctly
+        sensitivity: "base",
+      }),
     );
+  }, [processedData]);
 
-    return students.map((student) => {
-      const categoryScores: Record<string, number> = {};
-      let totalScore = 0;
-
-      // Handle potential ID location difference
-      const sId = student.student_id || student.id;
-
-      assignments.forEach((assign) => {
-        const rawScore = scoreMap.get(`${sId}_${assign.id}`) || 0;
-
-        // 🟢 FIX: Use maxScore (camelCase) and prevent division by zero
-        const max = Number(assign.maxScore) || 100;
-        const weight = Number(assign.weight) || 0;
-
-        // Weighted Calculation
-        const calculatedScore = (rawScore / max) * weight;
-
-        if (!categoryScores[assign.category]) {
-          categoryScores[assign.category] = 0;
-        }
-
-        categoryScores[assign.category] += calculatedScore;
-        totalScore += calculatedScore;
-      });
-
-      // 🟢 GRADE MAPPING LOGIC
-      // Find the first grade where totalScore >= minScore (since sorted Descending)
-      const assignedGrade =
-        gradeSettings.find((g) => totalScore >= g.score)?.grade || "F";
-
-      return {
-        student,
-        categoryScores,
-        totalScore,
-        grade: assignedGrade,
-      };
-    });
-  }, [students, assignments, scores, gradeSettings]);
-
-  // 3. Determine active categories
+  // 3. Determine Active Categories
   const activeCategories = useMemo(() => {
-    const categories = [
-      "assignment",
-      "quiz",
-      "project",
-      "presentation",
-      "midtermExam",
-      "finalExam",
-    ];
-    return categories.filter((cat) =>
-      assignments.some((a) => a.category === cat)
-    );
-  }, [assignments]);
+    if (sortedData.length === 0) return [];
+    return Object.keys(sortedData[0].categoryScores);
+  }, [sortedData]);
 
   const formatCategory = (cat: string) => {
     const map: Record<string, string> = {
@@ -177,12 +78,12 @@ export default function ScoreCalculated({
     return map[cat] || cat;
   };
 
-  // Helper for grade colors
   const getGradeColor = (grade: string) => {
-    if (grade.startsWith("A")) return "bg-green-100 text-green-700";
-    if (grade.startsWith("B")) return "bg-blue-100 text-blue-700";
-    if (grade.startsWith("C")) return "bg-yellow-100 text-yellow-700";
-    if (grade.startsWith("D")) return "bg-orange-100 text-orange-700";
+    const g = grade.toUpperCase();
+    if (g.startsWith("A")) return "bg-green-100 text-green-700";
+    if (g.startsWith("B")) return "bg-blue-100 text-blue-700";
+    if (g.startsWith("C")) return "bg-yellow-100 text-yellow-700";
+    if (g.startsWith("D")) return "bg-orange-100 text-orange-700";
     return "bg-red-100 text-red-700";
   };
 
@@ -225,64 +126,57 @@ export default function ScoreCalculated({
           </thead>
 
           <tbody className="divide-y divide-gray-50">
-            {processedData.length > 0 ? (
-              processedData.map((data, index) => {
-                const { student, categoryScores, totalScore, grade } = data;
-
-                return (
+            {sortedData.length > 0
+              ? sortedData.map((data) => (
                   <tr
-                    key={index}
+                    key={data.student_id}
                     className="group hover:bg-blue-50/30 transition-all"
                   >
                     <td className="p-4 font-bold text-gray-700 sticky left-0 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-20">
                       <div className="flex flex-col w-[200px]">
                         <span>
-                          {student.first_name} {student.last_name}
+                          {data.first_name} {data.last_name}
                         </span>
                         <span className="text-[10px] text-gray-400 font-medium">
-                          {student.student_code}
+                          {data.student_code}
                         </span>
                       </div>
                     </td>
 
-                    {activeCategories.map((cat) => {
-                      const score = categoryScores[cat] || 0;
-                      return (
-                        <td
-                          key={cat}
-                          className="p-4 text-center border-r text-gray-600 font-medium"
-                        >
-                          {score > 0 ? score.toFixed(2) : "-"}
-                        </td>
-                      );
-                    })}
+                    {activeCategories.map((cat) => (
+                      <td
+                        key={cat}
+                        className="p-4 text-center border-r text-gray-600 font-medium"
+                      >
+                        {data.categoryScores[cat] > 0
+                          ? data.categoryScores[cat].toFixed(2)
+                          : "-"}
+                      </td>
+                    ))}
 
                     <td className="p-4 text-center font-black text-blue-700 bg-blue-50/30 border-r border-blue-100">
-                      {totalScore.toFixed(2)}
+                      {data.totalScore.toFixed(2)}
                     </td>
 
                     <td className="p-4 text-center">
                       <span
-                        className={`px-3 py-1 rounded-xl text-xs font-black ${getGradeColor(
-                          grade
-                        )}`}
+                        className={`px-3 py-1 rounded-xl text-xs font-black ${getGradeColor(data.grade)}`}
                       >
-                        {grade}
+                        {data.grade}
                       </span>
                     </td>
                   </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td
-                  colSpan={activeCategories.length + 3}
-                  className="p-10 text-center text-gray-400 italic"
-                >
-                  No data available.
-                </td>
-              </tr>
-            )}
+                ))
+              : !loading && (
+                  <tr>
+                    <td
+                      colSpan={activeCategories.length + 3}
+                      className="p-10 text-center text-gray-400 italic"
+                    >
+                      No student summary found for this section.
+                    </td>
+                  </tr>
+                )}
           </tbody>
         </table>
       </div>

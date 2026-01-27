@@ -8,37 +8,42 @@ const prisma = new PrismaClient();
 // POST: Batch save/update scores
 router.post("/", authenticateToken, async (req, res) => {
   try {
-    const { updates } = req.body; // Expects [{ student_id, assignment_id, score }, ...]
+    const { updates } = req.body;
 
-    if (!updates || !Array.isArray(updates) || updates.length === 0) {
-      return res.status(400).json({ error: "No updates provided" });
+    // 🟢 แก้ไขเงื่อนไข: ตรวจสอบแค่ว่าส่ง updates มาหรือไม่ (แม้จะเป็น Array ว่างก็ยอมรับได้ถ้าต้องการ)
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({ error: "Invalid updates format" });
     }
 
-    // Process all upserts in a single transaction
     const results = await prisma.$transaction(
       updates.map((item) => {
+        // 🟢 จัดการค่า score: ถ้าส่งมาเป็นค่าว่าง หรือ null ให้เซตเป็น 0 (หรือตาม Business Logic ของคุณ)
+        const scoreValue =
+          item.score === null || item.score === undefined || item.score === ""
+            ? 0
+            : Number(item.score);
+
         return prisma.studentScore.upsert({
           where: {
-            // Unique compound key from your schema
             student_id_assignment_id: {
               student_id: Number(item.student_id),
               assignment_id: Number(item.assignment_id),
             },
           },
           update: {
-            score: Number(item.score),
+            score: scoreValue,
             updatedAt: new Date(),
           },
           create: {
             student_id: Number(item.student_id),
             assignment_id: Number(item.assignment_id),
-            score: Number(item.score),
+            score: scoreValue,
           },
         });
-      })
+      }),
     );
 
-    res.json({ message: "Scores saved successfully", count: results.length });
+    res.json({ message: "Scores updated successfully", count: results.length });
   } catch (err: any) {
     console.error("Error saving scores:", err);
     res.status(500).json({ error: "Failed to save scores: " + err.message });

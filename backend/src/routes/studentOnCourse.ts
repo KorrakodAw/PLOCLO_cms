@@ -58,7 +58,7 @@ router.get("/", authenticateToken, async (req, res) => {
         JOIN course c ON cs.course_id = c.id
         JOIN student s ON sos.student_id = s.id
         WHERE sos.section_id = $1
-        ORDER BY s.id ASC
+        ORDER BY s.student_code ASC
         `,
         [sectionId],
       );
@@ -194,18 +194,19 @@ router.post("/bulk-delete", authenticateToken, async (req, res) => {
       `DELETE FROM student_on_section 
        WHERE section_id = $1 AND student_id = ANY($2::int[]) 
        RETURNING *`,
-      [sectionId, studentIds]
+      [sectionId, studentIds],
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "No matching records found to delete" });
+      return res
+        .status(404)
+        .json({ error: "No matching records found to delete" });
     }
 
-    res.json({ 
-      message: `Successfully removed ${result.rowCount} students`, 
-      removedCount: result.rowCount 
+    res.json({
+      message: `Successfully removed ${result.rowCount} students`,
+      removedCount: result.rowCount,
     });
-
   } catch (err) {
     console.error("Error bulk deleting:", err);
     res.status(500).json({ error: "Failed to delete records" });

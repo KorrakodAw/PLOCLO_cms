@@ -2,7 +2,7 @@ import { apiClient } from "../utils/apiClient";
 
 export interface Student {
   id: number;
-  student_code: string | number;
+  student_code: string;
   program_id: string;
   first_name: string;
   last_name: string;
@@ -31,7 +31,7 @@ export async function getStudentsPaginated(
     facultyId?: string;
     programId?: string;
     year?: string;
-  }
+  },
 ) {
   const res = await apiClient.get("/student/paginate", {
     headers: { Authorization: `Bearer ${token}` },

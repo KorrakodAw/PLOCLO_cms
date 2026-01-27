@@ -116,7 +116,7 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
         });
 
         const currentTotal = existingMappings.reduce(
-          (acc, curr) => acc + (curr.weight ?? 0),
+          (acc, curr) => acc + Number(curr.weight ?? 0),
           0
         );
 
