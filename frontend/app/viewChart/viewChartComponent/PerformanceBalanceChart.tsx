@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Radar,
   RadarChart,
@@ -10,25 +10,19 @@ import {
   Legend,
 } from "recharts";
 
-interface PerformanceBalanceChartProps {
-  chartData: any[];
-  summaryData: any;
-  visibleLines: Record<string, boolean>;
-  getGradeColor: (grade: string) => string;
-}
-
 export const PerformanceBalanceChart = ({
   chartData,
   summaryData,
   visibleLines,
   getGradeColor,
-}: PerformanceBalanceChartProps) => {
-  // Extract unique grades for mapping
-  const uniqueGrades = React.useMemo(() => {
-    return Array.from(
-      new Set(summaryData?.students?.map((s: any) => s.grade)),
-    ) as string[];
-  }, [summaryData]);
+}: any) => {
+  const uniqueGrades = useMemo(
+    () =>
+      Array.from(new Set(summaryData?.students?.map((s: any) => s.grade)))
+        .filter(Boolean)
+        .sort(),
+    [summaryData],
+  );
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -50,8 +44,6 @@ export const PerformanceBalanceChart = ({
             boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
           }}
         />
-
-        {/* 1. Background Shell: Total Possible Points */}
         <Radar
           name="Total Possible"
           dataKey="fullScore"
@@ -60,8 +52,6 @@ export const PerformanceBalanceChart = ({
           fillOpacity={0.3}
           isAnimationActive={false}
         />
-
-        {/* 2. Global Metric: Highest Achieved */}
         {visibleLines.maxScore && (
           <Radar
             name="Highest Achieved"
@@ -71,8 +61,6 @@ export const PerformanceBalanceChart = ({
             fillOpacity={0.1}
           />
         )}
-
-        {/* 3. Global Metric: Class Average */}
         {visibleLines.allAvg && (
           <Radar
             name="Class Average"
@@ -82,10 +70,8 @@ export const PerformanceBalanceChart = ({
             fillOpacity={0.2}
           />
         )}
-
-        {/* 4. Dynamic Grade Radars */}
         {uniqueGrades.map(
-          (grade) =>
+          (grade: any) =>
             visibleLines[`avg_grade_${grade}`] && (
               <Radar
                 key={grade}

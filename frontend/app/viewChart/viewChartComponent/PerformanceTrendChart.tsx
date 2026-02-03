@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from "react";
 import {
   ComposedChart,
   CartesianGrid,
@@ -9,13 +9,18 @@ import {
   Bar,
   Line,
   ResponsiveContainer,
-} from 'recharts';
+} from "recharts";
 
 interface PerformanceTrendChartProps {
   chartData: any[];
-  summaryData: any;
-  visibleLines: Record<string, boolean>;
-  getGradeColor: (grade: string) => string;
+  summaryData: { students: { grade: string }[] };
+  visibleLines?: Record<string, boolean>;
+  getGradeColor?: (grade: string) => string;
+  xAxisKey: string;
+  maxScoreKey?: string;
+  minScoreKey?: string;
+  allAvgKey?: string;
+  maxScorePosKey: string;
 }
 
 export const PerformanceTrendChart = ({
@@ -23,13 +28,21 @@ export const PerformanceTrendChart = ({
   summaryData,
   visibleLines,
   getGradeColor,
+  xAxisKey,
+  maxScoreKey,
+  maxScorePosKey,
+  minScoreKey,
+  allAvgKey,
 }: PerformanceTrendChartProps) => {
-  // Extract unique grades for mapping
-  const uniqueGrades = React.useMemo(() => {
-    return Array.from(
-      new Set(summaryData?.students?.map((s: any) => s.grade))
-    ) as string[];
-  }, [summaryData]);
+  const uniqueGrades = useMemo(
+    () =>
+      Array.from(
+        new Set(summaryData?.students?.map((s: { grade: string }) => s.grade)),
+      )
+        .filter(Boolean)
+        .sort(),
+    [summaryData],
+  );
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -43,7 +56,7 @@ export const PerformanceTrendChart = ({
           stroke="#f1f5f9"
         />
         <XAxis
-          dataKey="name"
+          dataKey={xAxisKey}
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 12, fill: "#64748b" }}
@@ -69,60 +82,54 @@ export const PerformanceTrendChart = ({
           iconType="circle"
         />
         <Bar
-          dataKey="fullScore"
+          dataKey={maxScorePosKey}
           name="Max Possible"
           fill="#93e3f5"
           radius={[6, 6, 0, 0]}
-          barSize={300} // Adjusted from 400 for better visibility
+          barSize={300}
         />
-
-        {/* Global Reference Lines */}
-        {visibleLines.maxScore && (
+        {visibleLines?.maxScore && (
           <Line
             type="monotone"
-            dataKey="maxScore"
-            name="Highest"
+            dataKey={maxScoreKey}
             stroke="#22c55e"
             strokeDasharray="5 5"
             dot={false}
             strokeWidth={2}
           />
         )}
-        {visibleLines.minScore && (
+        {visibleLines?.minScore && (
           <Line
             type="monotone"
-            dataKey="minScore"
-            name="Lowest"
+            dataKey={minScoreKey}
             stroke="#ef4444"
             strokeDasharray="5 5"
             dot={false}
             strokeWidth={2}
           />
         )}
-        {visibleLines.allAvg && (
+        {visibleLines?.allAvg && (
           <Line
             type="monotone"
-            dataKey="allAvg"
-            name="Class Avg"
+            dataKey={allAvgKey}
             stroke="#6366f1"
             strokeWidth={4}
             dot={{ r: 6, fill: "#6366f1" }}
           />
         )}
-
-        {/* Dynamic Grade Lines */}
-        {uniqueGrades.map((grade) =>
-          visibleLines[`avg_grade_${grade}`] && (
-            <Line
-              key={grade}
-              type="monotone"
-              dataKey={`avg_grade_${grade}`}
-              name={`Grade ${grade}`}
-              stroke={getGradeColor(grade)}
-              strokeWidth={3}
-              dot={{ r: 4 }}
-            />
-          )
+        {uniqueGrades.map(
+          (grade: any) =>
+            visibleLines?.[`avg_grade_${grade}`] && (
+              <Line
+                key={grade}
+                type="monotone"
+                dataKey={`avg_grade_${grade}`}
+                name={`Grade ${grade}`}
+                stroke={getGradeColor ? getGradeColor(grade) : undefined}
+                strokeWidth={3}
+                dot={{ r: 4 }}
+              />
+            ),
         )}
       </ComposedChart>
     </ResponsiveContainer>

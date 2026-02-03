@@ -8,6 +8,7 @@ export interface Student {
   last_name: string;
   created_at: string;
   updated_at: string;
+  grade: string;
 }
 
 export interface StudentInput {

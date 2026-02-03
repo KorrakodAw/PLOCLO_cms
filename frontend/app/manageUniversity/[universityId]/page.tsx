@@ -97,21 +97,8 @@ export default function UniversityDetailPage({
       setLoading(true);
       fetchData();
       showToast("Faculty created successfully", "success");
-    } catch (err: any) {
-      console.error("Create Faculty Error:", err);
-
-      // 1. Check if the server sent a specific error message (e.g., "Faculty code already exists")
-      if (err.response && err.response.data && err.response.data.error) {
-        showToast(err.response.data.error, "error");
-      }
-      // 2. Check if it's a standard JavaScript/Network error
-      else if (err instanceof Error) {
-        showToast(err.message, "error");
-      }
-      // 3. Fallback for unknown errors
-      else {
-        showToast("Failed to create faculty. Check backend logs.", "error");
-      }
+    } catch {
+      showToast("Failed to create faculty. Check backend.", "error");
     }
   };
 

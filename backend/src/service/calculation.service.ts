@@ -8,6 +8,125 @@ const prisma = new PrismaClient();
 export async function getCloScorePerStudentPerCourse(
   tx: any,
   studentId: number,
+  courseId: number,
+) {
+  const resultCloStudent = await prisma.$transaction(async (tx) => {
+    // 1. Get Student Scores filtering by Assignment -> Course
+    const studentClo = await tx.studentScore.findMany({
+      where: {
+        student_id: Number(studentId),
+        assignment: {
+          course_id: Number(courseId), // ✅ Fixed: Direct link to course
+        },
+      },
+      select: {
+        student_id: true,
+        score: true,
+        assignment_id: true,
+        assignment: {
+          select: {
+            maxScore: true,
+            weight: true,
+            category: true,
+            assignment_clo_mappings: {
+              select: {
+                cloId: true,
+                weight: true,
+                clo: { select: { code: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // 2. Get all assignments for this course to calculate category totals
+    const courseAssignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) }, // ✅ Fixed: Direct link to course
+      select: { category: true, weight: true },
+    });
+
+    const categoryTotals: Record<string, number> = {};
+    courseAssignments.forEach((a: any) => {
+      const cat = a.category;
+      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + Number(a.weight);
+    });
+
+    // 3. Group by CLO Code
+    const cloGroups = studentClo.reduce(
+      (acc: Record<string, any[]>, row: any) => {
+        row.assignment.assignment_clo_mappings.forEach((mapping: any) => {
+          const cloCode = mapping.clo.code;
+          if (!acc[cloCode]) acc[cloCode] = [];
+          acc[cloCode].push({
+            student_id: row.student_id,
+            score: row.score,
+            assignment_id: row.assignment_id,
+            category: row.assignment.category,
+            maxScore: row.assignment.maxScore,
+            assignmentWeight: row.assignment.weight, // ✅ จาก assignment
+            weight: mapping.weight, // ✅ จาก mapping
+          });
+        });
+        return acc;
+      },
+      {},
+    );
+
+    // 4. Calculate Scores
+    const cloScores = Object.entries(cloGroups).map(
+      ([cloCode, assignments]) => {
+        let cloTotal = 0;
+
+        const byCategory = assignments.reduce(
+          (acc: Record<string, any[]>, row) => {
+            (acc[row.category] ??= []).push(row);
+            return acc;
+          },
+          {},
+        );
+
+        Object.entries(byCategory).forEach(([category, group]) => {
+          const totalMaxWeightForCategory = categoryTotals[category] ?? 0;
+
+          const totalWeightForCategory = group.reduce(
+            (sum, r) =>
+              sum +
+              Number(r.score) /
+                (Number(r.maxScore) / Number(r.assignmentWeight)),
+            0,
+          );
+
+          if (totalMaxWeightForCategory <= 0) return;
+
+          group.forEach((row) => {
+            const realScore =
+              Number(row.score) /
+              (Number(row.maxScore) / Number(row.assignmentWeight));
+            const normalized =
+              totalWeightForCategory / totalMaxWeightForCategory;
+            const weighted = (Number(row.weight) / 100) * normalized;
+            cloTotal += realScore * weighted;
+          });
+        });
+
+        return { cloCode, cloScore: cloTotal };
+      },
+    );
+
+    return { cloScores };
+  });
+
+  return resultCloStudent;
+}
+
+/*
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ clo แต่ละตัว ของ student 1 คน ใน 1 course
+/////////////////////////////////////////////////////////////////////////
+export async function getCloScorePerStudentPerCourse(
+  tx: any,
+  studentId: number,
   courseId: number
 ) {
   const resultCloStudent = await prisma.$transaction(async (tx) => {
@@ -110,6 +229,7 @@ export async function getCloScorePerStudentPerCourse(
 
   return resultCloStudent;
 }
+  */
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ใน 1 course (รวมคะแนนของนักศึกษาทุกคนใน course)
@@ -130,6 +250,7 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
         assignment: {
           select: {
             maxScore: true,
+            weight: true,
             category: true,
             assignment_clo_mappings: {
               select: {
@@ -146,13 +267,13 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
     // 2) รวม maxScore ของทุก assignment ตาม category
     const courseAssignments = await tx.assignment.findMany({
       where: { course_id: Number(courseId) }, // ✅ Fixed
-      select: { category: true, maxScore: true },
+      select: { category: true, weight: true },
     });
 
     const categoryTotals: Record<string, number> = {};
     courseAssignments.forEach((a: any) => {
       categoryTotals[a.category] =
-        (categoryTotals[a.category] ?? 0) + Number(a.maxScore);
+        (categoryTotals[a.category] ?? 0) + Number(a.weight);
     });
 
     // 3) Group ตาม student
@@ -162,7 +283,7 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
         acc[row.student_id].push(row);
         return acc;
       },
-      {}
+      {},
     );
 
     // 4) คำนวณ CLO ของแต่ละ student
@@ -177,12 +298,13 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
                 score: row.score,
                 category: row.assignment.category,
                 maxScore: row.assignment.maxScore,
+                assignmentWeight: row.assignment.weight,
                 weight: mapping.weight,
               });
             });
             return acc;
           },
-          {}
+          {},
         );
 
         const cloScores = Object.entries(cloGroups).map(
@@ -195,35 +317,41 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
                 (acc[row.category] ??= []).push(row);
                 return acc;
               },
-              {}
+              {},
             );
 
             Object.entries(byCategory).forEach(([category, group]) => {
-              const totalMaxScoreForCategory = categoryTotals[category] ?? 0;
-              const totalScoreForCategory = group.reduce(
-                (sum, r) => sum + Number(r.score),
-                0
+              const totalMaxWeightForCategory = categoryTotals[category] ?? 0;
+              const totalWeightForCategory = group.reduce(
+                (sum, r) =>
+                  sum +
+                  Number(r.score) /
+                    (Number(r.maxScore) / Number(r.assignmentWeight)),
+                0,
               );
 
-              if (totalMaxScoreForCategory <= 0) return;
+              if (totalMaxWeightForCategory <= 0) return;
 
               group.forEach((row) => {
+                const realScore =
+                  Number(row.score) /
+                  (Number(row.maxScore) / Number(row.assignmentWeight));
                 const normalized =
-                  totalScoreForCategory / totalMaxScoreForCategory;
+                  totalWeightForCategory / totalMaxWeightForCategory;
                 const weighted = (Number(row.weight) / 100) * normalized;
-                cloTotal += Number(row.score) * weighted;
+                cloTotal += realScore * weighted;
 
                 const weightedMax = (Number(row.weight) / 100) * 1;
-                cloMaxPossible += Number(row.maxScore) * weightedMax;
+                cloMaxPossible += Number(row.assignmentWeight) * weightedMax;
               });
             });
 
             return { cloCode, cloScore: cloTotal, cloMaxPossible };
-          }
+          },
         );
 
         return { student_id: Number(studentId), cloScores };
-      }
+      },
     );
 
     // 5) รวม CLO ของทุก student
@@ -243,8 +371,20 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
         const maxCloScore = totalCloMaxPossible[cloCode] ?? 0;
         const percentage = maxCloScore > 0 ? (cloScore / maxCloScore) * 100 : 0;
 
-        return { cloCode, cloScore, maxCloScore, percentage };
-      }
+        return {
+          cloCode,
+          cloScore: Number(cloScore.toFixed(4)),
+          maxCloScore: Number(maxCloScore.toFixed(4)),
+          percentage: Number(percentage.toFixed(2)),
+        };
+      },
+    );
+
+    cloScores.sort((a, b) =>
+      a.cloCode.localeCompare(b.cloCode, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
     );
 
     return { cloScores };
@@ -258,7 +398,7 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
 /////////////////////////////////////////////////////////////////////////
 export async function getCloScoreAllStudentPerCourse(
   tx: any,
-  courseId: number
+  courseId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1) ดึงคะแนนนักศึกษา + mapping CLO
@@ -275,6 +415,7 @@ export async function getCloScoreAllStudentPerCourse(
         assignment: {
           select: {
             maxScore: true,
+            weight: true,
             category: true,
             assignment_clo_mappings: {
               select: {
@@ -291,13 +432,13 @@ export async function getCloScoreAllStudentPerCourse(
     // 2) รวม maxScore ต่อ category ของทั้ง course
     const courseAssignments = await tx.assignment.findMany({
       where: { course_id: Number(courseId) }, // ✅ Fixed
-      select: { category: true, maxScore: true },
+      select: { category: true, weight: true },
     });
 
     const categoryTotals: Record<string, number> = {};
     courseAssignments.forEach((a: any) => {
       const cat = a.category;
-      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + Number(a.maxScore);
+      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + Number(a.weight);
     });
 
     // 3) Group ตาม student_id -> cloCode
@@ -312,12 +453,13 @@ export async function getCloScoreAllStudentPerCourse(
             assignment_id: row.assignment_id,
             category: row.assignment.category,
             maxScore: row.assignment.maxScore,
+            assignmentWeight: row.assignment.weight,
             weight: mapping.weight,
           });
         });
         return acc;
       },
-      {}
+      {},
     );
 
     // 4) คำนวณ cloScore ต่อ student ต่อ clo
@@ -337,22 +479,29 @@ export async function getCloScoreAllStudentPerCourse(
             (acc[row.category] ??= []).push(row);
             return acc;
           },
-          {}
+          {},
         );
 
         Object.entries(byCategory).forEach(([category, group]) => {
-          const totalMaxScoreForCategory = categoryTotals[category] ?? 0;
-          if (totalMaxScoreForCategory <= 0) return;
+          const totalMaxWeightForCategory = categoryTotals[category] ?? 0;
+          if (totalMaxWeightForCategory <= 0) return;
 
-          const totalScoreForCategory = group.reduce(
-            (sum, r) => sum + Number(r.score),
-            0
+          const totalWeightForCategory = group.reduce(
+            (sum, r) =>
+              sum +
+              Number(r.score) /
+                (Number(r.maxScore) / Number(r.assignmentWeight)),
+            0,
           );
 
           group.forEach((row) => {
-            const normalized = totalScoreForCategory / totalMaxScoreForCategory;
+            const realScore =
+              Number(row.score) /
+              (Number(row.maxScore) / Number(row.assignmentWeight));
+            const normalized =
+              totalWeightForCategory / totalMaxWeightForCategory;
             const weighted = (Number(row.weight) / 100) * normalized;
-            cloTotal += Number(row.score) * weighted;
+            cloTotal += realScore * weighted;
           });
         });
 
@@ -405,12 +554,12 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
 export async function getPloScorePerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number
+  courseId: number,
 ) {
   const cloResult = await getCloScorePerStudentPerCourse(
     tx,
     studentId,
-    courseId
+    courseId,
   );
 
   type CloMapping = {
@@ -431,7 +580,7 @@ export async function getPloScorePerStudentPerCourse(
   const ploGroups: Record<string, number> = {};
   cloMappings.forEach((map: CloMapping) => {
     const cloScoreArray = cloResult.cloScores.find(
-      (c) => String(c.cloCode) === String(map.clo.code)
+      (c) => String(c.cloCode) === String(map.clo.code),
     );
     if (!cloScoreArray) return;
 
@@ -472,7 +621,7 @@ export async function getPloScorePerCourse(tx: any, courseId: number) {
 
   cloMappings.forEach((map: CloMapping) => {
     const cloScoreObj = cloResult.cloScores.find(
-      (c) => String(c.cloCode) === String(map.clo.code)
+      (c) => String(c.cloCode) === String(map.clo.code),
     );
     if (!cloScoreObj) return;
 
@@ -490,8 +639,16 @@ export async function getPloScorePerCourse(tx: any, courseId: number) {
   const ploScores = Object.entries(ploGroups).map(
     ([ploCode, { score, max }]) => {
       const percentage = max > 0 ? (score / max) * 100 : 0;
-      return { ploCode, ploScore: score, maxPloScore: max, percentage };
-    }
+
+      return {
+        ploCode,
+
+        ploScore: Number(score.toFixed(4)),
+        maxPloScore: Number(max.toFixed(4)),
+        // Percentage usually looks better with 2 decimal places
+        percentage: Number(percentage.toFixed(2)),
+      };
+    },
   );
 
   return { ploScores };
@@ -502,7 +659,7 @@ export async function getPloScorePerCourse(tx: any, courseId: number) {
 /////////////////////////////////////////////////////////////////////////
 export async function getPloScoreAllStudentPerCourse(
   tx: any,
-  courseId: number
+  courseId: number,
 ) {
   const students = await tx.studentScore.findMany({
     where: {
@@ -519,7 +676,7 @@ export async function getPloScoreAllStudentPerCourse(
     const ploResult = await getPloScorePerStudentPerCourse(
       tx,
       s.student_id,
-      courseId
+      courseId,
     );
     results.push({
       studentId: s.student_id,
@@ -557,7 +714,7 @@ export async function getPloScorePerProgram(tx: any, programId: number) {
     ([ploCode, { score, max }]) => {
       const percentage = max > 0 ? (score / max) * 100 : 0;
       return { ploCode, ploScore: score, maxPloScore: max, percentage };
-    }
+    },
   );
 
   return { programPloScores };
@@ -568,7 +725,7 @@ export async function getPloScorePerProgram(tx: any, programId: number) {
 /////////////////////////////////////////////////////////////
 export async function getPloScorePerStudentFromAllCourse(
   tx: any,
-  studentId: number
+  studentId: number,
 ) {
   // 1) ดึง course ที่นักเรียนเรียนผ่าน assignment
   const courseRefs = await tx.studentScore.findMany({
@@ -587,8 +744,8 @@ export async function getPloScorePerStudentFromAllCourse(
     new Set(
       courseRefs
         .map((ref: any) => ref.assignment?.course_id) // ✅ Fixed
-        .filter((id: any): id is number => typeof id === "number")
-    )
+        .filter((id: any): id is number => typeof id === "number"),
+    ),
   ) as number[];
 
   const ploGroups: Record<string, number> = {};
@@ -597,7 +754,7 @@ export async function getPloScorePerStudentFromAllCourse(
     const { ploScores } = await getPloScorePerStudentPerCourse(
       tx,
       studentId,
-      courseId
+      courseId,
     );
 
     ploScores.forEach(({ ploCode, ploScore }) => {
@@ -609,7 +766,7 @@ export async function getPloScorePerStudentFromAllCourse(
     ([ploCode, ploScore]) => ({
       ploCode,
       ploScore,
-    })
+    }),
   );
 
   return { ploScoresAllCourses };
@@ -620,7 +777,7 @@ export async function getPloScorePerStudentFromAllCourse(
 /////////////////////////////////////////////////////////////////////////
 export async function getPloProgramWhereScoreComeFrom(
   tx: any,
-  programId: number
+  programId: number,
 ) {
   const courses = await tx.course.findMany({
     where: { program_id: Number(programId) },
@@ -681,7 +838,7 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
     const { ploScores } = await getPloScorePerStudentPerCourse(
       tx,
       s.student_id,
-      courseId
+      courseId,
     );
 
     ploScores.forEach(({ ploCode, ploScore }) => {
@@ -698,7 +855,7 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
       const max = Math.max(...scores);
       const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
       return { ploCode, min, max, mean };
-    }
+    },
   );
 
   return { ploStats };
@@ -718,7 +875,7 @@ export async function getPloStatsPerProgram(tx: any, programId: number) {
   for (const { id: studentId } of students) {
     const { ploScoresAllCourses } = await getPloScorePerStudentFromAllCourse(
       tx,
-      studentId
+      studentId,
     );
 
     ploScoresAllCourses.forEach(({ ploCode, ploScore }) => {
@@ -747,21 +904,21 @@ export async function getPloStatsPerProgram(tx: any, programId: number) {
 export async function getCloBestWorstPerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number
+  courseId: number,
 ) {
   const resultCloStudent = await getCloScorePerStudentPerCourse(
     tx,
     studentId,
-    courseId
+    courseId,
   );
   if (resultCloStudent.cloScores.length === 0) return {};
 
   const scores = resultCloStudent.cloScores.map((c) => c.cloScore);
   const maxClo = resultCloStudent.cloScores.reduce((prev, curr) =>
-    curr.cloScore > prev.cloScore ? curr : prev
+    curr.cloScore > prev.cloScore ? curr : prev,
   );
   const minClo = resultCloStudent.cloScores.reduce((prev, curr) =>
-    curr.cloScore < prev.cloScore ? curr : prev
+    curr.cloScore < prev.cloScore ? curr : prev,
   );
   const meanClo = scores.reduce((sum, s) => sum + s, 0) / scores.length;
 
@@ -774,10 +931,10 @@ export async function getCloBestWorstPerCourse(tx: any, courseId: number) {
 
   const scores = resultCloStudent.cloScores.map((c) => c.cloScore);
   const maxClo = resultCloStudent.cloScores.reduce((prev, curr) =>
-    curr.cloScore > prev.cloScore ? curr : prev
+    curr.cloScore > prev.cloScore ? curr : prev,
   );
   const minClo = resultCloStudent.cloScores.reduce((prev, curr) =>
-    curr.cloScore < prev.cloScore ? curr : prev
+    curr.cloScore < prev.cloScore ? curr : prev,
   );
   const meanClo = scores.reduce((sum, s) => sum + s, 0) / scores.length;
 
@@ -786,17 +943,17 @@ export async function getCloBestWorstPerCourse(tx: any, courseId: number) {
 
 export async function getCloBestWorstPerCoursePercentage(
   tx: any,
-  courseId: number
+  courseId: number,
 ) {
   const resultCloStudent = await getCloScorePerCourse(tx, courseId);
   if (resultCloStudent.cloScores.length === 0) return {};
 
   const scores = resultCloStudent.cloScores.map((c) => c.percentage);
   const maxClo = resultCloStudent.cloScores.reduce((prev, curr) =>
-    curr.percentage > prev.percentage ? curr : prev
+    curr.percentage > prev.percentage ? curr : prev,
   );
   const minClo = resultCloStudent.cloScores.reduce((prev, curr) =>
-    curr.percentage < prev.percentage ? curr : prev
+    curr.percentage < prev.percentage ? curr : prev,
   );
   const meanClo = scores.reduce((sum, s) => sum + s, 0) / scores.length;
 
@@ -806,21 +963,21 @@ export async function getCloBestWorstPerCoursePercentage(
 export async function getPloBestWorstPerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number
+  courseId: number,
 ) {
   const resultPloStudent = await getPloScorePerStudentPerCourse(
     tx,
     studentId,
-    courseId
+    courseId,
   );
   if (resultPloStudent.ploScores.length === 0) return {};
 
   const scores = resultPloStudent.ploScores.map((c) => c.ploScore);
   const maxClo = resultPloStudent.ploScores.reduce((prev, curr) =>
-    curr.ploScore > prev.ploScore ? curr : prev
+    curr.ploScore > prev.ploScore ? curr : prev,
   );
   const minClo = resultPloStudent.ploScores.reduce((prev, curr) =>
-    curr.ploScore < prev.ploScore ? curr : prev
+    curr.ploScore < prev.ploScore ? curr : prev,
   );
   const meanClo = scores.reduce((sum, s) => sum + s, 0) / scores.length;
 
@@ -833,10 +990,10 @@ export async function getPloBestWorstPerCourse(tx: any, courseId: number) {
 
   const scores = resultPloStudent.ploScores.map((c) => c.ploScore);
   const maxClo = resultPloStudent.ploScores.reduce((prev, curr) =>
-    curr.ploScore > prev.ploScore ? curr : prev
+    curr.ploScore > prev.ploScore ? curr : prev,
   );
   const minClo = resultPloStudent.ploScores.reduce((prev, curr) =>
-    curr.ploScore < prev.ploScore ? curr : prev
+    curr.ploScore < prev.ploScore ? curr : prev,
   );
   const meanClo = scores.reduce((sum, s) => sum + s, 0) / scores.length;
 
@@ -849,10 +1006,10 @@ export async function getPloBestWorstPerProgram(tx: any, programId: number) {
 
   const scores = resultPloStudent.programPloScores.map((c) => c.ploScore);
   const maxClo = resultPloStudent.programPloScores.reduce((prev, curr) =>
-    curr.ploScore > prev.ploScore ? curr : prev
+    curr.ploScore > prev.ploScore ? curr : prev,
   );
   const minClo = resultPloStudent.programPloScores.reduce((prev, curr) =>
-    curr.ploScore < prev.ploScore ? curr : prev
+    curr.ploScore < prev.ploScore ? curr : prev,
   );
   const meanClo = scores.reduce((sum, s) => sum + s, 0) / scores.length;
 

@@ -43,12 +43,11 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const selectedOption = options.find((opt) => opt.value === value);
 
   return (
-    <div className=" relative" ref={dropdownRef}>
+    <div className="relative w-[200px]" ref={dropdownRef}>
       {label && (
         <p className="mb-1 text-sm font-light text-gray-700">{label}</p>
       )}
 
-      {/* The "Select Box" */}
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`

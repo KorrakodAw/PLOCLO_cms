@@ -545,7 +545,7 @@ export default function EditCourseClient({
             </div>
 
             {/* Context Switcher (Year/Sem/Sec) */}
-            <div className="w-full lg:w-72 relative z-[60]">
+            <div className="w-full lg:w-72 relative z-[50]">
               <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase">
                 {t("Switch Section")}
               </label>

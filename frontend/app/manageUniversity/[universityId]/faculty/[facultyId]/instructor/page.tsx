@@ -193,7 +193,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
                 : faculty?.university?.name || t("loading..."),
 
             // ✅ FIX: Use the ID from the university object or the faculty FK
-            href: `/manageUniversity/${faculty?.university_id}`,
+            href: `/manageUniversity/${faculty?.university_id ?? ""}`,
           },
           {
             label:
@@ -213,9 +213,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
           </h1>
           <p className="text-gray-500 mt-1">
             Faculty:{" "}
-            <span className="font-light text-orange-600">
-              {faculty?.name}
-            </span>
+            <span className="font-light text-orange-600">{faculty?.name}</span>
           </p>
         </div>
         {/* <button

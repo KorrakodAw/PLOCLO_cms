@@ -147,7 +147,7 @@ export default function ManageAccount() {
     { header: "ID", accessor: "id" },
     { header: "Username", accessor: "username" },
     { header: "Email", accessor: "email" },
-    { header: "Role", accessor: "role" },
+    { header: "Created At", accessor: "created_at" },
     {
       header: "Actions",
       accessor: "id",
@@ -216,11 +216,11 @@ export default function ManageAccount() {
           <div className="flex justify-between items-center mb-8 border-b pb-4">
             <div>
               <h1 className="text-3xl font-light text-gray-800">
-                Manage Account
+                Accounts
               </h1>
-              <p className="text-sm font-light text-gray-500 mt-1 uppercase tracking-wider">
+              {/* <p className="text-sm font-light text-gray-500 mt-1 uppercase tracking-wider">
                 User Administration
-              </p>
+              </p> */}
             </div>
 
             {/* ปุ่ม Add User - ใช้ Component AddButton เพื่อความสวยงาม */}

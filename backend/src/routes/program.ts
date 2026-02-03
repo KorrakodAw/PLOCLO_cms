@@ -47,6 +47,42 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/ByCode", authenticateToken, async (req, res) => {
+  try {
+    // ดึงค่าจาก Query Parameters (?programCode=...&facultyId=...)
+    const { programCode } = req.query;
+
+    if (!programCode) {
+      return res.status(400).json({ error: "programCode is required" });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT 
+          id,
+          program_code,
+          program_year
+      FROM program 
+      WHERE program_code = $1
+      ORDER BY program_year DESC
+      `,
+      [programCode],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "No programs found for this code in the selected faculty",
+      });
+    }
+
+    // ส่งคืนข้อมูลทั้งหมดเป็น Array (ไม่ใช่แค่แถวแรก)
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch program details" });
+  }
+});
+
 // =========================================
 // 2. PAGINATION (Refactored)
 // =========================================

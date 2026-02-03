@@ -134,10 +134,15 @@ export default function CloPloMapping({
     Object.keys(mappingGrid).forEach((key) => {
       const [cloIdStr] = key.split("_");
       const cloId = Number(cloIdStr);
-      const weight = mappingGrid[key] || 0;
+
+      // 🟢 FIX: Explicitly cast to Number and handle NaN/undefined
+      const rawValue = mappingGrid[key];
+      const weight = rawValue === "" ? 0 : Number(rawValue);
 
       if (clos.some((c) => c.id === cloId)) {
-        totals[cloId] = (totals[cloId] || 0) + weight;
+        // 🟢 FIX: Use parseFloat or Number to ensure mathematical addition
+        const currentTotal = totals[cloId] || 0;
+        totals[cloId] = Number((currentTotal + weight).toFixed(4));
       }
     });
 
@@ -153,7 +158,7 @@ export default function CloPloMapping({
   const isValidationSuccess = useMemo(() => {
     if (clos.length === 0) return true;
     return Object.values(cloTotals).every(
-      (total) => Math.abs(total - 100) < 0.01
+      (total) => Math.abs(total - 100) < 0.01,
     );
   }, [cloTotals, clos]);
 
@@ -185,7 +190,7 @@ export default function CloPloMapping({
       await apiClient.post(
         "/mapping/clo-plo",
         { updates },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       showToast(t("Mapping saved successfully!"), "success");
       setChangedKeys(new Set());
@@ -217,8 +222,8 @@ export default function CloPloMapping({
                   !isValidationSuccess
                     ? "bg-red-500 text-white cursor-not-allowed"
                     : changedKeys.size === 0
-                    ? "bg-gray-300 text-gray-500"
-                    : "bg-green-600 hover:bg-green-700 text-white"
+                      ? "bg-gray-300 text-gray-500"
+                      : "bg-green-600 hover:bg-green-700 text-white"
                 }`}
             >
               {loading ? t("Loading...") : t("Save Changes")}
@@ -295,6 +300,10 @@ export default function CloPloMapping({
                         const weight = mappingGrid[key] || "";
                         const hasValue = Number(weight) > 0;
                         const isChanged = changedKeys.has(key);
+                        const displayValue =
+                          weight !== "" && weight !== undefined
+                            ? Number(weight).toString()
+                            : "";
 
                         return (
                           <td
@@ -320,12 +329,12 @@ export default function CloPloMapping({
                                 }
                               `}
                               placeholder="-"
-                              value={weight}
+                              value={displayValue}
                               onChange={(e) =>
                                 handleWeightChange(
                                   clo.id,
                                   plo.id,
-                                  e.target.value
+                                  e.target.value,
                                 )
                               }
                             />
@@ -345,7 +354,7 @@ export default function CloPloMapping({
                             : `Error: Total is ${total}%. Must be 100%`
                         }
                       >
-                        {total}
+                        {parseFloat(total.toString())}%
                       </td>
                     </tr>
                   );
