@@ -10,7 +10,7 @@ export default function EditProgramPage({
 }) {
   const program_code = params.program_code;
   return (
-    <ProtectedRoute roles={["system_admin", "instructor"]}>
+    <ProtectedRoute roles={["system_admin", "Super_admin"]}>
       <div className="max-w-[1400px] h-full flex flex-col mx-auto">
         <EditProgramClient programCode={program_code} />
       </div>

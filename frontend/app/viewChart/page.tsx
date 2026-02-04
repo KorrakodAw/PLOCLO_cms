@@ -3,14 +3,10 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import {
-  FaChartPie,
   FaUserGraduate,
-  FaFilter,
-  FaTable,
   FaChartLine,
   FaUniversity,
   FaThLarge,
-  FaStream,
 } from "react-icons/fa";
 import DropdownSelect from "@/components/DropdownSelect";
 import { apiClient } from "@/utils/apiClient";
@@ -485,25 +481,25 @@ export default function PLOChart() {
 
               {/* GRADE & AVG TOGGLES (THE BUTTONS YOU WANTED) */}
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
-                <ToggleButton 
+                <ToggleButton
                   label="Max Score"
                   active={visibleLines.maxScore}
                   onClick={() => toggleLine("maxScore")}
                   color="#22c55e"
                 />
-                <ToggleButton 
+                <ToggleButton
                   label="Min Score"
                   active={visibleLines.minScore}
                   onClick={() => toggleLine("minScore")}
                   color="#ef4444"
                 />
-                <ToggleButton 
+                <ToggleButton
                   label="Class Average"
                   active={visibleLines.allAvg}
                   onClick={() => toggleLine("allAvg")}
                   color="#6366f1"
                 />
-              
+
                 <div className="h-4 w-[1px] bg-slate-200 mx-1" />
                 {Array.from(
                   new Set(summaryData?.students?.map((s: any) => s.grade)),

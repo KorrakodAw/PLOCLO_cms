@@ -70,7 +70,7 @@ export default function Navbar({
               >
                 {t("analytics")}
               </NavLink>
-              {["system_admin", "instructor"].includes(user?.role || "") && (
+              {["system_admin", "Super_admin"].includes(user?.role || "") && (
                 <>
                   <NavLink
                     href="/editProgram"
@@ -84,27 +84,21 @@ export default function Navbar({
                   >
                     {t("courses")}
                   </NavLink>
-                </>
-              )}
-              {/* ✅ เฉพาะ Admin */}
-              {["system_admin"].includes(user?.role || "") && (
-                <>
-                  <NavLink
-                    href="/manageAccount"
-                    onClick={() => handleNavClick("/manageAccount")}
-                  >
-                    {t("accounts")}
-                  </NavLink>
                   <NavLink
                     href="/manageUniversity"
                     onClick={() => handleNavClick("/manageUniversity")}
                   >
                     {t("universities")}
                   </NavLink>
+                  <NavLink
+                    href="/manageAccount"
+                    onClick={() => handleNavClick("/manageAccount")}
+                  >
+                    {t("accounts")}
+                  </NavLink>
                 </>
               )}
-
-              {/* ✅ ทุก role เข้าได้ */}
+              {/* ✅ เฉพาะ Admin */}
             </>
           )}
 
@@ -115,7 +109,7 @@ export default function Navbar({
             {t("about")}
           </NavLink>
 
-          <div className="fixed bottom-0 center flex flex-col justify-between items-center p-4 z-40">
+          <div className="fixed bottom-[20px] center flex flex-col justify-between items-center p-4 z-40">
             <LanguageSwitcher />
 
             {isLoggedIn && (

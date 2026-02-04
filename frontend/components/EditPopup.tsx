@@ -69,7 +69,7 @@ export default function FormEditPopup<T>({
               field.type === "number") && (
               <textarea
                 rows={1}
-                className="w-full border font-light border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500  outline-none transition-all resize-none overflow-hidden"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500  outline-none transition-all resize-none overflow-hidden font-light"
                 value={String(data[field.key] ?? "")}
                 onChange={(e) => {
                   onChange({ ...data, [field.key]: e.target.value });
@@ -85,14 +85,14 @@ export default function FormEditPopup<T>({
             {/* SELECT INPUT */}
             {field.type === "select" && (
               <select
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500  outline-none transition-all resize-none overflow-hidden"
+                className="w-full border font-light border-gray-300 rounded-lg px-4 py-3 focus:ring-1 focus:ring-orange-500 outline-none transition-all resize-none overflow-hidden  "
                 value={String(data[field.key] ?? "")}
                 onChange={(e) =>
                   onChange({ ...data, [field.key]: e.target.value })
                 }
               >
                 {field.options?.map((opt) => (
-                  <option key={opt} value={opt} >
+                  <option key={opt} value={opt} className="font-light">
                     {opt}
                   </option>
                 ))}

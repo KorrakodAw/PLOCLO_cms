@@ -19,7 +19,7 @@ export const seedAdminUser = async () => {
       // 3. Insert the admin
       await pool.query(
         "INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)",
-        ["System Admin", adminEmail, hashedPassword, "system_admin"]
+        ["Super Admin", adminEmail, hashedPassword, "Super_admin"]
       );
 
       console.log("✅ Admin user seeded successfully!");

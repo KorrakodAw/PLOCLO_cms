@@ -225,7 +225,7 @@ export default function EditProgram() {
   // }, [program, faculty, t, lang]);
 
   return (
-    <ProtectedRoute roles={["system_admin", "instructor"]}>
+    <ProtectedRoute roles={["system_admin", "Super_admin"]}>
       <div className="max-w-[1400px] flex flex-col mx-auto">
         <p className="font-light text-2xl ">{t("program information")}</p>
 
