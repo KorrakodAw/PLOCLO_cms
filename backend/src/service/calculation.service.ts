@@ -293,7 +293,73 @@ export async function getCloScoreAllStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ min, max, mean ของ clo แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////////////////
+
 export async function getCloStatsPerCourse(tx: any, courseId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    // -----------------------------
+    // 1) คำนวณ min, max, mean จาก student scores (โค้ดเดิม)
+    // -----------------------------
+    const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
+    const cloScoresPerStudent = perStudent.cloScoresPerStudent;
+
+    const cloGroups: Record<string, number[]> = {};
+
+    cloScoresPerStudent.forEach((student) => {
+      student.cloScores.forEach((clo) => {
+        if (!cloGroups[clo.cloCode]) cloGroups[clo.cloCode] = [];
+        cloGroups[clo.cloCode].push(clo.cloScore);
+      });
+    });
+
+    const cloStatsBase = Object.entries(cloGroups).map(([cloCode, scores]) => {
+      const min = Math.min(...scores);
+      const max = Math.max(...scores);
+      const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+      return { cloCode, min, max, mean };
+    });
+
+    // -----------------------------
+    // 2) เพิ่มการหา highest clo possible จาก assignment weight
+    // -----------------------------
+    const assignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) },
+      select: {
+        weight: true,
+        assignment_clo_mappings: {
+          select: {
+            clo: { select: { code: true } },
+            weight: true,
+          },
+        },
+      },
+    });
+
+    const highestCloMap: Record<string, number> = {};
+    assignments.forEach((assignment) => {
+      assignment.assignment_clo_mappings.forEach((mapping) => {
+        const cloCode = mapping.clo.code;
+        const contribution =
+          Number(assignment.weight) * (Number(mapping.weight) / 100);
+        if (!highestCloMap[cloCode]) highestCloMap[cloCode] = 0;
+        highestCloMap[cloCode] += contribution;
+      });
+    });
+
+    // -----------------------------
+    // 3) merge cloStatsBase + highestClo
+    // -----------------------------
+    const cloStats = cloStatsBase.map((stat) => ({
+      ...stat,
+      highestPossible: highestCloMap[stat.cloCode] ?? 0,
+    }));
+
+    return { cloStats };
+  });
+
+  return result;
+}
+
+/*export async function getCloStatsPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
     const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
     const cloScoresPerStudent = perStudent.cloScoresPerStudent;
@@ -319,7 +385,7 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
   });
 
   return result;
-}
+}*/
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student 1 คนใน 1 course

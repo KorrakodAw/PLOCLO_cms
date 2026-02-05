@@ -94,7 +94,7 @@ router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
 // GET http://localhost:9771/api/calculation/ass-clo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
