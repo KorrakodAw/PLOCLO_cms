@@ -291,7 +291,7 @@ export async function getCloScoreAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////////////////
 
 export async function getCloStatsPerCourse(tx: any, courseId: number) {
@@ -638,7 +638,7 @@ export async function getTotalScoreAndGradePerStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ realScoreรวม และเกรดของนักเรียนทุกคนใน course
+// คำนวณ realScore รวม ,เกรดของนักเรียนทุกคนใน course และ mean ของทั้ง course
 /////////////////////////////////////////////////////////////////////////
 export async function getTotalScoreAndGradeAllStudentPerCourse(
   tx: any,
@@ -680,7 +680,73 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
       };
     });
 
-    return { studentResults: results };
+     // 4. คำนวณ mean ของคะแนนนักเรียนทั้งหมด
+    const meanScore =
+      results.reduce((sum, s) => sum + s.totalScore, 0) / results.length;
+
+    return { studentResults: results, meanScore };
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+/////////////////////////////////////////////////////////////////////////
+export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    // -----------------------------
+    // 1) คำนวณ min, max, mean จาก student scores (ใช้ getRealScoreAllStudentPerCourse)
+    // -----------------------------
+    const perStudent = await getRealScoreAllStudentPerCourse(tx, courseId);
+    const categoryScoresPerStudent = perStudent.realScoresPerStudent;
+
+    const categoryGroups: Record<string, number[]> = {};
+
+    categoryScoresPerStudent.forEach((student) => {
+      student.categoryScores.forEach((cat) => {
+        if (!categoryGroups[cat.category]) categoryGroups[cat.category] = [];
+        categoryGroups[cat.category].push(cat.realScore);
+      });
+    });
+
+    const categoryStatsBase = Object.entries(categoryGroups).map(
+      ([category, scores]) => {
+        const min = Math.min(...scores);
+        const max = Math.max(...scores);
+        const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+        return { category, min, max, mean };
+      }
+    );
+
+    // -----------------------------
+    // 2) หา highestPossible ต่อ category จาก assignment weight
+    // -----------------------------
+    const assignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) },
+      select: {
+        weight: true,
+        category: true,
+      },
+    });
+
+    const highestCategoryMap: Record<string, number> = {};
+    assignments.forEach((assignment) => {
+      const category = assignment.category;
+      const contribution = Number(assignment.weight);
+      if (!highestCategoryMap[category]) highestCategoryMap[category] = 0;
+      highestCategoryMap[category] += contribution;
+    });
+
+    // -----------------------------
+    // 3) merge categoryStatsBase + highestPossible
+    // -----------------------------
+    const categoryStats = categoryStatsBase.map((stat) => ({
+      ...stat,
+      highestPossible: highestCategoryMap[stat.category] ?? 0,
+    }));
+
+    return { categoryStats };
   });
 
   return result;

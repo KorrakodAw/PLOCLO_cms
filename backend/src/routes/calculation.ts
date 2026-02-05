@@ -13,6 +13,7 @@ import {
   getRealScoreAllStudentPerCourse,
   getTotalScoreAndGradePerStudentPerCourse,
   getTotalScoreAndGradeAllStudentPerCourse,
+  getRealScoreStatsPerCourse,
   getGradeSummaryPerCourse,
   getPloScorePerStudentPerCourse,
   getPloScorePerCourse,
@@ -172,7 +173,7 @@ router.get("/realScoreAndGrade/studentCourse", authenticateToken, async (req, re
 });
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณคะแนนรวม และเกรดของนักเรียนทุกคนใน 1 course
+// คำนวณคะแนนรวม และเกรดของนักเรียนทุกคนใน 1 course และ mean ของทั้ง course
 // GET http://localhost:9771/api/calculation/realScoreAndGrade/allStudentCourse?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
@@ -181,6 +182,25 @@ router.get("/realScoreAndGrade/allStudentCourse", authenticateToken, async (req,
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
       return await getTotalScoreAndGradeAllStudentPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/stats?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/stats", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getRealScoreStatsPerCourse(tx, Number(courseId));
     });
 
     res.json(resultCloPerStudent);
