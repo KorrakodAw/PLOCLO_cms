@@ -8,6 +8,13 @@ import {
   getCloScorePerCourse,
   getCloScoreAllStudentPerCourse,
   getCloStatsPerCourse,
+  getCloGradeSummaryPerCourse,
+  getRealScorePerStudentPerCourse,
+  getRealScoreAllStudentPerCourse,
+  getTotalScoreAndGradePerStudentPerCourse,
+  getTotalScoreAndGradeAllStudentPerCourse,
+  getRealScoreStatsPerCourse,
+  getGradeSummaryPerCourse,
   getPloScorePerStudentPerCourse,
   getPloScorePerCourse,
   getPloScoreAllStudentPerCourse,
@@ -30,6 +37,11 @@ const router = Router();
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // น่าจะได้ใช้
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+// CLO
+//---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ของ student 1 คน ใน 1 course
@@ -94,7 +106,7 @@ router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
 // GET http://localhost:9771/api/calculation/ass-clo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
@@ -111,6 +123,116 @@ router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
+
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน clo ต่อเกรด, ผลรวมของค่าเฉลี่ย
+// ตารางฟ้าใน TABEE
+// GET http://localhost:9771/api/calculation/ass-clo/gradeSummary?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/ass-clo/gradeSummary", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getCloGradeSummaryPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
+// realScore
+//----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณคะแนนรวม และเกรดของ 1 นักเรียนใน 1 course
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/studentCourse", authenticateToken, async (req, res) => {
+  const { studentId, courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getTotalScoreAndGradePerStudentPerCourse(
+        tx,
+        Number(studentId),
+        Number(courseId)
+      );
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณคะแนนรวม และเกรดของนักเรียนทุกคนใน 1 course และ mean ของทั้ง course
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/allStudentCourse?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/allStudentCourse", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getTotalScoreAndGradeAllStudentPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/stats?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/stats", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getRealScoreStatsPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน category ต่อเกรด, ผลรวมของค่าเฉลี่ย
+// ตารางเหลืองใน TABEE
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/gradSummary?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/gradSummary", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getGradeSummaryPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+// PLO
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student 1 คนใน 1 course

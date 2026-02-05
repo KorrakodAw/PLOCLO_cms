@@ -310,9 +310,75 @@ export async function getCloScoreAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////////////////
+
 export async function getCloStatsPerCourse(tx: any, courseId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    // -----------------------------
+    // 1) คำนวณ min, max, mean จาก student scores (โค้ดเดิม)
+    // -----------------------------
+    const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
+    const cloScoresPerStudent = perStudent.cloScoresPerStudent;
+
+    const cloGroups: Record<string, number[]> = {};
+
+    cloScoresPerStudent.forEach((student) => {
+      student.cloScores.forEach((clo) => {
+        if (!cloGroups[clo.cloCode]) cloGroups[clo.cloCode] = [];
+        cloGroups[clo.cloCode].push(clo.cloScore);
+      });
+    });
+
+    const cloStatsBase = Object.entries(cloGroups).map(([cloCode, scores]) => {
+      const min = Math.min(...scores);
+      const max = Math.max(...scores);
+      const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+      return { cloCode, min, max, mean };
+    });
+
+    // -----------------------------
+    // 2) เพิ่มการหา highest clo possible จาก assignment weight
+    // -----------------------------
+    const assignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) },
+      select: {
+        weight: true,
+        assignment_clo_mappings: {
+          select: {
+            clo: { select: { code: true } },
+            weight: true,
+          },
+        },
+      },
+    });
+
+    const highestCloMap: Record<string, number> = {};
+    assignments.forEach((assignment) => {
+      assignment.assignment_clo_mappings.forEach((mapping) => {
+        const cloCode = mapping.clo.code;
+        const contribution =
+          Number(assignment.weight) * (Number(mapping.weight) / 100);
+        if (!highestCloMap[cloCode]) highestCloMap[cloCode] = 0;
+        highestCloMap[cloCode] += contribution;
+      });
+    });
+
+    // -----------------------------
+    // 3) merge cloStatsBase + highestClo
+    // -----------------------------
+    const cloStats = cloStatsBase.map((stat) => ({
+      ...stat,
+      highestPossible: highestCloMap[stat.cloCode] ?? 0,
+    }));
+
+    return { cloStats };
+  });
+
+  return result;
+}
+
+/*export async function getCloStatsPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
     const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
     const cloScoresPerStudent = perStudent.cloScoresPerStudent;
@@ -345,6 +411,426 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
   });
 
   return result;
+}*/
+
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด + ค่าเฉลี่ย CLO ต่อเกรด + ค่าเฉลี่ยรวม
+/////////////////////////////////////////////////////////////////////////
+export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1) ใช้ผลลัพธ์จากฟังก์ชัน clo เดิม
+    const { cloScoresPerStudent } = await getCloScoreAllStudentPerCourse(tx, courseId);
+
+    // 2) ดึง grade setting ของ course
+    const gradeSettings = await tx.gradeSetting.findMany({
+      where: { course_id: Number(courseId) },
+      orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
+    });
+
+    // 3) จัดกลุ่มตาม grade
+    const gradeSummary: Record<
+      string,
+      {
+        count: number;
+        categoryAverages: Record<string, number>;
+        totalAverage: number;
+      }
+    > = {};
+
+    for (const student of cloScoresPerStudent) {
+      // รวมคะแนน CLO ของนักเรียนแต่ละคน
+      const totalScore = student.cloScores.reduce((sum, c) => sum + c.cloScore, 0);
+
+      // หา grade ของนักเรียน
+      let grade = "F";
+      for (const gs of gradeSettings) {
+        if (totalScore >= Number(gs.score)) {
+          grade = gs.grade;
+          break;
+        }
+      }
+
+      // ถ้า grade ยังไม่มีใน summary → initialize
+      if (!gradeSummary[grade]) {
+        gradeSummary[grade] = {
+          count: 0,
+          categoryAverages: {},
+          totalAverage: 0,
+        };
+      }
+
+      gradeSummary[grade].count += 1;
+      gradeSummary[grade].totalAverage += totalScore;
+
+      // รวมคะแนน CLO ต่อ grade
+      for (const clo of student.cloScores) {
+        if (!gradeSummary[grade].categoryAverages[clo.cloCode]) {
+          gradeSummary[grade].categoryAverages[clo.cloCode] = 0;
+        }
+        gradeSummary[grade].categoryAverages[clo.cloCode] += clo.cloScore;
+      }
+    }
+
+    // 4) หาค่าเฉลี่ยต่อ grade
+    for (const grade in gradeSummary) {
+      const summary = gradeSummary[grade];
+      for (const cloCode in summary.categoryAverages) {
+        summary.categoryAverages[cloCode] =
+          summary.categoryAverages[cloCode] / summary.count;
+      }
+      summary.totalAverage = summary.totalAverage / summary.count;
+    }
+
+    return gradeSummary;
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ realScore ของ student 1 คน ใน 1 course แยกตาม category
+/////////////////////////////////////////////////////////////////////////
+export async function getRealScorePerStudentPerCourse(
+  tx: any,
+  studentId: number,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Get Student Scores filtering by Assignment -> Course
+    const studentScores = await tx.studentScore.findMany({
+      where: {
+        student_id: Number(studentId),
+        assignment: {
+          course_id: Number(courseId),
+        },
+      },
+      select: {
+        student_id: true,
+        score: true,
+        assignment_id: true,
+        assignment: {
+          select: {
+            maxScore: true,
+            weight: true,
+            category: true,
+          },
+        },
+      },
+    });
+
+    // 2. Group by category
+    const categoryGroups: Record<string, number[]> = {};
+
+    studentScores.forEach((row) => {
+      const category = row.assignment.category;
+      const realScore =
+        Number(row.score) /
+        (Number(row.assignment.maxScore) / Number(row.assignment.weight));
+
+      if (!categoryGroups[category]) categoryGroups[category] = [];
+      categoryGroups[category].push(realScore);
+    });
+
+    // 3. Sum realScore per category
+    const categoryScores = Object.entries(categoryGroups).map(
+      ([category, scores]) => {
+        const total = scores.reduce((sum, s) => sum + s, 0);
+        return { category, realScore: total };
+      }
+    );
+
+    return { categoryScores };
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ realScore ของนักเรียนทุกคนใน course แยกตาม category
+/////////////////////////////////////////////////////////////////////////
+export async function getRealScoreAllStudentPerCourse(
+  tx: any,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Get Student Scores filtering by Assignment -> Course
+    const studentScores = await tx.studentScore.findMany({
+      where: {
+        assignment: {
+          course_id: Number(courseId),
+        },
+      },
+      select: {
+        student_id: true,
+        score: true,
+        assignment_id: true,
+        assignment: {
+          select: {
+            maxScore: true,
+            weight: true,
+            category: true,
+          },
+        },
+      },
+    });
+
+    // 2. Group by student_id -> category
+    const studentGroups: Record<
+      string,
+      Record<string, number[]>
+    > = {};
+
+    studentScores.forEach((row) => {
+      const studentId = row.student_id;
+      const category = row.assignment.category;
+      const realScore =
+        Number(row.score) /
+        (Number(row.assignment.maxScore) / Number(row.assignment.weight));
+
+      if (!studentGroups[studentId]) studentGroups[studentId] = {};
+      if (!studentGroups[studentId][category])
+        studentGroups[studentId][category] = [];
+
+      studentGroups[studentId][category].push(realScore);
+    });
+
+    // 3. Sum realScore per student per category
+    const results: {
+      student_id: number;
+      categoryScores: { category: string; realScore: number }[];
+    }[] = [];
+
+    Object.entries(studentGroups).forEach(([student_id, categories]) => {
+      const categoryScores = Object.entries(categories).map(
+        ([category, scores]) => {
+          const total = scores.reduce((sum, s) => sum + s, 0);
+          return { category, realScore: total };
+        }
+      );
+
+      results.push({
+        student_id: Number(student_id),
+        categoryScores,
+      });
+    });
+
+    return { realScoresPerStudent: results };
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ realScore รวม และเกรดของนักเรียนใน course
+/////////////////////////////////////////////////////////////////////////
+export async function getTotalScoreAndGradePerStudentPerCourse(
+  tx: any,
+  studentId: number,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category
+    const { categoryScores } = await getRealScorePerStudentPerCourse(
+      tx,
+      studentId,
+      courseId
+    );
+
+    // 2. รวมคะแนนทุก category
+    const totalScore = categoryScores.reduce(
+      (sum, c) => sum + c.realScore,
+      0
+    );
+
+    // 3. ดึง grade setting ของ course
+    const gradeSettings = await tx.gradeSetting.findMany({
+      where: { course_id: Number(courseId) },
+      orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
+    });
+
+    // 4. หา grade ที่ตรงกับคะแนนรวม
+    let grade = "F"; // default ถ้าไม่เข้าเงื่อนไข
+    for (const gs of gradeSettings) {
+      if (totalScore >= Number(gs.score)) {
+        grade = gs.grade;
+        break; // เจอเกรดที่เหมาะสมแล้ว
+      }
+    }
+
+    return { totalScore, grade, categoryScores }; // เก็บรายละเอียด category ด้วย
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ realScore รวม ,เกรดของนักเรียนทุกคนใน course และ mean ของทั้ง course
+/////////////////////////////////////////////////////////////////////////
+export async function getTotalScoreAndGradeAllStudentPerCourse(
+  tx: any,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category ของนักเรียนทุกคน
+    const { realScoresPerStudent } = await getRealScoreAllStudentPerCourse(
+      tx,
+      courseId
+    );
+
+    // 2. ดึง grade setting ของ course
+    const gradeSettings = await tx.gradeSetting.findMany({
+      where: { course_id: Number(courseId) },
+      orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
+    });
+
+    // 3. รวมคะแนน และหาเกรดของนักเรียนแต่ละคน
+    const results = realScoresPerStudent.map((student) => {
+      const totalScore = student.categoryScores.reduce(
+        (sum, c) => sum + c.realScore,
+        0
+      );
+
+      let grade = "F"; // default ถ้าไม่เข้าเงื่อนไข
+      for (const gs of gradeSettings) {
+        if (totalScore >= Number(gs.score)) {
+          grade = gs.grade;
+          break;
+        }
+      }
+
+      return {
+        student_id: student.student_id,
+        totalScore,
+        grade,
+        categoryScores: student.categoryScores, // เก็บรายละเอียด category ด้วย
+      };
+    });
+
+     // 4. คำนวณ mean ของคะแนนนักเรียนทั้งหมด
+    const meanScore =
+      results.reduce((sum, s) => sum + s.totalScore, 0) / results.length;
+
+    return { studentResults: results, meanScore };
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+/////////////////////////////////////////////////////////////////////////
+export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    // -----------------------------
+    // 1) คำนวณ min, max, mean จาก student scores (ใช้ getRealScoreAllStudentPerCourse)
+    // -----------------------------
+    const perStudent = await getRealScoreAllStudentPerCourse(tx, courseId);
+    const categoryScoresPerStudent = perStudent.realScoresPerStudent;
+
+    const categoryGroups: Record<string, number[]> = {};
+
+    categoryScoresPerStudent.forEach((student) => {
+      student.categoryScores.forEach((cat) => {
+        if (!categoryGroups[cat.category]) categoryGroups[cat.category] = [];
+        categoryGroups[cat.category].push(cat.realScore);
+      });
+    });
+
+    const categoryStatsBase = Object.entries(categoryGroups).map(
+      ([category, scores]) => {
+        const min = Math.min(...scores);
+        const max = Math.max(...scores);
+        const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+        return { category, min, max, mean };
+      }
+    );
+
+    // -----------------------------
+    // 2) หา highestPossible ต่อ category จาก assignment weight
+    // -----------------------------
+    const assignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) },
+      select: {
+        weight: true,
+        category: true,
+      },
+    });
+
+    const highestCategoryMap: Record<string, number> = {};
+    assignments.forEach((assignment) => {
+      const category = assignment.category;
+      const contribution = Number(assignment.weight);
+      if (!highestCategoryMap[category]) highestCategoryMap[category] = 0;
+      highestCategoryMap[category] += contribution;
+    });
+
+    // -----------------------------
+    // 3) merge categoryStatsBase + highestPossible
+    // -----------------------------
+    const categoryStats = categoryStatsBase.map((stat) => ({
+      ...stat,
+      highestPossible: highestCategoryMap[stat.category] ?? 0,
+    }));
+
+    return { categoryStats };
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน category ต่อเกรด, ผลรวมของค่าเฉลี่ย
+// ตารางเหลืองใน TABEE
+/////////////////////////////////////////////////////////////////////////
+export async function getGradeSummaryPerCourse(tx: any, courseId: number) {
+  const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(tx, courseId);
+
+  const gradeSummary: Record<
+    string,
+    {
+      count: number;
+      categoryAverages: Record<string, number>;
+      totalAverage: number; // ค่าเฉลี่ยรวมทุก category
+    }
+  > = {};
+
+  // 1. รวมข้อมูลตาม grade
+  for (const student of studentResults) {
+    const grade = student.grade;
+
+    if (!gradeSummary[grade]) {
+      gradeSummary[grade] = {
+        count: 0,
+        categoryAverages: {},
+        totalAverage: 0,
+      };
+    }
+
+    gradeSummary[grade].count += 1;
+
+    // รวมคะแนน category
+    for (const c of student.categoryScores) {
+      if (!gradeSummary[grade].categoryAverages[c.category]) {
+        gradeSummary[grade].categoryAverages[c.category] = 0;
+      }
+      gradeSummary[grade].categoryAverages[c.category] += c.realScore;
+    }
+
+    // รวมคะแนนรวมของ student เพื่อใช้หาค่าเฉลี่ยรวม
+    gradeSummary[grade].totalAverage += student.totalScore;
+  }
+
+  // 2. หาค่าเฉลี่ย category และค่าเฉลี่ยรวมต่อ grade
+  for (const grade in gradeSummary) {
+    const summary = gradeSummary[grade];
+    for (const category in summary.categoryAverages) {
+      summary.categoryAverages[category] =
+        summary.categoryAverages[category] / summary.count;
+    }
+    summary.totalAverage = summary.totalAverage / summary.count;
+  }
+
+  return gradeSummary;
 }
 
 /////////////////////////////////////////////////////////////////////////
