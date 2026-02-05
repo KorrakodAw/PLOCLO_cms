@@ -125,7 +125,7 @@ router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน clo ต่อเกรด, ผลรวมของค่าเฉลี่ย
 // ตารางฟ้าใน TABEE
 // GET http://localhost:9771/api/calculation/ass-clo/gradeSummary?courseId=ไอดีวิชา
 // Test result: OK
