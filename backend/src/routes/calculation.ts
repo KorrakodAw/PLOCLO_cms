@@ -8,6 +8,10 @@ import {
   getCloScorePerCourse,
   getCloScoreAllStudentPerCourse,
   getCloStatsPerCourse,
+  getRealScorePerStudentPerCourse,
+  getRealScoreAllStudentPerCourse,
+  getTotalScoreAndGradePerStudentPerCourse,
+  getTotalScoreAndGradeAllStudentPerCourse,
   getPloScorePerStudentPerCourse,
   getPloScorePerCourse,
   getPloScoreAllStudentPerCourse,
@@ -30,6 +34,11 @@ const router = Router();
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // น่าจะได้ใช้
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+// CLO
+//---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ของ student 1 คน ใน 1 course
@@ -111,6 +120,58 @@ router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
+
+
+// realScore
+//----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณคะแนนรวม และเกรดของ 1 นักเรียนใน 1 course
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/studentCourse", authenticateToken, async (req, res) => {
+  const { studentId, courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getTotalScoreAndGradePerStudentPerCourse(
+        tx,
+        Number(studentId),
+        Number(courseId)
+      );
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณคะแนนรวม และเกรดของนักเรียนทุกคนใน 1 course
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/allStudentCourse?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/allStudentCourse", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getTotalScoreAndGradeAllStudentPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+
+// PLO
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student 1 คนใน 1 course
