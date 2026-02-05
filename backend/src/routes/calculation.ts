@@ -8,10 +8,12 @@ import {
   getCloScorePerCourse,
   getCloScoreAllStudentPerCourse,
   getCloStatsPerCourse,
+  getCloGradeSummaryPerCourse,
   getRealScorePerStudentPerCourse,
   getRealScoreAllStudentPerCourse,
   getTotalScoreAndGradePerStudentPerCourse,
   getTotalScoreAndGradeAllStudentPerCourse,
+  getGradeSummaryPerCourse,
   getPloScorePerStudentPerCourse,
   getPloScorePerCourse,
   getPloScoreAllStudentPerCourse,
@@ -121,6 +123,26 @@ router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
   }
 });
 
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
+// ตารางฟ้าใน TABEE
+// GET http://localhost:9771/api/calculation/ass-clo/gradeSummary?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/ass-clo/gradeSummary", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getCloGradeSummaryPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
 
 // realScore
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -168,6 +190,25 @@ router.get("/realScoreAndGrade/allStudentCourse", authenticateToken, async (req,
   }
 });
 
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน category ต่อเกรด, ผลรวมของค่าเฉลี่ย
+// ตารางเหลืองใน TABEE
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/gradSummary?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/gradSummary", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getGradeSummaryPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
 
 // PLO
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

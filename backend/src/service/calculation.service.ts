@@ -388,6 +388,80 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
 }*/
 
 /////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด + ค่าเฉลี่ย CLO ต่อเกรด + ค่าเฉลี่ยรวม
+/////////////////////////////////////////////////////////////////////////
+export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1) ใช้ผลลัพธ์จากฟังก์ชัน clo เดิม
+    const { cloScoresPerStudent } = await getCloScoreAllStudentPerCourse(tx, courseId);
+
+    // 2) ดึง grade setting ของ course
+    const gradeSettings = await tx.gradeSetting.findMany({
+      where: { course_id: Number(courseId) },
+      orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
+    });
+
+    // 3) จัดกลุ่มตาม grade
+    const gradeSummary: Record<
+      string,
+      {
+        count: number;
+        categoryAverages: Record<string, number>;
+        totalAverage: number;
+      }
+    > = {};
+
+    for (const student of cloScoresPerStudent) {
+      // รวมคะแนน CLO ของนักเรียนแต่ละคน
+      const totalScore = student.cloScores.reduce((sum, c) => sum + c.cloScore, 0);
+
+      // หา grade ของนักเรียน
+      let grade = "F";
+      for (const gs of gradeSettings) {
+        if (totalScore >= Number(gs.score)) {
+          grade = gs.grade;
+          break;
+        }
+      }
+
+      // ถ้า grade ยังไม่มีใน summary → initialize
+      if (!gradeSummary[grade]) {
+        gradeSummary[grade] = {
+          count: 0,
+          categoryAverages: {},
+          totalAverage: 0,
+        };
+      }
+
+      gradeSummary[grade].count += 1;
+      gradeSummary[grade].totalAverage += totalScore;
+
+      // รวมคะแนน CLO ต่อ grade
+      for (const clo of student.cloScores) {
+        if (!gradeSummary[grade].categoryAverages[clo.cloCode]) {
+          gradeSummary[grade].categoryAverages[clo.cloCode] = 0;
+        }
+        gradeSummary[grade].categoryAverages[clo.cloCode] += clo.cloScore;
+      }
+    }
+
+    // 4) หาค่าเฉลี่ยต่อ grade
+    for (const grade in gradeSummary) {
+      const summary = gradeSummary[grade];
+      for (const cloCode in summary.categoryAverages) {
+        summary.categoryAverages[cloCode] =
+          summary.categoryAverages[cloCode] / summary.count;
+      }
+      summary.totalAverage = summary.totalAverage / summary.count;
+    }
+
+    return gradeSummary;
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
 // คำนวณ realScore ของ student 1 คน ใน 1 course แยกตาม category
 /////////////////////////////////////////////////////////////////////////
 export async function getRealScorePerStudentPerCourse(
@@ -521,7 +595,7 @@ export async function getRealScoreAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณคะแนนรวม และเกรดของนักเรียนใน course
+// คำนวณ realScore รวม และเกรดของนักเรียนใน course
 /////////////////////////////////////////////////////////////////////////
 export async function getTotalScoreAndGradePerStudentPerCourse(
   tx: any,
@@ -564,7 +638,7 @@ export async function getTotalScoreAndGradePerStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณคะแนนรวม และเกรดของนักเรียนทุกคนใน course
+// คำนวณ realScoreรวม และเกรดของนักเรียนทุกคนใน course
 /////////////////////////////////////////////////////////////////////////
 export async function getTotalScoreAndGradeAllStudentPerCourse(
   tx: any,
@@ -610,6 +684,61 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
   });
 
   return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน category ต่อเกรด, ผลรวมของค่าเฉลี่ย
+// ตารางเหลืองใน TABEE
+/////////////////////////////////////////////////////////////////////////
+export async function getGradeSummaryPerCourse(tx: any, courseId: number) {
+  const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(tx, courseId);
+
+  const gradeSummary: Record<
+    string,
+    {
+      count: number;
+      categoryAverages: Record<string, number>;
+      totalAverage: number; // ค่าเฉลี่ยรวมทุก category
+    }
+  > = {};
+
+  // 1. รวมข้อมูลตาม grade
+  for (const student of studentResults) {
+    const grade = student.grade;
+
+    if (!gradeSummary[grade]) {
+      gradeSummary[grade] = {
+        count: 0,
+        categoryAverages: {},
+        totalAverage: 0,
+      };
+    }
+
+    gradeSummary[grade].count += 1;
+
+    // รวมคะแนน category
+    for (const c of student.categoryScores) {
+      if (!gradeSummary[grade].categoryAverages[c.category]) {
+        gradeSummary[grade].categoryAverages[c.category] = 0;
+      }
+      gradeSummary[grade].categoryAverages[c.category] += c.realScore;
+    }
+
+    // รวมคะแนนรวมของ student เพื่อใช้หาค่าเฉลี่ยรวม
+    gradeSummary[grade].totalAverage += student.totalScore;
+  }
+
+  // 2. หาค่าเฉลี่ย category และค่าเฉลี่ยรวมต่อ grade
+  for (const grade in gradeSummary) {
+    const summary = gradeSummary[grade];
+    for (const category in summary.categoryAverages) {
+      summary.categoryAverages[category] =
+        summary.categoryAverages[category] / summary.count;
+    }
+    summary.totalAverage = summary.totalAverage / summary.count;
+  }
+
+  return gradeSummary;
 }
 
 /////////////////////////////////////////////////////////////////////////
