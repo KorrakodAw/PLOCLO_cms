@@ -184,5 +184,18 @@
   "instructor": "Instructor",
   "manage universities": "Manage Universities",
   "manage programs": "Manage Programs",
-  "manage courses": "Manage Courses"
+  "manage courses": "Manage Courses",
+  "create_new_account": "Create New Account",
+  "enter_username": "Enter Username",
+  "email_address": "Email Address",
+  "admins": "Admins",
+  "course_admins": "Course Admins",
+  "instructors": "Instructors",
+  "students": "Students",
+  "guests": "Guests",
+  "id": "ID",
+  "username": "Username",
+  "created_at": "Created At"
+  
+
 }

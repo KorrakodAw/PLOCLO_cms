@@ -188,5 +188,16 @@
   "instructor": "อาจารย์ผู้สอน",
   "manage universities": "จัดการมหาวิทยาลัย",
   "manage programs": "จัดการแผนการเรียน",
-  "manage courses": "จัดการรายวิชา"
+  "manage courses": "จัดการรายวิชา",
+  "create_new_account": "สร้างบัญชีใหม่",
+  "enter_username": "กรอกชื่อผู้ใช้",
+  "email_address": "ที่อยู่อีเมล",
+  "admins": "ผู้ดูแลระบบ",
+  "course_admins": "ผู้ดูแลรายวิชา",
+  "instructors": "อาจารย์ผู้สอน",
+  "students": "นักศึกษา",
+  "guests": "ผู้เยี่ยมชม",
+  "id": "รหัส",
+  "username": "ชื่อผู้ใช้",
+  "created_at": "สร้างเมื่อ"
 }

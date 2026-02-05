@@ -11,6 +11,7 @@ import {
 import DropdownSelect from "@/components/DropdownSelect";
 import { apiClient } from "@/utils/apiClient";
 
+
 // Import Refactored Components
 import { PerformanceTrendChart } from "./viewChartComponent/PerformanceTrendChart";
 import { PerformanceBalanceChart } from "./viewChartComponent/PerformanceBalanceChart";
@@ -56,6 +57,8 @@ export default function PLOChart() {
     minScore: true,
     allAvg: true,
   });
+
+  
 
   // --- API FETCHERS ---
   const fetchData = async (endpoint: string, params = {}) => {
@@ -440,6 +443,7 @@ export default function PLOChart() {
               />
             </div>
           </div>
+          
 
           {/* BOTTOM ROW: Dynamic Analytics Controls */}
           {summaryData && (

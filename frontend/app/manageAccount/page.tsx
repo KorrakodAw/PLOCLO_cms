@@ -25,7 +25,7 @@ interface User {
 }
 
 export default function ManageAccount() {
-  const { i18n } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const { token, isLoggedIn, user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
@@ -54,8 +54,6 @@ export default function ManageAccount() {
       showToast("Cannot reach API. Check backend.", "error");
     }
   };
-
-  
 
   useEffect(() => {
     if (!isLoggedIn || !token) return;
@@ -129,9 +127,9 @@ export default function ManageAccount() {
   // COLUMNS DEFINITION (FIXED)
   // ============================
   const manageAccoutColumns: Column<User>[] = [
-    { header: "ID", accessor: "id" },
-    { header: "Username", accessor: "username" },
-    { header: "Email", accessor: "email" },
+    { header: t("id"), accessor: "id" },
+    { header: t("username"), accessor: "username" },
+    { header: t("email_address"), accessor: "email" },
     // {
     //   header: "Created At",
     //   accessor: "created_at",
@@ -145,7 +143,7 @@ export default function ManageAccount() {
     //   ),
     // },
     {
-      header: "Created At",
+      header: t("created_at"),
       accessor: "created_at",
       render: (row) => {
         if (!row.created_at) return "-";
@@ -156,8 +154,8 @@ export default function ManageAccount() {
         return (
           <span className="text-gray-600 font-light">
             {new Intl.DateTimeFormat(locale, {
-              day: "2-digit",
-              month: "long",
+              day: "numeric",
+              month: "short",
               year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
@@ -168,7 +166,7 @@ export default function ManageAccount() {
       },
     },
     {
-      header: "Actions",
+      header: t("actions"),
       accessor: "id",
       actions: [
         {
@@ -194,31 +192,31 @@ export default function ManageAccount() {
   const ROLES_TABS = [
     {
       id: "system_admin",
-      label: "Admins",
+      label: t("admins"),
       color: "text-red-800",
       dot: "bg-red-700",
     },
     {
       id: "course_admin",
-      label: "Course Admins",
+      label: t("course_admins"),
       color: "text-red-600",
       dot: "bg-red-500",
     },
     {
       id: "instructor",
-      label: "Instructors",
+      label: t("instructors"),
       color: "text-blue-600",
       dot: "bg-blue-500",
     },
     {
       id: "student",
-      label: "Students",
+      label: t("students"),
       color: "text-green-600",
       dot: "bg-green-500",
     },
     {
       id: "guest",
-      label: "Guests",
+      label: t("guests"),
       color: "text-orange-600",
       dot: "bg-orange-500",
     },
@@ -239,18 +237,20 @@ export default function ManageAccount() {
   if (!isLoggedIn) return <p>Please login first.</p>;
 
   return (
-    <ProtectedRoute roles={["Super_admin","system_admin"]}>
+    <ProtectedRoute roles={["Super_admin", "system_admin"]}>
       <div className="max-w-[1400px] flex flex-col mx-auto">
         <ToastElement />
         {loading && <LoadingOverlay />}
         <div className="p-5 md:p-8">
           <div className="flex justify-between items-center mb-8 border-b pb-4">
-            <h1 className="text-3xl font-light text-gray-800">Accounts</h1>
+            <h1 className="text-3xl font-light text-gray-800">
+              {t("accounts")}
+            </h1>
             <AddButton
-              buttonText="Create New Account"
+              buttonText={t("create_new_account")}
               placeholderText={{
-                nameEn: "Enter Username",
-                nameTh: "Email Address",
+                nameEn: t("enter_username"),
+                nameTh: t("email_address"),
               }}
               showCodeInput={false}
               showAbbreviationInputs={false}
