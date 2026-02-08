@@ -32,6 +32,10 @@ export default function RootLayout({
           <AuthProvider>
             <I18nProvider>
               <ClientWrapper>{children}</ClientWrapper>
+              {/* Footer Info (Optional) */}
+              <footer className="text-center text-slate-400 text-xs pb-4 ml-[200px]">
+                © 2026 PLOCLO Management System • All Rights Reserved
+              </footer>
             </I18nProvider>
           </AuthProvider>
         </GoogleOAuthProvider>

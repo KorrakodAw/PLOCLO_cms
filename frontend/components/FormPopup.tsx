@@ -185,8 +185,6 @@ export default function FormPopup<T>({
       // 4. Convert to JSON and Cast to T[]
       const rows = XLSX.utils.sheet_to_json(worksheet);
 
-      console.log("Excel Data:", rows);
-
       if (onSubmitExcel) {
         // Cast rows (any[]) to T[] to satisfy the strict generic type
         await onSubmitExcel(rows as T[]);

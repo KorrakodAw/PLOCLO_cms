@@ -1,323 +1,208 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import React, { useState, useEffect } from "react";
-import DropdownSelect from "../../components/DropdownSelect";
-import { getUniversities, University } from "../../utils/universityApi";
-import { getFaculties, Faculty } from "../../utils/facultyApi";
-import { getPrograms, Program } from "../../utils/programApi";
-import ProgramManagement from "./ProgramManagement";
 import { useTranslation } from "react-i18next";
+import DropdownSelect from "../../components/DropdownSelect";
+import ProgramManagement from "./ProgramManagement";
 import ProtectedRoute from "../../components/ProtectedRoute";
 
-// import TabButton from "../../components/TabButton";
-// import AddPlo from "./AddPlo";
-// import AddStudent from "./AddStudent";
+import { getUniversities } from "../../utils/universityApi";
+import { getFaculties, Faculty } from "../../utils/facultyApi";
+import { getPrograms, Program } from "../../utils/programApi";
+import SearchBar from "@/components/SearchBar";
+
+import { useAuth } from "../context/AuthContext";
+
+interface Option {
+  label: string;
+  value: string;
+}
 
 export default function EditProgram() {
+  
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
-  const [university, setUniversity] = useState<string>("");
-  const [faculty, setFaculty] = useState<string>("");
-  const [program, setProgram] = useState<string>("");
-  const [year, setYear] = useState<string>("");
 
-  // const ACTIVE_TAB_KEY = "editProgramActiveTab";
-  // const ACTIVE_TAB_KEY = `activeTab_${location.pathname}`;
+  // --- 1. STATES ---
+  const [selections, setSelections] = useState({
+    university: "",
+    faculty: "",
+    program: "",
+  });
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Initialize activeTab from URL hash or localStorage on first client render
-  // const [activeTab, setActiveTab] = useState<string>(() => {
-  //   try {
-  //     if (typeof window !== "undefined") {
-  //       const hash = window.location.hash
-  //         ? window.location.hash.replace(/^#/, "")
-  //         : "";
-  //       const valid = ["general", "plo", "add-student"];
-  //       if (hash && valid.includes(hash)) return hash;
-  //       const stored = localStorage.getItem(ACTIVE_TAB_KEY);
-  //       if (stored && valid.includes(stored)) return stored;
-  //     }
-  //   } catch {
-  //     // ignore
-  //   }
-  //   return "general";
-  // });
+  const [options, setOptions] = useState({
+    universities: [] as Option[],
+    faculties: [] as Option[],
+    programs: [] as Option[],
+  });
 
-  const [universityOptions, setUniversityOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [facultyOptions, setFacultyOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [programOptions, setProgramOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  // const [yearOptions, setYearOptions] = useState<
-  //   { label: string; value: string }[]
-  // >([]);
+const { user, token } = useAuth();
+const isInstructor = user?.role === "instructor";
 
-  // const tabs = [
-  //   { id: "general", label: t("general information") },
-  //   { id: "plo", label: t("program learning outcomes (PLO)") },
-  //   { id: "add-student", label: t("add student to program") },
-  // ];
-
-  // (initial value handled by useState initializer)
-
-  // Persist active tab whenever it changes (write both hash and localStorage)
-  // useEffect(() => {
-  //   try {
-  //     // update hash without adding history entry
-  //     if (typeof window !== "undefined") {
-  //       window.history.replaceState(null, "", `#${activeTab}`);
-  //     }
-  //     localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
-  //   } catch {
-  //     // ignore localStorage/window errors
-  //   }
-  // }, [ACTIVE_TAB_KEY, activeTab]);
-
-  const clearFilters = () => {
-    setUniversity("");
-    setFaculty("");
-    setProgram("");
-    setYear("");
+  // --- 2. HANDLERS ---
+  const updateSelections = (updates: Partial<typeof selections>) => {
+    // Prevent updates if instructor is trying to change via logic
+    if (isInstructor) return;
+    setSelections((prev) => ({ ...prev, ...updates }));
   };
 
-  // โหลดมหาวิทยาลัยตอนเริ่มต้น
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    if (!university) {
-      setUniversity("");
-      setFaculty("");
-      setProgram("");
-      setYear("");
+  const clearFilters = () => {
+    if (isInstructor) {
+      setSearchTerm(""); // Instructors can only clear the search, not the program lock
+      return;
     }
+    setSelections({ university: "", faculty: "", program: "" });
+    setSearchTerm("");
+  };
 
+  // --- 3. FETCH DATA EFFECTS ---
+
+  // Load Universities
+  useEffect(() => {
+    if (!token) return;
     getUniversities(token)
       .then((data) => {
-        setUniversityOptions([
-          { label: t("all"), value: "" },
-          ...data.map((u: University) => ({
-            label: lang === "th" ? u.name_th : u.name, // ⬅️ FIX: Conditional label assignment
-            value: String(u.id),
-          })),
-        ]);
-      })
-      .catch(() => setUniversityOptions([{ label: t("all"), value: "" }]));
-  }, [t]);
-
-  // เมื่อเลือกมหาวิทยาลัย → โหลดคณะ
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token || !university) {
-      setFacultyOptions([{ label: t("all"), value: "" }]);
-      setFaculty("");
-      setProgram("");
-      setYear("");
-      setFacultyOptions([{ label: t("all"), value: "" }]);
-      setProgramOptions([{ label: t("all"), value: "" }]);
-      // setYearOptions([{ label: t("all"), value: "" }]);
-      return;
-    }
-
-    const fetchFaculties = async () => {
-      try {
-        // Send universityId to the API
-        const data = await getFaculties(token, university);
-
-        setFacultyOptions([
-          { label: t("all"), value: "" },
-          ...data.map((f: Faculty) => ({
-            label: lang === "th" ? f.name_th : f.name, // ⬅️ FIX: Conditional label assignment if needed
-            value: String(f.id),
-          })),
-        ]);
-      } catch (err) {
-        console.error(err);
-        setFacultyOptions([{ label: t("all"), value: "" }]);
-      }
-    };
-
-    fetchFaculties();
-  }, [university, t]);
-
-  // เมื่อเลือกคณะ → โหลดโปรแกรม
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token || !faculty) {
-      setProgram("");
-      setYear("");
-      setProgramOptions([{ label: t("all"), value: "" }]);
-      // setYearOptions([{ label: t("all"), value: "" }]);
-      return;
-    }
-
-    getPrograms(token, faculty) // ← ส่ง facultyId ไป
-      .then((data) => {
-        const uniquePrograms = Array.from(
-          new Map(data.map((p: Program) => [p.program_code, p])).values(),
-        );
-
-        setProgramOptions([
-          { label: t("all"), value: "" },
-          ...(uniquePrograms as Program[]).map((p) => ({
-            label:
-              lang === "th" ? p.program_shortname_th : p.program_shortname_en, // ⬅️ FIX: Conditional label assignment if needed
-            value: String(p.program_code),
-          })),
-        ]);
-
-        // const years = Array.from(
-        //   new Set(data.map((p: Program) => p.program_year))
-        // ).sort() as number[];
-        // setYearOptions([
-        //   { label: t("all"), value: "" },
-        //   ...years.map((y: number) => ({ label: String(y), value: String(y) })),
-        // ]);
+        setOptions((prev) => ({
+          ...prev,
+          universities: data,
+        }));
       })
       .catch(() => {
-        setProgramOptions([{ label: t("all"), value: "" }]);
-        // setYearOptions([{ label: t("all"), value: "" }]);
+        setOptions((p) => ({ ...p, universities: [] }));
       });
-  }, [faculty, t]);
+  }, [token]);
 
-  // เมื่อเลือกโปรแกรม → โหลดปีการศึกษา
-  // useEffect(() => {
-  //   const token = localStorage.getItem("token");
-  //   if (!token || !faculty || !program) {
-  //     setYearOptions([{ label: t("all"), value: "" }]);
-  //     return;
-  //   }
+  // Load Faculties when University changes
+  useEffect(() => {
+    if (!token || !selections.university) {
+      setOptions((p) => ({ ...p, faculties: [], programs: [] }));
+      return;
+    }
+    getFaculties(token, selections.university)
+      .then((data) => {
+        const formatted = data.map((f: Faculty) => ({
+          label: lang === "th" ? f.name_th : f.name,
+          value: String(f.id),
+        }));
+        setOptions((prev) => ({
+          ...prev,
+          faculties: [{ label: t("all"), value: "" }, ...formatted],
+        }));
+      })
+      .catch(() => setOptions((p) => ({ ...p, faculties: [] })));
+  }, [selections.university, lang, t]);
 
-  //   if (!program) {
-  //     // If no program selected, keep the faculty-wide year options (do nothing)
-  //     return;
-  //   }
+  // Load Programs when Faculty changes
+  useEffect(() => {
+    if (!token || !selections.faculty) {
+      setOptions((p) => ({ ...p, programs: [] }));
+      return;
+    }
+    getPrograms(token, selections.faculty)
+      .then((data) => {
+        const formatted = data.map((p: Program) => ({
+          label: lang === "th" ? p.program_name_th : p.program_name_en,
+          value: String(p.id),
+        }));
+        setOptions((prev) => ({
+          ...prev,
+          programs: [{ label: t("all"), value: "" }, ...formatted],
+        }));
+      })
+      .catch(() => setOptions((p) => ({ ...p, programs: [] })));
+  }, [selections.faculty, lang, t]);
 
-  //   getPrograms(token, faculty)
-  //     .then((data) => {
-  //       // Filter programs with the selected program_code
-  //       const years = Array.from(
-  //         new Set(
-  //           data
-  //             .filter(
-  //               (p: Program) => String(p.program_code) === String(program)
-  //             )
-  //             .map((p: Program) => p.program_year)
-  //         )
-  //       ).sort() as number[];
-
-  //       if (years.length === 0) {
-  //         setYearOptions([{ label: t("all"), value: "" }]);
-  //       } else {
-  //         setYearOptions([
-  //           { label: t("all"), value: "" },
-  //           ...years.map((y) => {
-  //             const label = lang === "en" ? String(y - 543) : String(y);
-  //             return { label, value: String(y) }; // display converted label, keep real value
-  //           }),
-  //         ]);
-  //       }
-  //     })
-  //     .catch(() => setYearOptions([{ label: t("all"), value: "" }]));
-  // }, [program, faculty, t, lang]);
-
+  // --- 4. RENDER ---
   return (
     <ProtectedRoute roles={["system_admin", "Super_admin"]}>
-      <div className="max-w-[1400px] flex flex-col mx-auto">
-        <p className="font-light text-2xl ">{t("program information")}</p>
+      <div className="max-w-[1400px] min-h-screen flex flex-col mx-auto p-6 space-y-6">
+        {/* Header */}
+        <header className="space-y-1">
+          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
+            {t("program information")}
+          </h1>
+          <div className="h-1.5 w-16 bg-orange-400 rounded-full" />
+        </header>
 
-        {/* Tabs */}
-        {/* <div className="flex gap-3 mt-5 px-3 py-2 ">
-          {tabs.map((tab) => (
-            <TabButton
-              key={tab.id}
-              label={tab.label}
-              isActive={activeTab === tab.id}
-              onClick={() => {
-                setActiveTab(tab.id);
-                clearFilters();
-              }}
-            />
-          ))}
+        {/* Filter & Search Card */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 space-y-6">
+          {/* Row 1: Search Bar (Full Width) */}
+          <div className="w-full space-y-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+              {t("search_program")}
+            </label>
+            <div className="relative group">
+              <SearchBar
+                placeholder={t("search_program_placeholder")}
+                onSearch={(value) => setSearchTerm(value)}
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Row 2: Cascading Filters */}
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="min-w-[220px]">
+                <DropdownSelect
+                  label={t("university")}
+                  value={selections.university}
+                  onChange={(val) =>
+                    updateSelections({
+                      university: String(val),
+                      faculty: "",
+                      program: "",
+                    })
+                  }
+                  options={options.universities}
+                />
+              </div>
+
+              <div className="min-w-[220px]">
+                <DropdownSelect
+                  label={t("faculty")}
+                  value={selections.faculty}
+                  onChange={(val) =>
+                    updateSelections({ faculty: String(val), program: "" })
+                  }
+                  options={options.faculties}
+                  disabled={!selections.university}
+                />
+              </div>
+
+              <div className="min-w-[220px]">
+                <DropdownSelect
+                  label={t("program")}
+                  value={selections.program}
+                  onChange={(val) => updateSelections({ program: String(val) })}
+                  options={options.programs}
+                  disabled={!selections.faculty}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={clearFilters}
+              className="px-6 py-2.5 text-slate-500 hover:text-orange-600 font-semibold transition-all hover:bg-orange-50 rounded-xl flex items-center gap-2 border border-slate-100 hover:border-orange-200"
+            >
+              <span className="text-xl leading-none">×</span>
+              {t("clear")}
+            </button>
+          </div>
         </div>
-        <hr /> */}
 
-        {/* Filters */}
-        <div className="flex gap-3 mt-5 items-center">
-          <DropdownSelect
-            label={t("university")}
-            value={university}
-            onChange={(value) => setUniversity(String(value))}
-            options={universityOptions}
-          />
-
-          <DropdownSelect
-            label={t("faculty")}
-            value={faculty}
-            onChange={(value) => setFaculty(String(value))}
-            options={facultyOptions}
-            disabled={!university}
-          />
-
-          <DropdownSelect
-            label={t("program")}
-            value={program}
-            onChange={(value) => setProgram(String(value))}
-            options={programOptions}
-            disabled={!faculty}
-          />
-
-          {/* <DropdownSelect
-            label={t("year")}
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            options={yearOptions}
-            disabled={!program}
-          /> */}
-
-          <button
-            onClick={clearFilters}
-            className="text-white bg-orange-300 hover:bg-orange-400 h-5 flex ml-3 items-center p-2 rounded-full cursor-pointer"
-          >
-            {t("clear")}
-          </button>
-        </div>
-
-        <ProgramManagement
-          universityId={university}
-          facultyId={faculty}
-          programId={program}
-          year={year}
-        />
-
-        {/* Tab Contents */}
-        {/* {activeTab === "general" && (
+        {/* Data Content */}
+        <section className="flex-1 bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-200/60 overflow-hidden mb-8 p-1">
           <ProgramManagement
-            universityId={university}
-            facultyId={faculty}
-            programId={program}
-            year={year}
+            universityId={selections.university}
+            facultyId={selections.faculty}
+            programId={selections.program}
+            searchTerm={searchTerm} // อย่าลืมส่ง searchTerm เข้าไปที่ Component ลูกเพื่อ Filter ข้อมูล
           />
-        )} */}
-        {/* {activeTab === "plo" && (
-          <AddPlo
-            universityId={university}
-            facultyId={faculty}
-            programId={program}
-            year={year}
-          />
-        )}
-        {activeTab === "add-student" && (
-          <AddStudent
-            universityId={university}
-            facultyId={faculty}
-            programId={program}
-            year={year}
-          />
-        )} */}
+        </section>
       </div>
     </ProtectedRoute>
   );

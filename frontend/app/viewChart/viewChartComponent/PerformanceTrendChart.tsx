@@ -13,7 +13,7 @@ import {
 
 interface PerformanceTrendChartProps {
   chartData: any[];
-  summaryData: { students: { grade: string }[] };
+  summaryData: any[];
   visibleLines?: Record<string, boolean>;
   getGradeColor?: (grade: string) => string;
   xAxisKey: string;
@@ -34,15 +34,22 @@ export const PerformanceTrendChart = ({
   minScoreKey,
   allAvgKey,
 }: PerformanceTrendChartProps) => {
-  const uniqueGrades = useMemo(
-    () =>
-      Array.from(
-        new Set(summaryData?.students?.map((s: { grade: string }) => s.grade)),
-      )
-        .filter(Boolean)
-        .sort(),
-    [summaryData],
-  );
+
+
+  const uniqueGrades = useMemo(() => {
+    if (!summaryData || chartData.length === 0) return [];
+
+    // 1. Get all keys from the first data object (e.g., "cloCode", "avg_grade_A", etc.)
+    const keys = Object.keys(chartData[0]);
+
+    // 2. Filter for keys that start with 'avg_grade_' and extract the grade name
+    return keys
+      .filter((key) => key.startsWith("avg_grade_"))
+      .map((key) => key.replace("avg_grade_", ""))
+      .sort(); // Sorts them as A, B, C, F
+  }, [chartData]);
+
+  
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -131,6 +138,7 @@ export const PerformanceTrendChart = ({
               />
             ),
         )}
+        
       </ComposedChart>
     </ResponsiveContainer>
   );

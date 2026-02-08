@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import React, { useEffect, useState, use } from "react";
@@ -13,6 +14,14 @@ import { useTranslation } from "react-i18next";
 import BreadCrumb from "@/components/BreadCrumb";
 
 // --- Types ---
+/* interface Users {
+  id: number;
+  email: string;
+  username: string;
+  role: string;
+} 
+*/
+
 interface Instructor {
   id: number;
   full_thai_name: string;
@@ -46,13 +55,17 @@ interface PageProps {
 }
 
 export default function FacultyInstructorPage({ params }: PageProps) {
-  // Unwrap params using React.use()
   const { facultyId } = use(params);
-
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
+
+  // --- User Selection State (Commented Out) ---
+  /* const [systemUsers, setSystemUsers] = useState<Users[]>([]);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState(""); 
+  */
 
   // --- State ---
   const [faculty, setFaculty] = useState<Faculty | null>(null);
@@ -72,11 +85,9 @@ export default function FacultyInstructorPage({ params }: PageProps) {
     if (!token) return;
     setLoading(true);
     try {
-      // A. Get Faculty Info (for display header)
       const facultyRes = await apiClient.get(`/faculty/${facultyId}`);
       setFaculty(facultyRes.data);
 
-      // B. Get Instructors (filtered by facultyId)
       const instructorRes = await apiClient.get(
         `/instructor?facultyId=${facultyId}`,
       );
@@ -100,7 +111,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
         full_thai_name: data.nameEn,
         full_eng_name: data.nameTh,
         email: data.abbrEn,
-        phoneNum: data.abbrTh, // Optional
+        phoneNum: data.abbrTh,
         faculty_id: parseInt(facultyId),
       });
       showToast("Instructor created successfully", "success");
@@ -119,7 +130,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
         full_eng_name: selectedInstructor.full_eng_name,
         email: selectedInstructor.email,
         phoneNum: selectedInstructor.phoneNum,
-        faculty_id: parseInt(facultyId), // Keep the faculty link
+        faculty_id: parseInt(facultyId),
       });
       showToast("Instructor updated successfully", "success");
       setShowEditPopup(false);
@@ -143,10 +154,51 @@ export default function FacultyInstructorPage({ params }: PageProps) {
     }
   };
 
+  // --- User-to-Instructor Handlers (Commented Out) ---
+  /* const fetchSystemUsers = async () => {
+    try {
+      const res = await apiClient.get(`/users?role=instructor`);
+      setSystemUsers(res.data);
+    } catch {
+      showToast("Failed to fetch users", "error");
+    }
+  };
+
+  const handleOpenUserModal = () => {
+    fetchSystemUsers();
+    setShowUserModal(true);
+  };
+
+  const handleAddFromUser = async (user: Users) => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      await apiClient.post("/instructor", {
+        full_thai_name: `${user.username} `,
+        full_eng_name: `${user.username} `,
+        email: user.email,
+        phoneNum: "",
+        faculty_id: parseInt(facultyId),
+        user_id: user.id,
+      });
+
+      showToast("User added as instructor", "success");
+      setShowUserModal(false);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to add instructor", "error");
+    } finally {
+      setLoading(false);
+    }
+  }; 
+  */
+
   // --- 3. Table Columns ---
   const columns: Column<Instructor>[] = [
-    { header: t("First Name"), accessor: "full_thai_name" },
-    { header: t("Last Name"), accessor: "full_eng_name" },
+    lang === "th"
+      ? { header: t("Thai Name"), accessor: "full_thai_name" }
+      : { header: t("En Name"), accessor: "full_eng_name" },
+
     { header: t("Email"), accessor: "email" },
     { header: t("Phone"), accessor: "phoneNum" },
     {
@@ -178,21 +230,15 @@ export default function FacultyInstructorPage({ params }: PageProps) {
   if (loading) return <LoadingOverlay />;
 
   return (
-    // <div className="bg-yellow-200 p-4 mb-4 border border-yellow-400 text-yellow-800 rounded font-mono">
-    //   TEST: Faculty ID is ({facultyId})
-    // </div>
     <div className="p-8 min-h-screen bg-gray-50/50">
       <BreadCrumb
         items={[
           { label: t("manage universities"), href: "/manageUniversity" },
           {
-            // ✅ FIX: Use optional chaining to get the name safely
             label:
               lang === "th"
                 ? faculty?.university?.name_th || t("loading...")
                 : faculty?.university?.name || t("loading..."),
-
-            // ✅ FIX: Use the ID from the university object or the faculty FK
             href: `/manageUniversity/${faculty?.university_id ?? ""}`,
           },
           {
@@ -216,12 +262,6 @@ export default function FacultyInstructorPage({ params }: PageProps) {
             <span className="font-light text-orange-600">{faculty?.name}</span>
           </p>
         </div>
-        {/* <button
-          onClick={() => router.back()} // Go back to University Detail
-          className="text-sm text-gray-500 hover:text-gray-800 underline"
-        >
-          &larr; Back to Faculty List
-        </button> */}
       </div>
 
       {/* Main Content */}
@@ -231,23 +271,33 @@ export default function FacultyInstructorPage({ params }: PageProps) {
             Instructors List ({instructors.length})
           </h2>
 
-          <AddButton
-            buttonText={t("Add Instructor")}
-            // Repurpose the placeholder text for Instructor fields
-            placeholderText={{
-              nameEn: "Full Thai Name",
-              nameTh: "Full English Name",
-              abbrEn: "Email Address",
-              abbrTh: "Phone (Optional)",
-            }}
-            submitButtonText={{
-              insert: t("Add Instructor"),
-              upload: t("Upload Excel"),
-            }}
-            showAbbreviationInputs={true} // We need the 3rd input for Email
-            showCodeInput={false}
-            onSubmit={handleCreateInstructor}
-          />
+          <div className="flex gap-2">
+            {/* --- Select from Users Button (Commented Out) --- */}
+            {/* <button
+              onClick={handleOpenUserModal}
+              className="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-700 transition-colors"
+            >
+              {t("Select from Users")}
+            </button> 
+            */}
+
+            <AddButton
+              buttonText={t("Add Instructor")}
+              placeholderText={{
+                nameEn: "Full Thai Name",
+                nameTh: "Full English Name",
+                abbrEn: "Email Address",
+                abbrTh: "Phone (Optional)",
+              }}
+              submitButtonText={{
+                insert: t("Add Instructor"),
+                upload: t("Upload Excel"),
+              }}
+              showAbbreviationInputs={true}
+              showCodeInput={false}
+              onSubmit={handleCreateInstructor}
+            />
+          </div>
         </div>
 
         <div className="p-6">
@@ -262,6 +312,63 @@ export default function FacultyInstructorPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      {/* --- User Selection Modal (Commented Out) --- */}
+      {/* {showUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="p-6 border-b flex justify-between items-center">
+              <h3 className="text-xl font-bold">{t("Select User to Add")}</h3>
+              <button onClick={() => setShowUserModal(false)} className="text-gray-400 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 border-b">
+              <input
+                type="text"
+                placeholder={t("Search by name or email...")}
+                className="w-full p-2 bg-gray-50 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20"
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <table className="w-full text-left">
+                <thead className="text-xs uppercase text-gray-400 font-bold border-b">
+                  <tr>
+                    <th className="pb-2">{t("Name")}</th>
+                    <th className="pb-2">{t("Email")}</th>
+                    <th className="pb-2 text-right">{t("Action")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {systemUsers
+                    .filter((u) => {
+                      const isAlreadyInstructor = instructors.some(
+                        (instructor) => instructor.email.toLowerCase() === u.email.toLowerCase()
+                      );
+                      const matchesSearch = u.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                        u.username.toLowerCase().includes(userSearchTerm.toLowerCase());
+                      return !isAlreadyInstructor && matchesSearch;
+                    })
+                    .map((user) => (
+                      <tr key={user.id} className="hover:bg-gray-50 group">
+                        <td className="py-3 text-sm">{user.username}</td>
+                        <td className="py-3 text-sm text-gray-500">{user.email}</td>
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => handleAddFromUser(user)}
+                            className="text-orange-600 font-bold text-xs uppercase hover:underline"
+                          >
+                            {t("Select")}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )} 
+      */}
 
       {/* Popups */}
       {showEditPopup && selectedInstructor && (

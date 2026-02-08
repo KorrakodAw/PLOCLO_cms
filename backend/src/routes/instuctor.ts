@@ -91,4 +91,24 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/email/:email", authenticateToken, async (req, res) => {
+  try {
+    // Force email to be a string
+    const email = req.params.email as string;
+
+    const instructor = await prisma.instructor.findFirst({
+      where: { email }, // Prisma now sees this as a single string
+    });
+
+    if (!instructor) {
+      return res.status(404).json({ error: "Instructor not found" });
+    }
+
+    res.json(instructor);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch instructor by email" });
+  }
+});
+
 export default router;

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDownIcon } from "@heroicons/react/24/outline"; // Make sure you have heroicons or use an SVG
+import { ChevronDownIcon } from "@heroicons/react/24/outline"; 
+import { useTranslation } from "react-i18next";
 
 interface Option {
   label: string | number;
@@ -24,6 +25,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation("common");
 
   // Close dropdown if clicking outside
   useEffect(() => {
@@ -43,7 +45,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const selectedOption = options.find((opt) => opt.value === value);
 
   return (
-    <div className="relative w-[200px]" ref={dropdownRef}>
+    <div className="relative max-w-[400px]" ref={dropdownRef}>
       {label && (
         <p className="mb-1 text-sm font-light text-gray-700">{label}</p>
       )}
@@ -63,7 +65,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
         `}
       >
         <span className="block truncate">
-          {selectedOption ? selectedOption.label : "Select an option..."}
+          {selectedOption ? selectedOption.label : t("select_an_option")}
         </span>
         <ChevronDownIcon className="w-4 h-4 text-gray-500" />
       </div>

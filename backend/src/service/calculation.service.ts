@@ -287,21 +287,31 @@ export async function getCloScoreAllStudentPerCourse(
 
       Object.entries(cloMap).forEach(([cloCode, assignments]) => {
         let cloTotal = 0;
-
         assignments.forEach((row) => {
           const realScore =
             Number(row.score) /
             (Number(row.maxScore) / Number(row.assignmentWeight));
 
-          const weighted = Number(row.weight) / 100; // mappingWeight เป็น %
+          const weighted = Number(row.weight) / 100;
           cloTotal += realScore * weighted;
         });
 
-        cloScores.push({ cloCode, cloScore: cloTotal });
+        cloScores.push({ cloCode, cloScore: Number(cloTotal.toFixed(2)) });
       });
+
+      // --- SORT CLOs (e.g., CLO1, CLO2) ---
+      cloScores.sort((a, b) =>
+        a.cloCode.localeCompare(b.cloCode, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
 
       results.push({ student_id: Number(student_id), cloScores });
     });
+
+    // --- SORT STUDENTS (by student_id) ---
+    results.sort((a, b) => a.student_id - b.student_id);
 
     return { cloScoresPerStudent: results };
   });
@@ -316,7 +326,7 @@ export async function getCloScoreAllStudentPerCourse(
 export async function getCloStatsPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
     // -----------------------------
-    // 1) คำนวณ min, max, mean จาก student scores (โค้ดเดิม)
+    // 1) คำนวณ min, max, mean จาก student scores
     // -----------------------------
     const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
     const cloScoresPerStudent = perStudent.cloScoresPerStudent;
@@ -334,7 +344,14 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
       const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
-      return { cloCode, min, max, mean };
+
+      return {
+        cloCode,
+        // Rounding to 2 digits
+        min: Number(min.toFixed(2)),
+        max: Number(max.toFixed(2)),
+        mean: Number(mean.toFixed(2)),
+      };
     });
 
     // -----------------------------
@@ -365,12 +382,19 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     });
 
     // -----------------------------
-    // 3) merge cloStatsBase + highestClo
+    // 3) merge + Round 2 digits + Natural Sort
     // -----------------------------
-    const cloStats = cloStatsBase.map((stat) => ({
-      ...stat,
-      highestPossible: highestCloMap[stat.cloCode] ?? 0,
-    }));
+    const cloStats = cloStatsBase
+      .map((stat) => ({
+        ...stat,
+        highestPossible: Number((highestCloMap[stat.cloCode] ?? 0).toFixed(2)),
+      }))
+      .sort((a, b) =>
+        a.cloCode.localeCompare(b.cloCode, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
 
     return { cloStats };
   });
@@ -419,7 +443,10 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
 export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
     // 1) ใช้ผลลัพธ์จากฟังก์ชัน clo เดิม
-    const { cloScoresPerStudent } = await getCloScoreAllStudentPerCourse(tx, courseId);
+    const { cloScoresPerStudent } = await getCloScoreAllStudentPerCourse(
+      tx,
+      courseId,
+    );
 
     // 2) ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
@@ -439,7 +466,10 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
 
     for (const student of cloScoresPerStudent) {
       // รวมคะแนน CLO ของนักเรียนแต่ละคน
-      const totalScore = student.cloScores.reduce((sum, c) => sum + c.cloScore, 0);
+      const totalScore = student.cloScores.reduce(
+        (sum, c) => sum + c.cloScore,
+        0,
+      );
 
       // หา grade ของนักเรียน
       let grade = "F";
@@ -471,17 +501,45 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
       }
     }
 
-    // 4) หาค่าเฉลี่ยต่อ grade
+    // 4) Calculate averages per grade (Keep current logic for intermediate steps)
     for (const grade in gradeSummary) {
       const summary = gradeSummary[grade];
       for (const cloCode in summary.categoryAverages) {
-        summary.categoryAverages[cloCode] =
-          summary.categoryAverages[cloCode] / summary.count;
+        summary.categoryAverages[cloCode] = Number(
+          (summary.categoryAverages[cloCode] / summary.count).toFixed(2),
+        );
       }
-      summary.totalAverage = summary.totalAverage / summary.count;
+      summary.totalAverage = Number(
+        (summary.totalAverage / summary.count).toFixed(2),
+      );
     }
 
-    return gradeSummary;
+    // 5) Pivot Data: Group by CLO Code instead of Grade
+    // Get all unique CLO codes present in the data
+    const allCloCodes = Array.from(
+      new Set(
+        cloScoresPerStudent.flatMap((s) => s.cloScores.map((c) => c.cloCode)),
+      ),
+    );
+
+    const result = allCloCodes
+      .map((cloCode) => {
+        const entry: any = { cloCode };
+
+        // For this CLO, pull the average from every grade
+        for (const grade in gradeSummary) {
+          const avg = gradeSummary[grade].categoryAverages[cloCode];
+          // Dynamic key: avg_grade_A, avg_grade_B, etc.
+          entry[grade] = avg !== undefined ? avg : 0;
+        }
+
+        return entry;
+      })
+      .sort((a, b) =>
+        a.cloCode.localeCompare(b.cloCode, undefined, { numeric: true }),
+      );
+
+    return result; // Now returns [{ cloCode: "CLO1", avg_grade_A: 7.48, ... }, ...]
   });
 
   return result;
@@ -493,7 +551,7 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
 export async function getRealScorePerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number
+  courseId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. Get Student Scores filtering by Assignment -> Course
@@ -536,7 +594,7 @@ export async function getRealScorePerStudentPerCourse(
       ([category, scores]) => {
         const total = scores.reduce((sum, s) => sum + s, 0);
         return { category, realScore: total };
-      }
+      },
     );
 
     return { categoryScores };
@@ -550,7 +608,7 @@ export async function getRealScorePerStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 export async function getRealScoreAllStudentPerCourse(
   tx: any,
-  courseId: number
+  courseId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. Get Student Scores filtering by Assignment -> Course
@@ -575,10 +633,7 @@ export async function getRealScoreAllStudentPerCourse(
     });
 
     // 2. Group by student_id -> category
-    const studentGroups: Record<
-      string,
-      Record<string, number[]>
-    > = {};
+    const studentGroups: Record<string, Record<string, number[]>> = {};
 
     studentScores.forEach((row) => {
       const studentId = row.student_id;
@@ -605,7 +660,7 @@ export async function getRealScoreAllStudentPerCourse(
         ([category, scores]) => {
           const total = scores.reduce((sum, s) => sum + s, 0);
           return { category, realScore: total };
-        }
+        },
       );
 
       results.push({
@@ -626,21 +681,18 @@ export async function getRealScoreAllStudentPerCourse(
 export async function getTotalScoreAndGradePerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number
+  courseId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category
     const { categoryScores } = await getRealScorePerStudentPerCourse(
       tx,
       studentId,
-      courseId
+      courseId,
     );
 
     // 2. รวมคะแนนทุก category
-    const totalScore = categoryScores.reduce(
-      (sum, c) => sum + c.realScore,
-      0
-    );
+    const totalScore = categoryScores.reduce((sum, c) => sum + c.realScore, 0);
 
     // 3. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
@@ -668,13 +720,13 @@ export async function getTotalScoreAndGradePerStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 export async function getTotalScoreAndGradeAllStudentPerCourse(
   tx: any,
-  courseId: number
+  courseId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category ของนักเรียนทุกคน
     const { realScoresPerStudent } = await getRealScoreAllStudentPerCourse(
       tx,
-      courseId
+      courseId,
     );
 
     // 2. ดึง grade setting ของ course
@@ -687,7 +739,7 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
     const results = realScoresPerStudent.map((student) => {
       const totalScore = student.categoryScores.reduce(
         (sum, c) => sum + c.realScore,
-        0
+        0,
       );
 
       let grade = "F"; // default ถ้าไม่เข้าเงื่อนไข
@@ -706,7 +758,7 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
       };
     });
 
-     // 4. คำนวณ mean ของคะแนนนักเรียนทั้งหมด
+    // 4. คำนวณ mean ของคะแนนนักเรียนทั้งหมด
     const meanScore =
       results.reduce((sum, s) => sum + s.totalScore, 0) / results.length;
 
@@ -742,7 +794,7 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
         const max = Math.max(...scores);
         const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
         return { category, min, max, mean };
-      }
+      },
     );
 
     // -----------------------------
@@ -783,7 +835,10 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
 // ตารางเหลืองใน TABEE
 /////////////////////////////////////////////////////////////////////////
 export async function getGradeSummaryPerCourse(tx: any, courseId: number) {
-  const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(tx, courseId);
+  const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(
+    tx,
+    courseId,
+  );
 
   const gradeSummary: Record<
     string,

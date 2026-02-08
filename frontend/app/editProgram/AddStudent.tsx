@@ -208,7 +208,7 @@ export default function AddStudent({ programId }: AddStudentProps) {
       program_id: programId,
     };
 
-    console.log("PAYLOAD IN COMPONENT:", payload);
+ 
 
     try {
       await addStudent(payload, token);

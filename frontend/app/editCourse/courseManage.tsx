@@ -27,6 +27,7 @@ interface CourseManagementProps {
   semester?: string;
   section?: string;
   course?: string;
+  searchTerm?: string;
 }
 
 interface ExcelCourseRow {
@@ -47,6 +48,7 @@ export default function CourseManagement({
   universityId,
   facultyId,
   programId,
+  searchTerm = "",
 }: CourseManagementProps) {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
@@ -230,11 +232,6 @@ export default function CourseManagement({
 
       // Store ALL data (so pagination works correctly)
       setCourses(courseData);
-
-      const totalItems = data.pagination?.total || courseData.length;
-      // Note: If you group items, total pages logic might need adjustment depending on if you paginate "Groups" or "Items"
-      // For now, we paginate based on raw items returned from backend.
-      setTotalPages(Math.ceil(totalItems / limit));
     } catch {
       showToast("Error fetching courses", "error");
     } finally {
@@ -245,20 +242,6 @@ export default function CourseManagement({
   useEffect(() => {
     fetchCourses();
   }, [fetchCourses]);
-
-  // 🟢 UNIQUE COURSES LOGIC
-  // This creates a filtered list for the table display only.
-  // It takes the first occurrence of every unique 'code'.
-  const uniqueCoursesDisplay = useMemo(() => {
-    const seenCodes = new Set();
-    return courses.filter((course) => {
-      if (seenCodes.has(course.code)) {
-        return false;
-      }
-      seenCodes.add(course.code);
-      return true;
-    });
-  }, [courses]);
 
   // --- ADD COURSE Handlers ---
 
@@ -441,6 +424,28 @@ export default function CourseManagement({
   //   }
   // };
 
+  const filteredCourses = useMemo(() => {
+    // 1. กรองข้อมูลตาม Search Term ก่อน
+    const searched = courses.filter((course) => {
+      const term = searchTerm.toLowerCase();
+      return (
+        course.name?.toLowerCase().includes(term) ||
+        course.code?.toLowerCase().includes(term) ||
+        course.name_th?.toLowerCase().includes(term)
+      );
+    });
+
+    // 2. กำจัดตัวซ้ำ (Deduplication) โดยยึดตาม course.code
+    // ถ้าตัวไหน code ซ้ำกัน จะเหลือแค่ตัวเดียว
+    const uniqueData = Array.from(
+      new Map(searched.map((item) => [item.code, item])).values(),
+    );
+
+    setTotalPages(Math.ceil(uniqueData.length / limit) || 1);
+
+    return uniqueData;
+  }, [courses, searchTerm]);
+
   return (
     <div className="mt-5 p-5">
       {loading && <LoadingOverlay />}
@@ -484,7 +489,7 @@ export default function CourseManagement({
 
       <div className="bg-white p-4 rounded-lg shadow-xl">
         {/* 🟢 PASS UNIQUE COURSES TO TABLE */}
-        <Table<Course> columns={courseColumns} data={uniqueCoursesDisplay} />
+        <Table<Course> columns={courseColumns} data={filteredCourses} />
 
         <div className="pt-4 flex justify-end">
           <PaginationControlButton

@@ -193,11 +193,30 @@ router.get("/me", authenticateToken, async (req: AuthRequest, res) => {
 // ===== USERS CRUD (PROTECTED) =====
 
 // Get all users
-router.get("/", authenticateToken, async (_req, res) => {
-  const result = await pool.query(
-    "SELECT id, username, email, role, created_at FROM users ORDER BY id",
-  );
-  res.json(result.rows);
+router.get("/", authenticateToken, async (req, res) => {
+  try {
+    const { role } = req.query;
+    let query: string;
+
+    // ✅ Fix: Explicitly type the array
+    let values: (string | number | boolean | null)[] = [];
+
+    if (role) {
+      // TypeScript now knows 'role' (string) is allowed in this array
+      query =
+        "SELECT id, username, email, role, created_at FROM users WHERE role = $1 ORDER BY id";
+      values = [role as string];
+    } else {
+      query =
+        "SELECT id, username, email, role, created_at FROM users ORDER BY id";
+    }
+
+    const result = await pool.query(query, values);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 // Get user by ID
@@ -221,7 +240,11 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
 
   try {
     // 🔒 1. สิทธิ์การเปลี่ยน Role (เฉพาะ Admin)
-    if (role && requester?.role !== "system_admin") {
+    if (
+      role &&
+      requester?.role !== "system_admin " &&
+      requester?.role !== "Super_admin"
+    ) {
       return res
         .status(403)
         .json({ error: "Forbidden: only admin can change roles" });

@@ -195,7 +195,22 @@
   "guests": "Guests",
   "id": "ID",
   "username": "Username",
-  "created_at": "Created At"
-  
-
+  "created_at": "Created At",
+  "select_an_option": "Select an option...",
+  "search_course": "Search Course",
+  "search_course_placeholder": "Search by Course ID or Name...",
+  "search_program": "Search Program",
+  "search_program_placeholder": "Search by Program Code or Name...",
+  "no_courses_found": "No courses found",
+  "no_programs_found": "No programs found",
+  "Are you sure you want to remove this instructor from the course?": "Are you sure you want to remove this instructor from the course?",
+  "Instructors": "Instructors",
+  "Metadata": "Metadata",
+  "Duplicate": "Duplicate",
+  "Assign Instructor": "Assign Instructor",
+  "Search Staff": "Search Staff",
+  "Select from list...": "Select from list...",
+  "Confirm Assignment": "Confirm Assignment",
+  "Instructors assigned to this course will have access to manage course content and student evaluations.": "Instructors assigned to this course will have access to manage course content and student evaluations.",
+  "Assigned Instructors": "Assigned Instructors"
 }

@@ -107,10 +107,9 @@ export default function ManageAccount() {
     }
     try {
       const payload = {
-        username: data.nameEn,
-        email: data.nameTh,
-        role: data.code || "guest",
-        password: null,
+        username: data.code,
+        email: data.nameEn,
+        password: data.nameTh || null,
       };
       await apiClient.post("/users/register", payload, {
         headers: { Authorization: `Bearer ${token}` },
@@ -249,10 +248,10 @@ export default function ManageAccount() {
             <AddButton
               buttonText={t("create_new_account")}
               placeholderText={{
-                nameEn: t("enter_username"),
-                nameTh: t("email_address"),
+                code: t("enter_username"),
+                nameEn: t("email_address"),
+                nameTh: t("enter_password"),
               }}
-              showCodeInput={false}
               showAbbreviationInputs={false}
               onSubmit={handleAddUser}
             />

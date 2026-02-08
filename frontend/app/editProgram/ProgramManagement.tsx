@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   addProgram,
@@ -30,6 +30,7 @@ interface ProgramManagementProps {
   facultyId?: string;
   programId?: string;
   year?: string;
+  searchTerm?: string;
 }
 
 export default function ProgramManagement({
@@ -37,6 +38,7 @@ export default function ProgramManagement({
   facultyId,
   programId,
   year,
+  searchTerm = "",
 }: ProgramManagementProps) {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
@@ -163,10 +165,8 @@ export default function ProgramManagement({
 
         const uniqueList = Array.from(uniqueProgramsMap.values());
         setPrograms(uniqueList);
-        setTotalPages(Math.ceil(uniqueList.length / limit) || 1);
       } else {
         setPrograms([]);
-        setTotalPages(1);
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -280,7 +280,7 @@ export default function ProgramManagement({
 
       if (axios.isAxiosError(err)) {
         // Log the server response to see the REAL error message
-        console.log("Server Response Data:", err.response?.data);
+       
 
         const errorMsg = err.response?.data?.error || "Upload failed";
         showToast(errorMsg, "error");
@@ -400,6 +400,27 @@ export default function ProgramManagement({
     fetchPrograms();
   }, [fetchPrograms]);
 
+  const filteredCourses = useMemo(() => {
+    // 1. กรองข้อมูลตาม Search Term ก่อน
+    const searched = programs.filter((course) => {
+      const term = searchTerm.toLowerCase();
+      return (
+        course.program_name_en?.toLowerCase().includes(term) ||
+        course.program_code?.toLowerCase().includes(term) ||
+        course.program_name_th?.toLowerCase().includes(term)
+      );
+    });
+
+    // 2. กำจัดตัวซ้ำ (Deduplication) โดยยึดตาม course.program_code
+    // ถ้าตัวไหน code ซ้ำกัน จะเหลือแค่ตัวเดียว
+    const uniqueData = Array.from(
+      new Map(searched.map((item) => [item.program_code, item])).values(),
+    );
+    setTotalPages(Math.ceil(uniqueData.length / limit) || 1);
+
+    return uniqueData;
+  }, [programs, searchTerm]);
+
   return (
     <div className="p-5 md:p-8">
       {loading && <LoadingOverlay />}
@@ -440,7 +461,7 @@ export default function ProgramManagement({
       {/* FILTERING CONTROLS */}
       {/* DATA TABLE SECTION */}
       <div className="bg-white p-4 rounded-lg shadow-xl">
-        <Table<Program> columns={programColumns} data={programs} />
+        <Table<Program> columns={programColumns} data={filteredCourses} />
         {/* Pagination Controls */}
         <div className="pt-4 flex justify-end">
           <PaginationControlButton

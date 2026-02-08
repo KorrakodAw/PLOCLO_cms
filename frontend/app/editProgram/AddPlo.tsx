@@ -140,7 +140,7 @@ export default function AddPlo({ programId }: AddPloProps) {
       setPage(1);
     } catch {
       showToast("Failed to refresh PLO list after Excel upload.", "error");
-    } 
+    }
   };
 
   // ฟังก์ชันสำหรับเพิ่ม PLO
@@ -240,11 +240,6 @@ export default function AddPlo({ programId }: AddPloProps) {
     //       render: (v) => v || "-",
     //     },
     {
-      header: t("year"),
-      accessor: "program_year",
-      render: (value) => (lang === "en" ? Number(value) - 543 : value),
-    },
-    {
       header: t("actions"),
       accessor: "id",
       actions: [
@@ -335,7 +330,7 @@ export default function AddPlo({ programId }: AddPloProps) {
         isOpen={showDeletePopup}
         type="confirm"
         title="Delete PLO"
-        message="Are you sure you want to delete this university?"
+        message="Are you sure you want to delete this PLO?"
         onConfirm={confirmDelete}
         onCancel={() => {
           setShowDeletePopup(false);

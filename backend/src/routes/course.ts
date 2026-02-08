@@ -374,4 +374,23 @@ router.get("/forSummary", async (_req, res) => {
   }
 });
 
+router.get("/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params as { id: string };
+
+    const course = await prisma.course.findFirst({
+      where: { id: parseInt(id) },
+    });
+
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.json(course);
+  } catch (err: any) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch course by code" });
+  }
+});
+
 export default router;

@@ -134,6 +134,7 @@ export default function AddStudentCourse({
   // --- TABLE COLUMNS ---
   const StudentColumns: Column<StudentCourse>[] = [
     {
+     
       header: (
         <input
           type="checkbox"
@@ -148,11 +149,12 @@ export default function AddStudentCourse({
               setSelectedEnrolledIds([]);
             }
           }}
-          className="cursor-pointer"
+          className="cursor-pointer w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
         />
-      ),
-      accessor: "id", // Dummy accessor for checkbox column
-      render: (_, row) => (
+      ) as unknown as string, // Cast only if your interface strictly requires 'string'
+      accessor: "student_id",
+      // Fix 2: Adjust signature from (_: any, row: any) to (row: StudentCourse)
+      render: (row) => (
         <input
           type="checkbox"
           checked={selectedEnrolledIds.includes(row.student_id)}
@@ -163,7 +165,7 @@ export default function AddStudentCourse({
                 : [...prev, row.student_id],
             );
           }}
-          className="cursor-pointer"
+          className="cursor-pointer w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
         />
       ),
     },

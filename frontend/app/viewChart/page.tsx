@@ -11,14 +11,12 @@ import {
 import DropdownSelect from "@/components/DropdownSelect";
 import { apiClient } from "@/utils/apiClient";
 
-
 // Import Refactored Components
 import { PerformanceTrendChart } from "./viewChartComponent/PerformanceTrendChart";
 import { PerformanceBalanceChart } from "./viewChartComponent/PerformanceBalanceChart";
 import { GradeDistributionChart } from "./viewChartComponent/gradeDistributionChart";
-import { CLOPerformanceTable } from "./viewChartComponent/CLOPerformanceTable";
-import { PLOPerformanceTable } from "./viewChartComponent/PLOPerformanceTable";
-import { AssignmentPerformanceTable } from "./viewChartComponent/AssignmentPerformanceTable";
+import { PerformanceTable } from "./viewChartComponent/PerformanceTable";
+
 import { ToggleButton } from "./viewChartComponent/ToggleButton";
 
 export default function PLOChart() {
@@ -57,8 +55,6 @@ export default function PLOChart() {
     minScore: true,
     allAvg: true,
   });
-
-  
 
   // --- API FETCHERS ---
   const fetchData = async (endpoint: string, params = {}) => {
@@ -181,7 +177,7 @@ export default function PLOChart() {
       fetchData("/reports/gradeSummary", {
         courseId: selections.courseId,
       }).then(setSummaryData);
-      fetchData("/calculation/ass-clo/allStudentCourse", {
+      fetchData("/calculation/ass-clo/gradeSummary", {
         courseId: selections.courseId,
       }).then(setCloStudentData);
       fetchData("/calculation/clo-plo/allStudentCourse", {
@@ -236,44 +232,6 @@ export default function PLOChart() {
       return dataPoint;
     });
   }, [summaryData]);
-
-  const cloAveragesByGrade = useMemo(() => {
-    if (!cloStudentData?.cloScoresPerStudent || !summaryData?.students)
-      return [];
-    const gradeMap = summaryData.students.reduce(
-      (acc: any, s: any) => ({ ...acc, [s.student_id]: s.grade }),
-      {},
-    );
-    const aggregates: any = {};
-    cloStudentData.cloScoresPerStudent.forEach((st: any) => {
-      const grade = gradeMap[st.student_id];
-      if (!grade) return;
-      if (!aggregates[grade]) aggregates[grade] = {};
-      st.cloScores.forEach((c: any) => {
-        if (!aggregates[grade][c.cloCode])
-          aggregates[grade][c.cloCode] = { sum: 0, count: 0 };
-        aggregates[grade][c.cloCode].sum += c.cloScore;
-        aggregates[grade][c.cloCode].count++;
-      });
-    });
-    const uniqueClos = Array.from(
-      new Set(
-        cloStudentData.cloScoresPerStudent.flatMap((s: any) =>
-          s.cloScores.map((c: any) => c.cloCode),
-        ),
-      ),
-    ).sort();
-    return uniqueClos.map((code: any) => {
-      const dp: any = { name: code };
-      Object.keys(aggregates).forEach((g) => {
-        const stats = aggregates[g][code];
-        dp[`avg_grade_${g}`] = stats
-          ? Number((stats.sum / stats.count).toFixed(2))
-          : 0;
-      });
-      return dp;
-    });
-  }, [cloStudentData, summaryData]);
 
   const ploAveragesByGrade = useMemo(() => {
     if (!Array.isArray(ploStudentData) || !summaryData?.students) return [];
@@ -338,6 +296,46 @@ export default function PLOChart() {
     return colors[grade] || "#94a3b8";
   };
 
+  const formattedCLOChartData = useMemo(() => {
+    const baseArray = Array.isArray(cloBalanceData)
+      ? cloBalanceData
+      : (cloBalanceData as any)?.cloStats || [];
+
+    if (baseArray.length === 0 || !Array.isArray(cloStudentData)) {
+      return [];
+    }
+
+    // 1. Create a quick lookup map for student data using cloCode as the key
+    const studentDataMap = new Map(
+      cloStudentData.map((item: any) => [item.cloCode, item]),
+    );
+
+    // 2. Merge base data with student data
+    return baseArray.map((baseItem: any) => {
+      const studentEntry = studentDataMap.get(baseItem.cloCode) || {};
+
+      // Define the grades we want to extract (A, C+, F, etc.)
+      // We filter out 'cloCode' so we only get the actual grade keys
+      const gradeKeys = Object.keys(studentEntry).filter(
+        (key) => key !== "cloCode",
+      );
+
+      const formattedGrades: any = {};
+      gradeKeys.forEach((grade) => {
+        const val = studentEntry[grade];
+        // Format as avg_grade_A, avg_grade_C+, etc.
+        formattedGrades[`avg_grade_${grade}`] = val
+          ? Number(Number(val).toFixed(2))
+          : 0;
+      });
+
+      return {
+        ...baseItem, // Original stats (min, max, mean)
+        ...formattedGrades, // Merged grade averages
+      };
+    });
+  }, [cloBalanceData, cloStudentData]);
+
   const toggleLine = (key: string) =>
     setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -345,10 +343,10 @@ export default function PLOChart() {
   const metricConfig = {
     CLO: {
       title: "CLO Analysis",
-      trendData: cloBalanceData?.cloStats || [],
-      balanceData: cloAveragesByGrade,
+      trendData: formattedCLOChartData,
+      balanceData: formattedCLOChartData,
       xAxis: "cloCode",
-      maxPos: "maxCloScore",
+      maxPos: "highestPossible",
       avg: "mean",
       max: "max",
       min: "min",
@@ -375,9 +373,7 @@ export default function PLOChart() {
     },
   };
 
-  useEffect(() => {
-    console.log(categoryChartData);
-  });
+  
 
   return (
     <div className="bg-[#f8fafc] min-h-screen font-sans text-slate-900 pb-12">
@@ -385,7 +381,7 @@ export default function PLOChart() {
       <div className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto px-4">
           {/* TOP ROW: Brand & Global Filters */}
-          <div className="py-4 flex flex-col xl:flex-row justify-between items-center gap-4 border-b border-slate-100">
+          <div className="py-4 flex flex-col justify-between gap-4 border-b border-slate-100">
             <div className="flex items-center gap-3 shrink-0">
               <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-200">
                 <FaChartLine className="text-white text-lg" />
@@ -443,93 +439,6 @@ export default function PLOChart() {
               />
             </div>
           </div>
-          
-
-          {/* BOTTOM ROW: Dynamic Analytics Controls */}
-          {summaryData && (
-            <div className="py-3 flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="flex items-center gap-4">
-                {/* Metric Type */}
-                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-                  {(["CLO", "PLO", "Ass"] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setActiveMetric(m)}
-                      className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        activeMetric === m
-                          ? "bg-white text-blue-600 shadow-sm"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {m === "Ass" ? "Assignments" : m}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Chart Style */}
-                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-                  <button
-                    onClick={() => setActiveTab("line")}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "line" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
-                  >
-                    Trend
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("radar")}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "radar" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
-                  >
-                    Balance
-                  </button>
-                </div>
-              </div>
-
-              {/* GRADE & AVG TOGGLES (THE BUTTONS YOU WANTED) */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
-                <ToggleButton
-                  label="Max Score"
-                  active={visibleLines.maxScore}
-                  onClick={() => toggleLine("maxScore")}
-                  color="#22c55e"
-                />
-                <ToggleButton
-                  label="Min Score"
-                  active={visibleLines.minScore}
-                  onClick={() => toggleLine("minScore")}
-                  color="#ef4444"
-                />
-                <ToggleButton
-                  label="Class Average"
-                  active={visibleLines.allAvg}
-                  onClick={() => toggleLine("allAvg")}
-                  color="#6366f1"
-                />
-
-                <div className="h-4 w-[1px] bg-slate-200 mx-1" />
-                {Array.from(
-                  new Set(summaryData?.students?.map((s: any) => s.grade)),
-                )
-                  .filter(Boolean)
-                  .sort()
-                  .map((grade: any) => (
-                    <button
-                      key={grade}
-                      onClick={() => toggleLine(`avg_grade_${grade}`)}
-                      className={`whitespace-nowrap px-3 py-1 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
-                        visibleLines[`avg_grade_${grade}`]
-                          ? "bg-white shadow-sm border-slate-300 text-slate-800"
-                          : "bg-slate-50 text-slate-300 border-transparent opacity-50"
-                      }`}
-                    >
-                      <span
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: getGradeColor(grade) }}
-                      />
-                      {grade}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -547,38 +456,118 @@ export default function PLOChart() {
           </div>
         ) : (
           <>
-            {/* TABLES SECTION FIRST (Logical Flow: See raw data then visualization) */}
-            <section className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-              {/* <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
-                <FaTable className="text-blue-500" />
-                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">
-                  Performance Data: {activeMetric}
-                </h3>
-              </div> */}
-              <div className="p-0 overflow-x-auto">
-                {activeMetric === "CLO" && (
-                  <CLOPerformanceTable
-                    summaryData={summaryData}
-                    cloAveragesByGrade={cloAveragesByGrade}
-                    getGradeColor={getGradeColor}
+            <div className="">
+              {activeMetric === "CLO" && (
+                <PerformanceTable
+                  title="CLO Performance Analysis"
+                  summaryData={summaryData}
+                  cloAveragesByGrade={formattedCLOChartData}
+                  getGradeColor={getGradeColor}
+                />
+              )}
+              {activeMetric === "PLO" && (
+                <PerformanceTable
+                  title="PLO Performance Analysis"
+                  summaryData={summaryData}
+                  cloAveragesByGrade={ploAveragesByGrade}
+                  getGradeColor={getGradeColor}
+                />
+              )}
+              {activeMetric === "Ass" && (
+                <PerformanceTable
+                  title="Assignment Category Performance Analysis"
+                  summaryData={summaryData}
+                  cloAveragesByGrade={categoryChartData}
+                  getGradeColor={getGradeColor}
+                />
+              )}
+            </div>
+
+            {/* BOTTOM ROW: Dynamic Analytics Controls */}
+            {summaryData && (
+              <div className="py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  {/* Metric Type */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    {(["CLO", "PLO", "Ass"] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setActiveMetric(m)}
+                        className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          activeMetric === m
+                            ? "bg-white text-blue-600 shadow-sm"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        {m === "Ass" ? "Assignments" : m}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Chart Style */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                      onClick={() => setActiveTab("line")}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "line" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
+                    >
+                      Trend
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("radar")}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "radar" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
+                    >
+                      Balance
+                    </button>
+                  </div>
+                </div>
+
+                {/* GRADE & AVG TOGGLES (THE BUTTONS YOU WANTED) */}
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
+                  <ToggleButton
+                    label="Max Score"
+                    active={visibleLines.maxScore}
+                    onClick={() => toggleLine("maxScore")}
+                    color="#22c55e"
                   />
-                )}
-                {activeMetric === "PLO" && (
-                  <PLOPerformanceTable
-                    summaryData={summaryData}
-                    ploAveragesByGrade={ploAveragesByGrade}
-                    getGradeColor={getGradeColor}
+                  <ToggleButton
+                    label="Min Score"
+                    active={visibleLines.minScore}
+                    onClick={() => toggleLine("minScore")}
+                    color="#ef4444"
                   />
-                )}
-                {activeMetric === "Ass" && (
-                  <AssignmentPerformanceTable
-                    summaryData={summaryData}
-                    categoryChartData={categoryChartData}
-                    getGradeColor={getGradeColor}
+                  <ToggleButton
+                    label="Class Average"
+                    active={visibleLines.allAvg}
+                    onClick={() => toggleLine("allAvg")}
+                    color="#6366f1"
                   />
-                )}
+
+                  <div className="h-4 w-[1px] bg-slate-200 mx-1" />
+                  {Array.from(
+                    new Set(summaryData?.students?.map((s: any) => s.grade)),
+                  )
+                    .filter(Boolean)
+                    .sort()
+                    .map((grade: any) => (
+                      <button
+                        key={grade}
+                        onClick={() => toggleLine(`avg_grade_${grade}`)}
+                        className={`whitespace-nowrap px-3 py-1 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
+                          visibleLines[`avg_grade_${grade}`]
+                            ? "bg-white shadow-sm border-slate-300 text-slate-800"
+                            : "bg-slate-50 text-slate-300 border-transparent opacity-50"
+                        }`}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: getGradeColor(grade) }}
+                        />
+                        {grade}
+                      </button>
+                    ))}
+                </div>
               </div>
-            </section>
+            )}
 
             {/* CHARTS ROW */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

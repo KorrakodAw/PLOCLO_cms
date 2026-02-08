@@ -6,7 +6,7 @@ export interface Course {
   course_id: number; // This is the Master Course ID
   code: string;
   name: string;
-  name_th?: string;
+  name_th: string;
   program_id: number;
   section: number; // Now included
   semester: number; // Now included

@@ -165,7 +165,7 @@ router.get("/paginate", authenticateToken, async (req, res) => {
 router.post(
   "/bulk",
   authenticateToken,
-  authorizeRoles("system_admin", "instructor"),
+  authorizeRoles("system_admin", "instructor", "Super_admin"),
   async (req, res) => {
     // IMPORTANT: Frontend sends array directly, OR { programs: [] }.
     // This logic handles direct array. If your frontend sends { programs: [...] }, change this line.
@@ -269,7 +269,7 @@ router.post(
 router.post(
   "/",
   authenticateToken,
-  authorizeRoles("system_admin", "instructor"),
+  authorizeRoles("system_admin", "instructor", "Super_admin"),
   async (req, res) => {
     const {
       faculty_id,
@@ -326,7 +326,7 @@ router.post(
 router.patch(
   "/:id",
   authenticateToken,
-  authorizeRoles("admin", "instructor"),
+  authorizeRoles("instructor", "system_admin", "Super_admin"),
   async (req, res) => {
     const programId = req.params.id;
     const {
@@ -376,7 +376,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticateToken,
-  authorizeRoles("admin", "instructor"),
+  authorizeRoles("instructor", "system_admin", "Super_admin"),
   async (req, res) => {
     const programId = req.params.id;
 
