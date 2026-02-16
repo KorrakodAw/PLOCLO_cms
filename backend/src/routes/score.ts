@@ -111,26 +111,7 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE: Remove a score
-router.delete("/:id", authenticateToken, async (req, res) => {
-  const scoreId = Number(req.params.id);
 
-  if (isNaN(scoreId)) return res.status(400).json({ error: "Invalid ID" });
-
-  try {
-    await prisma.studentScore.delete({
-      where: { id: scoreId },
-    });
-
-    res.json({ message: "Score deleted successfully" });
-  } catch (err: any) {
-    if (err.code === "P2025") {
-      return res.status(404).json({ error: "Score not found" });
-    }
-    console.error("Error deleting score:", err);
-    res.status(500).json({ error: "Failed to delete score" });
-  }
-});
 
 // PATCH: Update a single score
 router.patch("/:id", authenticateToken, async (req, res) => {

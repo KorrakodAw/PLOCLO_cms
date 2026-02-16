@@ -255,6 +255,19 @@ export async function getCloScoreAllStudentPerCourse(
       },
     });
 
+    const studentNames = await tx.student.findMany({
+      where: {
+        id: {
+          in: studentClo.map((sc) => sc.student_id),
+        },
+      },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+      },
+    });
+
     // 2) Group ตาม student_id -> cloCode
     const studentGroups = studentClo.reduce(
       (acc: Record<string, Record<string, any[]>>, row: any) => {
@@ -279,6 +292,7 @@ export async function getCloScoreAllStudentPerCourse(
     // 3) คำนวณ cloScore ต่อ student ต่อ clo (ไม่ normalize)
     const results: {
       student_id: number;
+      studentName: string;
       cloScores: { cloCode: string; cloScore: number }[];
     }[] = [];
 
@@ -307,7 +321,15 @@ export async function getCloScoreAllStudentPerCourse(
         }),
       );
 
-      results.push({ student_id: Number(student_id), cloScores });
+      results.push({
+        student_id: Number(student_id),
+        cloScores,
+        studentName:
+          studentNames.find((s) => s.id === Number(student_id))?.first_name +
+            " " +
+            studentNames.find((s) => s.id === Number(student_id))?.last_name ||
+          "",
+      });
     });
 
     // --- SORT STUDENTS (by student_id) ---
@@ -723,26 +745,38 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
   courseId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
-    // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category ของนักเรียนทุกคน
+    // 1. Get raw scores
     const { realScoresPerStudent } = await getRealScoreAllStudentPerCourse(
       tx,
       courseId,
     );
 
-    // 2. ดึง grade setting ของ course
-    const gradeSettings = await tx.gradeSetting.findMany({
-      where: { course_id: Number(courseId) },
-      orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
+    // 2. NEW: Fetch all student names in ONE batch query
+    const studentIds = realScoresPerStudent.map((s) => s.student_id);
+    const students = await tx.student.findMany({
+      where: { id: { in: studentIds } },
+      select: { id: true, first_name: true, last_name: true },
     });
 
-    // 3. รวมคะแนน และหาเกรดของนักเรียนแต่ละคน
+    // Create a lookup map for easy access: { 1: "John Doe", 2: "Jane Smith" }
+    const nameMap = Object.fromEntries(
+      students.map((s) => [s.id, `${s.first_name} ${s.last_name}`]),
+    );
+
+    // 3. Get grade settings
+    const gradeSettings = await tx.gradeSetting.findMany({
+      where: { course_id: Number(courseId) },
+      orderBy: { score: "desc" },
+    });
+
+    // 4. Map results and attach the name from the nameMap
     const results = realScoresPerStudent.map((student) => {
       const totalScore = student.categoryScores.reduce(
         (sum, c) => sum + c.realScore,
         0,
       );
 
-      let grade = "F"; // default ถ้าไม่เข้าเงื่อนไข
+      let grade = "F";
       for (const gs of gradeSettings) {
         if (totalScore >= Number(gs.score)) {
           grade = gs.grade;
@@ -752,15 +786,18 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 
       return {
         student_id: student.student_id,
+        // ADDED: Pull name from our lookup map
+        studentName: nameMap[student.student_id] || "Unknown",
         totalScore,
         grade,
-        categoryScores: student.categoryScores, // เก็บรายละเอียด category ด้วย
+        categoryScores: student.categoryScores,
       };
     });
 
-    // 4. คำนวณ mean ของคะแนนนักเรียนทั้งหมด
     const meanScore =
-      results.reduce((sum, s) => sum + s.totalScore, 0) / results.length;
+      results.length > 0
+        ? results.reduce((sum, s) => sum + s.totalScore, 0) / results.length
+        : 0;
 
     return { studentResults: results, meanScore };
   });

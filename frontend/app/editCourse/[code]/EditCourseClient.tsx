@@ -42,7 +42,6 @@ interface PaginatedResponse {
   totalPages: number;
 }
 
-
 // ... [Keep fetchMatchingCourses function] ...
 async function fetchMatchingCourses(
   token: string,
@@ -54,7 +53,16 @@ async function fetchMatchingCourses(
     const res = await getCoursePaginate(token, page, limit, {
       courseCode: courseCode,
     });
-    return res as unknown as PaginatedResponse;
+
+    // 🟢 กรองข้อมูลเพื่อให้เหลือเฉพาะวิชาที่รหัสตรงกับ courseCode เท่านั้น
+    const exactMatches = (res.data || []).filter(
+      (c: Course) => String(c.code) === String(courseCode),
+    );
+
+    return {
+      ...res,
+      data: exactMatches,
+    } as unknown as PaginatedResponse;
   } catch {
     console.error("Error fetching courses");
     throw new Error("Error fetching courses");
@@ -255,7 +263,7 @@ export default function EditCourseClient({
       ...existingSectionsInTerm.map((c) => Number(c.section)),
       0,
     );
-    const nextSection = String(maxSection + 1).padStart(3, "0");
+    const nextSection = String(maxSection + 1);
 
     setLoading(true);
     try {
@@ -285,41 +293,56 @@ export default function EditCourseClient({
   const deleteCourseVariant = async () => {
     if (!formData || !token) return;
 
-    // Store the ID we are about to delete to find the neighbor later
-    const deletedId = formData.id;
+    const sectionIdToDelete = formData.id;
+    const isLastSection = duplicateCourses.length === 1;
+
     setLoading(true);
 
     try {
-      await apiClient.delete(`/course/${deletedId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (isLastSection) {
+        // 🟢 กรณีเป็น Section สุดท้าย: ใช้ API ตัวที่ลบทั้งวิชา
+        await apiClient.delete(`/course`, {
+          params: { id: sectionIdToDelete }, // ส่ง id ของ section ไปเพื่อให้ backend หา courseId
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-      const response = await fetchMatchingCourses(token, courseCode);
-      const matching = response.data || [];
-      setDuplicateCourses(matching);
+        showToast(
+          t("Deleted the last section, course has been removed"),
+          "success",
+        );
+        setFormData(null);
 
-      if (matching.length > 0) {
-        // Find the best "previous" candidate:
-        // The largest ID that is still smaller than the one we just deleted
-        const previousVariant = matching
-          .filter((c) => c.id < deletedId)
+        // กลับไปหน้าหลักทันที
+        setTimeout(() => {
+          router.push("/editCourse");
+        }, 1500);
+      } else {
+        // 🔵 กรณีไม่ใช่ Section สุดท้าย: ลบเฉพาะ Section ปัจจุบัน (ใช้ API ลบปกติ)
+        await apiClient.delete(`/course/${sectionIdToDelete}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        // ดึงข้อมูลใหม่เพื่อหาตัวที่จะแสดงต่อไป
+        const response = await fetchMatchingCourses(token, courseCode);
+        const matching = response.data || [];
+        setDuplicateCourses(matching);
+
+        // เลือก Section ที่เหลืออยู่ขึ้นมาแสดง
+        const nextVariant = matching
+          .filter((c) => c.id !== sectionIdToDelete)
           .sort((a, b) => b.id - a.id)[0];
 
-        if (previousVariant) {
-          setSelectedSectionId(String(previousVariant.id));
-        } else {
-          // If no smaller ID exists, fall back to the first available one in the list
-          setSelectedSectionId(String(matching[0].id));
+        if (nextVariant) {
+          setSelectedSectionId(String(nextVariant.id));
         }
-      } else {
-        setFormData(null);
-        setError(t("No more course variants available."));
+
+        showToast(t("Course variant deleted successfully"), "success");
       }
 
       setShowDeletePopup(false);
-      showToast(t("Course variant deleted successfully"), "success");
-    } catch {
-      showToast(t("Failed to delete course variant"), "error");
+    } catch (err) {
+      console.error(err);
+      showToast(t("Failed to delete"), "error");
     } finally {
       setLoading(false);
     }
@@ -401,31 +424,53 @@ export default function EditCourseClient({
 
         {/* --- MAIN HEADER CARD --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 ">
-          {/* Top Row: Title & Dual Selection */}
-          <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 rounded bg-orange-100 text-orange-700 text-[10px] font-bold uppercase tracking-wider">
-                  {formData.course_id}
+          {/* Top Row: Title & Management Actions */}
+          <div className="p-6 md:p-8 flex flex-col lg:flex-row justify-between items-start gap-6 bg-white">
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="px-2.5 py-1 rounded-md bg-orange-50 text-orange-700 text-[11px] font-bold uppercase tracking-wider border border-orange-100">
+                  ID: {formData.course_id}
                 </span>
-                {/* Cleaned up redundant text here */}
+                <h1 className="text-2xl md:text-4xl font-extrabold text-gray-900 tracking-tight">
+                  {lang === "en" ? formData.name : formData.name_th}
+                  <span className="ml-3 font-medium text-orange-500 text-2xl md:text-3xl">
+                    ({formData.code})
+                  </span>
+                </h1>
               </div>
 
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
-                  {lang === "en" ? formData.name : formData.name_th}
-                </h1>
-                <span className="text-2xl font-medium text-orange-500">
-                  ({formData.code})
-                </span>
+              {/* Primary Admin Actions directly under the title for easy reach */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    router.push(
+                      `/editCourse/${courseCode}/instructors?courseId=${formData?.course_id}`,
+                    );
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-all shadow-sm"
+                >
+                  <UserPlus size={16} />
+                  {t("Manage Instructors")}
+                </button>
+                <button
+                  onClick={() => setShowEditPopup(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all"
+                >
+                  <Edit3 size={16} />
+                  {t("Course Settings")}
+                </button>
               </div>
             </div>
 
-            {/* Combined Selection Group */}
-            <div className="flex flex-col md:flex-row gap-3 w-full lg:w-auto relative z-[50]">
-              <div className="w-full md:w-[130px]">
-                <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-widest">
-                  {t("year") + "/ " + t("semester")}
+            {/* View Controls: Filters moved to the right to act as "Selectors" */}
+            {/* 1. เพิ่ม flex-wrap เพื่อให้ Dropdown ตกลงมาบรรทัดใหม่ได้ในมือถือ และปรับ gap ให้สมดุล */}
+            <div className="flex flex-wrap md:flex-row gap-6 w-full lg:w-auto p-4 relative z-50">
+              {/* Academic Year Dropdown */}
+              {/* 2. ใช้ min-w เพื่อรักษาขนาด และลบ z-10 ออกจากอันที่สองเพื่อให้สิทธิ์การลอย (z-index) อยู่ที่ Container หลักอันเดียว */}
+              <div className="flex-1 min-w-[160px] md:flex-none md:w-[180px] relative">
+                <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">
+                  {t("Academic Year / Term")}
                 </label>
                 <DropdownSelect
                   value={selectedTerm}
@@ -440,8 +485,10 @@ export default function EditCourseClient({
                   }}
                 />
               </div>
-              <div className="w-full md:w-[130px]">
-                <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-widest">
+
+              {/* Section Dropdown */}
+              <div className="flex-1 min-w-[140px] md:flex-none md:w-[160px] relative">
+                <label className="block text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">
                   {t("Section")}
                 </label>
                 <DropdownSelect
@@ -456,72 +503,50 @@ export default function EditCourseClient({
             </div>
           </div>
 
-          {/* Bottom Row: Separated Action Toolbar */}
-          <div className="px-6 py-4 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={() =>
-                  router.push(
-                    `/editCourse/${courseCode}/instructors?courseId=${formData?.course_id}`,
-                  )
-                }
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-blue-600 transition-all shadow-sm"
-              >
-                <UserPlus size={16} />
-                {t("Instructors")}
-              </button>
-
-              <button
-                onClick={() => setShowEditPopup(true)}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-orange-600 transition-all shadow-sm"
-              >
-                <Edit3 size={16} />
-                {t("Metadata")}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-200 justify-end">
-              <button
-                onClick={handleDuplicateSection}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-all"
-              >
-                <Copy size={16} />
-                {t("Duplicate")}
-              </button>
-
-              <button
-                onClick={() => setShowDeletePopup(true)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                title={t("Delete Section")}
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
+          {/* Footer Row: Low-frequency actions (Duplicate/Delete) */}
+          <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end items-center gap-3">
+            <button
+              onClick={handleDuplicateSection}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-blue-600 transition-all"
+            >
+              <Copy size={14} />
+              {t("Duplicate Section")}
+            </button>
+            <div className="h-4 w-px bg-gray-200" />
+            <button
+              onClick={() => setShowDeletePopup(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-red-600 transition-all"
+            >
+              <Trash2 size={14} />
+              {t("Delete")}
+            </button>
           </div>
         </div>
 
-        {/* --- STICKY NAVIGATION CONTROLS --- */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 sticky top-4 z-20">
-          <div className="bg-white p-1 rounded-xl shadow-md border border-gray-200 flex">
+        {/* --- NAVIGATION CONTROLS --- */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 sticky top-4 z-20 mt-6">
+          {/* Switcher: Styled like a segmented control */}
+          <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg border border-gray-200 flex w-full lg:w-auto">
             <button
               onClick={() => handleModeChange("setup")}
-              className={`flex-1 lg:px-6 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all
-              ${viewMode === "setup" ? "bg-gray-900 text-white shadow-inner" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`flex-1 lg:px-8 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-200
+      ${viewMode === "setup" ? "bg-gray-900 text-white shadow-lg scale-[1.02]" : "text-gray-500 hover:bg-gray-50"}`}
             >
-              <BookOpen size={16} />
+              <BookOpen size={18} />
               {t("Course Setup")}
             </button>
             <button
               onClick={() => handleModeChange("grading")}
-              className={`flex-1 lg:px-6 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all
-              ${viewMode === "grading" ? "bg-emerald-600 text-white shadow-inner" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`flex-1 lg:px-8 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-200
+      ${viewMode === "grading" ? "bg-emerald-600 text-white shadow-lg scale-[1.02]" : "text-gray-500 hover:bg-gray-50"}`}
             >
-              <Calculator size={16} />
+              <Calculator size={18} />
               {t("Grading & Scores")}
             </button>
           </div>
 
-          <div className="w-full lg:w-72 shadow-md rounded-xl">
+          {/* Tab Selector: Increased width for better readability of tab labels */}
+          <div className="w-full lg:w-80 shadow-lg rounded-2xl bg-white">
             <DropdownSelect
               value={activeTabObj.id}
               options={currentTabs.map((tab) => ({

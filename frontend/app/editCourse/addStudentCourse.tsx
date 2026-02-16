@@ -6,6 +6,7 @@ import { Column, Table } from "@/components/Table";
 import { useTranslation } from "react-i18next";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import AlertPopup from "@/components/AlertPopup";
+import { useAuth } from "../context/AuthContext";
 
 interface Student {
   id: number;
@@ -48,6 +49,7 @@ export default function AddStudentCourse({
 
   const { showToast, ToastElement } = useToast();
   const { t } = useTranslation("common");
+  const { token } = useAuth();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -111,14 +113,18 @@ export default function AddStudentCourse({
 
   // --- BULK DELETE ---
   const handleBulkDelete = async () => {
-    if (selectedEnrolledIds.length === 0) return;
+    if (selectedEnrolledIds.length === 0 || !token) return;
 
     setLoading(true);
     try {
       // Calls the new POST endpoint for bulk delete
-      await apiClient.post(`/studentOnCourse/bulk-delete`, {
-        sectionId: parseInt(sectionId),
-        studentIds: selectedEnrolledIds, // Array of student_ids to remove
+      // ✅ วิธีที่ถูกต้องสำหรับ Axios Delete พร้อม Request Body
+      await apiClient.delete(`/studentOnCourse/bulk-delete`, {
+        data: {
+          sectionId: parseInt(sectionId),
+          studentIds: selectedEnrolledIds,
+        },
+        headers: { Authorization: `Bearer ${token}` }, // อย่าลืมใส่ Token หากจำเป็น
       });
 
       showToast("Students removed successfully", "success");
@@ -134,7 +140,6 @@ export default function AddStudentCourse({
   // --- TABLE COLUMNS ---
   const StudentColumns: Column<StudentCourse>[] = [
     {
-     
       header: (
         <input
           type="checkbox"

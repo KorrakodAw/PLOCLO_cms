@@ -23,7 +23,7 @@ interface StudentScore {
 
 export default function ScoreMapping({
   masterCourseId,
-  sectionId
+  sectionId,
 }: {
   masterCourseId: string | number;
   sectionId?: string | number;
@@ -88,7 +88,7 @@ export default function ScoreMapping({
     const getSortScore = (name: string) => {
       const lowerName = name.toLowerCase();
       const index = sortOrder.findIndex((keyword) =>
-        lowerName.includes(keyword)
+        lowerName.includes(keyword),
       );
       return index === -1 ? 999 : index;
     };
@@ -132,7 +132,7 @@ export default function ScoreMapping({
     studentId: number,
     assignId: number,
     val: string,
-    maxScore: number
+    maxScore: number,
   ) => {
     // 🟢 FIX: Define the key here (combining studentId and assignId)
     const key = `${studentId}_${assignId}`;
@@ -164,14 +164,22 @@ export default function ScoreMapping({
 
     const updates = Array.from(changedKeys)
       .map((key) => {
-        const val = scoreGrid[key];
+        // 1. บอก TypeScript ว่า val อาจเป็น string, number หรือ null
+        const val = scoreGrid[key] as string | number | null;
+
         if (val !== undefined) {
           const [studentId, assignId] = key.split("_");
+
+          // 2. ใช้การเช็คค่าว่างที่ครอบคลุมทั้ง string และ null
+          // และใช้ Number(val) เฉพาะเมื่อมีค่าจริงเท่านั้น
+          const isBlank = val === "" || val === null;
+          const finalScore = isBlank ? null : Number(val);
+
           return {
             student_id: Number(studentId),
             assignment_id: Number(assignId),
             course_id: Number(masterCourseId),
-            score: val || 0,
+            score: finalScore,
           };
         }
         return null;
@@ -184,7 +192,7 @@ export default function ScoreMapping({
         { updates },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       showToast("Scores saved successfully", "success");
       setChangedKeys(new Set());
@@ -250,7 +258,9 @@ export default function ScoreMapping({
             {students.length > 0 ? (
               students.map((student, index) => {
                 const studentId =
-                  (student as any).student_id || (student as any).id || 0;
+                  (student as Student).student_id ||
+                  (student as Student).id ||
+                  0;
 
                 const rowKey = `row-${studentId}-${index}`;
 
@@ -308,7 +318,7 @@ export default function ScoreMapping({
                                 studentId,
                                 assign.id,
                                 e.target.value,
-                                assign.maxScore
+                                assign.maxScore,
                               )
                             }
                           />

@@ -125,7 +125,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
   const handleUpdateInstructor = async () => {
     if (!selectedInstructor) return;
     try {
-      await apiClient.put(`/instructor/${selectedInstructor.id}`, {
+      await apiClient.patch(`/instructor/${selectedInstructor.id}`, {
         full_thai_name: selectedInstructor.full_thai_name,
         full_eng_name: selectedInstructor.full_eng_name,
         email: selectedInstructor.email,
@@ -196,8 +196,8 @@ export default function FacultyInstructorPage({ params }: PageProps) {
   // --- 3. Table Columns ---
   const columns: Column<Instructor>[] = [
     lang === "th"
-      ? { header: t("Thai Name"), accessor: "full_thai_name" }
-      : { header: t("En Name"), accessor: "full_eng_name" },
+      ? { header: t("name"), accessor: "full_thai_name" }
+      : { header: t("name"), accessor: "full_eng_name" },
 
     { header: t("Email"), accessor: "email" },
     { header: t("Phone"), accessor: "phoneNum" },
@@ -255,11 +255,13 @@ export default function FacultyInstructorPage({ params }: PageProps) {
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-light text-gray-800 tracking-tight">
-            {"Instructor Management"}
+            {t("Instructor Management")}
           </h1>
           <p className="text-gray-500 mt-1">
-            Faculty:{" "}
-            <span className="font-light text-orange-600">{faculty?.name}</span>
+            {t("faculty")}:{" "}
+            <span className="font-light text-orange-600">
+              {lang === "th" ? faculty?.name_th : faculty?.name}
+            </span>
           </p>
         </div>
       </div>
@@ -268,7 +270,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
           <h2 className="text-lg font-light text-gray-700">
-            Instructors List ({instructors.length})
+            {t("Instructors List")} ({instructors.length})
           </h2>
 
           <div className="flex gap-2">

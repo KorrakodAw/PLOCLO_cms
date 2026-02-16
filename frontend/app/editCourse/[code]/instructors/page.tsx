@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
   Trash2,
   UserPlus,
   Users,
   Mail,
-  ArrowLeft,
+
   ShieldCheck,
 } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
@@ -43,6 +43,7 @@ export default function CourseInstructorsPage({ params }: PageProps) {
   const searchParams = useSearchParams();
   const courseId = searchParams.get("courseId") ?? "";
 
+
   const { token } = useAuth();
   const { t, i18n } = useTranslation("common");
   const { showToast, ToastElement } = useToast();
@@ -64,21 +65,52 @@ export default function CourseInstructorsPage({ params }: PageProps) {
     if (!token || !courseId) return;
     try {
       setLoading(true);
-      const [courseRes, currentRes, allRes] = await Promise.all([
+
+      // 1. ดึงข้อมูลวิชา และ อาจารย์ที่สอนวิชานี้อยู่แล้ว
+      const [courseRes, currentRes] = await Promise.all([
         apiClient.get(`/course/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         apiClient.get(`/instructorOnCourse/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        apiClient.get(`/instructor`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
       ]);
-      setCourseData(courseRes.data);
+
+      const courseInfo = courseRes.data;
+      setCourseData(courseInfo);
       setCurrentInstructors(currentRes.data || []);
-      setAllInstructors(allRes.data || []);
-    } catch {
+
+      // 2. ดึงข้อมูล Program เพื่อหา Faculty ID
+      const programId = courseInfo?.program_id;
+      let facultyId = null; // สร้างตัวแปร Local ไว้เก็บค่าเพื่อใช้ต่อทันที
+
+      if (programId) {
+        const programRes = await apiClient.get(`/program/${programId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        facultyId = programRes?.data?.faculty_id;
+        
+      }
+
+      // 3. ตรวจสอบและดึงรายชื่ออาจารย์ "ทั้งหมด" ในคณะ
+      // ใช้ facultyId แทนการใช้ State (facultyUsingId)
+      if (facultyId) {
+        const allInstRes = await apiClient.get(
+          `/instructor?facultyId=${facultyId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        setAllInstructors(allInstRes.data || []);
+      } else {
+        console.warn(
+          "Could not find Faculty ID associated with this course program",
+        );
+        setAllInstructors([]);
+      }
+    } catch (error) {
+      console.error("Data Fetch Error:", error);
       showToast(t("Failed to load data"), "error");
     } finally {
       setLoading(false);
@@ -218,7 +250,9 @@ export default function CourseInstructorsPage({ params }: PageProps) {
                   <p className="text-[11px] text-blue-700 leading-normal flex gap-2">
                     <ShieldCheck size={14} className="shrink-0 mt-0.5" />
                     <span>
-                      {t("Instructors assigned to this course will have access to manage course content and student evaluations.")}
+                      {t(
+                        "Instructors assigned to this course will have access to manage course content and student evaluations.",
+                      )}
                     </span>
                   </p>
                 </div>
@@ -263,7 +297,7 @@ export default function CourseInstructorsPage({ params }: PageProps) {
                       setShowDeletePopup(true);
                     }}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                    title={t("Remove")}
+                   
                   >
                     <Trash2 size={18} />
                   </button>

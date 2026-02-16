@@ -63,7 +63,7 @@ export default function AddPlo({ programId }: AddPloProps) {
       });
 
       setPlos(res.data.data);
-      setTotalPages(res.data.pagination.totalPages);
+      setTotalPages(res.data.pagination.totalPages || 1);
     } catch {
       showToast("Failed to fetch PLOs", "error");
     } finally {
@@ -264,6 +264,7 @@ export default function AddPlo({ programId }: AddPloProps) {
       ],
     },
   ];
+
 
   useEffect(() => {
     fetchPlos();

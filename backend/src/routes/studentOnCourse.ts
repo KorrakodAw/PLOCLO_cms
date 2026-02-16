@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
+import { PrismaClient } from "@prisma/client";
 
 const router = Router();
+const prisma = new PrismaClient();
 
 // --- GET: Fetch students ---
 // 1. If sectionId is provided: Fetch students in THAT specific section (for table display)
@@ -181,31 +183,40 @@ router.post("/bulk", authenticateToken, async (req, res) => {
 
 // --- DELETE: Remove a student from a section ---
 // Bulk Delete: Remove multiple students from a specific section
-router.post("/bulk-delete", authenticateToken, async (req, res) => {
-  const { sectionId, studentIds } = req.body; // Expecting { sectionId: 1, studentIds: [5, 12, 15] }
+router.delete("/bulk-delete", authenticateToken, async (req, res) => {
+  const { sectionId, studentIds } = req.body;
 
   if (!sectionId || !Array.isArray(studentIds) || studentIds.length === 0) {
     return res.status(400).json({ error: "Invalid sectionId or studentIds" });
   }
 
   try {
-    // Use Postgres ANY() for efficient bulk deletion
-    const result = await pool.query(
-      `DELETE FROM student_on_section 
-       WHERE section_id = $1 AND student_id = ANY($2::int[]) 
-       RETURNING *`,
-      [sectionId, studentIds],
-    );
+    // 🟢 ใช้ Transaction เพื่อความปลอดภัย: ลบคะแนนก่อน แล้วค่อยลบรายชื่อออกจาก Section
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. ลบคะแนนทั้งหมดของนักศึกษาเหล่านี้ใน Section ที่กำหนด
+      await tx.studentScore.deleteMany({
+        where: {
+          student_id: { in: studentIds.map((id) => Number(id)) },
+          assignment: {
+            course_id: Number(sectionId), // หรือใช้เงื่อนไขที่เชื่อมโยงกับ Section ของคุณ
+          },
+        },
+      });
 
-    if (result.rowCount === 0) {
-      return res
-        .status(404)
-        .json({ error: "No matching records found to delete" });
-    }
+      // 2. ลบนักศึกษาออกจากกลุ่มเรียน (Table: student_on_section)
+      const deleteResult = await tx.$executeRawUnsafe(
+        `DELETE FROM student_on_section 
+         WHERE section_id = $1 AND student_id = ANY($2::int[])`,
+        sectionId,
+        studentIds,
+      );
+
+      return deleteResult;
+    });
 
     res.json({
-      message: `Successfully removed ${result.rowCount} students`,
-      removedCount: result.rowCount,
+      message: `Successfully removed students and their associated scores`,
+      removedCount: result,
     });
   } catch (err) {
     console.error("Error bulk deleting:", err);

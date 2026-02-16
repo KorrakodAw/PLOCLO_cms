@@ -13,6 +13,7 @@ import { getFaculties, Faculty } from "../../utils/facultyApi";
 import { getPrograms, Program } from "../../utils/programApi";
 import { apiClient } from "../../utils/apiClient";
 import SearchBar from "@/components/SearchBar";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 interface Option {
   label: string;
@@ -178,13 +179,7 @@ export default function EditCourse() {
 
   // Loading Screen to prevent flickering
   if (!isInitialized || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#fcfcfd]">
-        <div className="text-slate-400 font-bold animate-pulse">
-          {t("loading")}...
-        </div>
-      </div>
-    );
+    return <LoadingOverlay />;
   }
 
   return (

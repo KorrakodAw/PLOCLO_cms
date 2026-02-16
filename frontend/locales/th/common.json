@@ -216,5 +216,15 @@
   "Select from list...": "เลือกจากรายการ...",
   "Confirm Assignment": "ยืนยันการมอบหมาย",
   "Instructors assigned to this course will have access to manage course content and student evaluations.": "อาจารย์ผู้สอนที่ได้รับมอบหมายให้รายวิชานี้จะสามารถจัดการเนื้อหารายวิชาและการประเมินผลนักศึกษาได้",
-  "Assigned Instructors": "อาจารย์ผู้สอนที่ได้รับมอบหมาย"
+  "Assigned Instructors": "อาจารย์ผู้สอนที่ได้รับมอบหมาย",
+  "no_options_available": "ไม่มีตัวเลือกที่ใช้ได้",
+  "Instructor Management": "การจัดการอาจารย์ผู้สอน",
+  "Instructors List": "รายชื่ออาจารย์ผู้สอน",
+  "Delete All": "ลบทั้งหมด",
+  "Delete ALL assignments? Action cannot be undone.": "ลบแบบฝึกหัดทั้งหมด? การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+  "Manage Instructors": "จัดการอาจารย์ผู้สอน",
+  "Course Settings": "การตั้งค่ารายวิชา",
+  "Academic Year / Term": "ปีการศึกษา / ภาคเรียน",
+  "Duplicate Section": "เพิ่มกลุ่มเรียน",
+  "Confirm Removal": "ยืนยันการลบ"
 }

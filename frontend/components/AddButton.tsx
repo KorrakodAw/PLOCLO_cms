@@ -24,6 +24,9 @@ interface AddButtonProps<T> {
   selectedSection?: string;
   selectedCourse?: string;
 
+  disableUniversity?: boolean;
+  disableFaculty?: boolean;
+
   // Handlers
   onUniversityChange?: (value: string | number) => void;
   onFacultyChange?: (value: string | number) => void;
@@ -86,6 +89,8 @@ export default function AddButton<T>({
   onSemesterChange,
   onSectionChange,
   onCourseChange,
+  disableFaculty = false,
+  disableUniversity = false,
   requiredFields = [],
 }: AddButtonProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
@@ -160,6 +165,9 @@ export default function AddButton<T>({
           sectionOptions={sectionOptions}
           courseOptions={courseOptions}
           requiredFields={requiredFields}
+          // Disable Dropdowns if needed
+          disableUniversity={disableUniversity}
+          disableFaculty={disableFaculty}
           // Change Handlers (ส่งตรงจาก Parent ไป FormPopup เลย ไม่ต้องผ่าน Local State)
           onUniversityChange={onUniversityChange}
           onFacultyChange={onFacultyChange}

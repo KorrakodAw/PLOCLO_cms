@@ -48,6 +48,9 @@ interface FormPopupProps<T> {
   onClose: () => void;
   onSubmit: (data: FormData) => Promise<void> | void;
 
+  disableUniversity?: boolean;
+  disableFaculty?: boolean;
+
   // 2. Update onSubmitExcel to accept T[]
   onSubmitExcel?: (rows: T[]) => Promise<void> | void;
 
@@ -92,6 +95,8 @@ export default function FormPopup<T>({
   onSemesterChange,
   onCourseChange,
   onSectionChange,
+  disableFaculty = false,
+  disableUniversity = false,
   requiredFields = [],
   fieldMap = {},
 }: FormPopupProps<T>) {
@@ -225,6 +230,7 @@ export default function FormPopup<T>({
                 value={selectedUniversity}
                 onChange={onUniversityChange}
                 options={universityOptions}
+                disabled={disableUniversity}
                 // label="University"
               />
             )}
@@ -234,7 +240,7 @@ export default function FormPopup<T>({
                 value={selectedFaculty}
                 onChange={onFacultyChange}
                 options={facultyOptions}
-                disabled={!selectedUniversity}
+                disabled={disableFaculty || !selectedUniversity}
                 // label="Faculty"
               />
             )}

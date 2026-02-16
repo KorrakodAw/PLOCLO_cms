@@ -212,5 +212,15 @@
   "Select from list...": "Select from list...",
   "Confirm Assignment": "Confirm Assignment",
   "Instructors assigned to this course will have access to manage course content and student evaluations.": "Instructors assigned to this course will have access to manage course content and student evaluations.",
-  "Assigned Instructors": "Assigned Instructors"
+  "Assigned Instructors": "Assigned Instructors",
+  "no_options_available": "No options available",
+  "Instructor Management": "Instructor Management",
+  "Instructors List": "Instructors List",
+  "Delete All": "Delete All",
+  "Delete ALL assignments? Action cannot be undone.": "Delete ALL assignments? Action cannot be undone.",
+  "Manage Instructors": "Manage Instructors",
+  "Course Settings": "Course Settings",
+  "Academic Year / Term": "Academic Year / Term",
+  "Duplicate Section": "Duplicate Section",
+  "Confirm Removal": "Confirm Removal"
 }

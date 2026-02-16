@@ -85,7 +85,7 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
 
   return (
     <div
-      className={`overflow-x-auto mt-5 bg-white rounded-lg shadow-md ${className}`}
+      className={`overflow-x-auto mt-5 bg-white rounded-lg shadow-md border border-gray-200 ${className}`}
     >
       <table className={`w-full ${fontSize} border-separate border-spacing-0`}>
         <thead className="bg-gray-50">
@@ -94,8 +94,10 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
               <th
                 key={i}
                 className={`
-                  text-left px-5 py-3 font-light text-gray-600 uppercase tracking-wider 
-                  sticky top-0 bg-gray-50 border-b-2 border-gray-200 
+                  text-left px-5 py-3 font-semibold text-gray-600 uppercase tracking-wider 
+                  sticky top-0 bg-gray-50 border-b-2 border-gray-200
+                  /* Vertical Line Logic */
+                  ${i !== columns.length - 1 ? "border-r border-gray-200" : ""}
                   ${col.className ?? ""}
                   ${i === 0 ? "rounded-tl-lg" : ""}
                   ${i === columns.length - 1 ? "rounded-tr-lg" : ""}
@@ -121,15 +123,21 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
             data.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="border-t border-gray-100 transition-colors duration-150 hover:bg-orange-50"
+                className="transition-colors duration-150 hover:bg-orange-50"
               >
                 {columns.map((col, colIndex) => {
-                  // --- ACTIONS COLUMN ---
+                  // Common classes for all cells, including vertical borders
+                  const cellClasses = `
+                    px-5 py-3 align-middle border-b border-gray-100
+                    ${colIndex !== columns.length - 1 ? "border-r border-gray-100" : ""}
+                    ${col.className ?? ""}
+                  `;
+
                   if (col.actions) {
                     return (
                       <td
                         key={colIndex}
-                        className="px-5 py-3 align-middle whitespace-nowrap"
+                        className={`${cellClasses} whitespace-nowrap`}
                       >
                         <div className="flex gap-3 items-center">
                           {col.actions.map((action, i) => (
@@ -150,14 +158,13 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                     );
                   }
 
-                  // --- NORMAL COLUMN ---
                   return (
                     <td
                       key={colIndex}
-                      className={`px-5 py-3 text-gray-700 align-middle font-light ${col.className ?? ""}`}
+                      className={`${cellClasses} text-gray-700 font-light`}
                     >
                       {col.render
-                        ? col.render(row) // Fix: Passing full row object to render
+                        ? col.render(row)
                         : String((row as any)[col.accessor]) || "-"}
                     </td>
                   );

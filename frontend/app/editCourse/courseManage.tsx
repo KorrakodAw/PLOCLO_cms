@@ -44,6 +44,11 @@ interface ExcelCourseRow {
   [key: string]: unknown;
 }
 
+interface Options {
+  label: string;
+  value: string;
+}
+
 export default function CourseManagement({
   universityId,
   facultyId,
@@ -52,9 +57,11 @@ export default function CourseManagement({
 }: CourseManagementProps) {
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
-  const { token, isLoggedIn, initialized } = useAuth();
+  const { token, isLoggedIn, initialized, user } = useAuth();
   const router = useRouter();
   const { showToast, ToastElement } = useToast();
+
+  const isInstructor = user?.role === "instructor";
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoadingCourse] = useState(false);
@@ -63,18 +70,10 @@ export default function CourseManagement({
   const [totalPages, setTotalPages] = useState(1);
 
   // --- Dropdown Options ---
-  const [yearOptions, setYearOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [programOptions, setProgramOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [universityOptions, setUniversityOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [facultyOptions, setFacultyOptions] = useState<
-    { label: string; value: string }[]
-  >([]);
+  const [yearOptions, setYearOptions] = useState<Options[]>([]);
+  const [programOptions, setProgramOptions] = useState<Options[]>([]);
+  const [universityOptions, setUniversityOptions] = useState<Options[]>([]);
+  const [facultyOptions, setFacultyOptions] = useState<Options[]>([]);
 
   // Static options
   const semesterOptions = [
@@ -91,6 +90,8 @@ export default function CourseManagement({
     { label: "4", value: "4" },
   ];
 
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // --- Create/Add State (Local) ---
   const [selectedProgram, setSelectedProgram] = useState("");
   const [selectedUniversity, setSelectedUniversity] = useState("");
@@ -104,53 +105,91 @@ export default function CourseManagement({
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
 
-  // 1. Fetch Universities
   useEffect(() => {
-    if (!isLoggedIn || !token) return;
-    const fetchUniversities = async () => {
-      try {
-        const data = await getUniversities(token);
-        setUniversityOptions([
-          { label: t("please select a university"), value: "" },
-          ...data.map((u: University) => ({
-            label: lang === "th" ? u.name_th : u.name,
-            value: String(u.id),
-          })),
-        ]);
-      } catch {
-        showToast("API university error", "error");
-      }
-    };
-    fetchUniversities();
-  }, [isLoggedIn, token, t, lang, showToast]);
+    if (!token) return;
 
-  // 2. Fetch Faculties
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedUniversity) {
-      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
-      setProgramOptions([{ label: t("please select a program"), value: "" }]);
-      setYearOptions([{ label: t("please select a year"), value: "" }]);
-      setSelectedFaculty("");
-      setSelectedProgram("");
-      setSelectedYear("");
-      return;
-    }
-    const fetchFaculties = async () => {
+    const initialize = async () => {
       try {
-        const data = await getFaculties(token, selectedUniversity);
-        setFacultyOptions([
-          { label: t("please select a faculty"), value: "" },
-          ...data.map((f: Faculty) => ({
+        setLoadingCourse(true);
+
+        // 1. Fetch และ Format มหาวิทยาลัยครั้งเดียว
+        const uniData = await getUniversities(token);
+        const formattedUni = uniData.map((u: University) => ({
+          label: lang === "th" ? u.name_th : u.name,
+          value: String(u.id),
+        }));
+
+        const defaultUniOption = {
+          label: t("please select a university"),
+          value: "",
+        };
+
+        if (isInstructor && user?.email) {
+          // 2. Instructor Path
+          const instructorRes = await apiClient.get(
+            `/instructor/email/${user.email}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+          const facultyId = instructorRes.data?.faculty_id;
+
+          const facultyRes = await apiClient.get(`/faculty/${facultyId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const facultyData = facultyRes.data;
+
+          const facultiesData = await getFaculties(
+            token,
+            String(facultyData.university_id),
+          );
+          const formattedFacs = facultiesData.map((f: Faculty) => ({
             label: lang === "th" ? f.name_th : f.name,
             value: String(f.id),
-          })),
-        ]);
-      } catch {
-        showToast("API faculty error", "error");
+          }));
+
+          // ✅ แก้ไข: ใช้ formattedUni ตรงๆ ไม่ต้อง map ซ้ำ
+          setUniversityOptions([defaultUniOption, ...formattedUni]);
+          setFacultyOptions([...formattedFacs]);
+
+          setSelectedUniversity(String(facultyData.university_id));
+          setSelectedFaculty(String(facultyId));
+        } else {
+          // 3. Admin Path
+          // ✅ แก้ไข: ใช้ formattedUni ตรงๆ ไม่ต้อง map ซ้ำ
+          setUniversityOptions([defaultUniOption, ...formattedUni]);
+        }
+      } catch (err) {
+        console.error("Initialization failed:", err);
+      } finally {
+        setIsInitialized(true);
+        setLoadingCourse(false);
       }
     };
-    fetchFaculties();
-  }, [isLoggedIn, token, t, lang, selectedUniversity, showToast]);
+
+    initialize();
+  }, [token, user?.email, user?.role, lang, t]); // เพิ่ม t เข้าไปใน dependency ด้วย
+
+  useEffect(() => {
+    if (!token || !selectedUniversity || isInstructor || !isInitialized) {
+      setFacultyOptions([{ label: t("please select a faculty"), value: "" }]);
+      setSelectedFaculty("");
+      return;
+    }
+
+    getFaculties(token, selectedUniversity)
+      .then((data) => {
+        const formatted = data.map((f: Faculty) => ({
+          label: lang === "th" ? f.name_th : f.name,
+          value: String(f.id),
+        }));
+        setFacultyOptions([
+          { label: t("please select a faculty"), value: "" },
+          ...formatted,
+        ]);
+      })
+      .catch(() => setFacultyOptions([]));
+  }, [selectedUniversity, isInitialized, lang, t]);
 
   // 3. Fetch Years (Derived from Programs in Faculty)
   useEffect(() => {
@@ -282,6 +321,9 @@ export default function CourseManagement({
       fetchCourses();
       setPage(1);
       showToast(t("Course added successfully!"), "success");
+      setSelectedUniversity("");
+      setSelectedSemester("");
+      setSelectedSection("");
     } catch (err: any) {
       const msg = err.response?.data?.error || t("Failed to add course");
       showToast(msg, "error");
@@ -463,6 +505,8 @@ export default function CourseManagement({
             insert: "Insert Course Section",
             upload: "Upload Excel",
           }}
+          disableUniversity={isInstructor}
+          disableFaculty={isInstructor}
           showAbbreviationInputs={false}
           programOptions={programOptions}
           universityOptions={universityOptions}

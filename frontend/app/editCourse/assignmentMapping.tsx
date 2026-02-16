@@ -298,7 +298,7 @@ export default function AssignmentMapping({
           }}
           className="flex flex-col md:flex-row gap-4 items-end w-full"
         >
-          <div className="max-w-[130px] md:w-1/4 ">
+          <div className="md:w-1/4 ">
             <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
               Category
             </label>
@@ -402,7 +402,7 @@ export default function AssignmentMapping({
                     onClick={() => setActiveFilter(filterValue)}
                     className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeFilter === filterValue ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"}`}
                   >
-                    {t(key)}
+                    {(key)}
                   </button>
                 );
               })}

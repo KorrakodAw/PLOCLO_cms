@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, use } from "react";
 import {
   FaUserGraduate,
   FaChartLine,
@@ -15,16 +15,31 @@ import { apiClient } from "@/utils/apiClient";
 import { PerformanceTrendChart } from "./viewChartComponent/PerformanceTrendChart";
 import { PerformanceBalanceChart } from "./viewChartComponent/PerformanceBalanceChart";
 import { GradeDistributionChart } from "./viewChartComponent/gradeDistributionChart";
-import { PerformanceTable } from "./viewChartComponent/PerformanceTable";
+import { useToast } from "@/components/Toast";
 
 import { ToggleButton } from "./viewChartComponent/ToggleButton";
+import Table, { Column } from "@/components/Table";
+import { useAuth } from "../context/AuthContext";
+import { getUniversities, University } from "@/utils/universityApi";
+import LoadingOverlay from "@/components/LoadingOverlay";
+import { useTranslation } from "react-i18next";
+import { Faculty, getFaculties } from "@/utils/facultyApi";
+
+interface Option {
+  label: string;
+  value: string;
+}
 
 export default function PLOChart() {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-
+  const { token, user } = useAuth();
   // --- STATE MANAGEMENT ---
-  const [options, setOptions] = useState<any>({
+  const [options, setOptions] = useState<{
+    universities: Option[];
+    faculties: Option[];
+    programs: Option[];
+    years: Option[];
+    courses: Option[];
+  }>({
     universities: [],
     faculties: [],
     programs: [],
@@ -44,6 +59,11 @@ export default function PLOChart() {
   const [ploStudentData, setPloStudentData] = useState<any>(null);
   const [cloBalanceData, setCloBalanceData] = useState<any>(null);
   const [ploBalanceData, setPloBalanceData] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const { showToast, ToastElement } = useToast();
+  const { t, i18n } = useTranslation("common");
+  const lang = i18n.language;
 
   // UI Control States
   const [activeMetric, setActiveMetric] = useState<"CLO" | "PLO" | "Ass">(
@@ -70,25 +90,91 @@ export default function PLOChart() {
     }
   };
 
-  useEffect(() => {
-    fetchData("/university").then(
-      (data) =>
-        data &&
-        setOptions((prev: any) => ({
-          ...prev,
-          universities: data.map((u: any) => ({ label: u.name, value: u.id })),
-        })),
-    );
-  }, []);
+  const [isInitialized, setIsInitialized] = useState(false); // Flag to prevent double fetch
+
+  const isInstructor = user?.role === "instructor";
+  const isStudent = user?.role === "student";
 
   useEffect(() => {
+    if (!token) return;
+
+    const initialize = async () => {
+      try {
+        setLoading(true);
+
+        const uniData = await getUniversities(token);
+        const formattedUni = uniData.map((u: University) => ({
+          label: lang === "th" ? u.name_th : u.name,
+          value: String(u.id),
+        }));
+
+        if (isInstructor && user?.email) {
+          const instructorRes = await apiClient.get(
+            `/instructor/email/${user.email}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+          const facultyId = instructorRes.data?.faculty_id;
+
+          const facultyRes = await apiClient.get(`faculty/${facultyId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const facultyData = facultyRes.data;
+
+          const facultiesData = await getFaculties(
+            token,
+            String(facultyData.university_id),
+          );
+          const formattedFacs = facultiesData.map((f: Faculty) => ({
+            label: lang === "th" ? f.name_th : f.name,
+            value: String(f.id),
+          }));
+
+          setOptions({
+            universities: [{ label: t("all"), value: "" }, ...formattedUni],
+            faculties: formattedFacs,
+            programs: [],
+            years: [],
+            courses: [],
+          });
+
+          setSelections({
+            university: String(facultyData.university_id),
+            faculty: String(facultyData.id),
+            program: "",
+            year: "",
+            courseId: "",
+          });
+        } else {
+          setOptions((prev) => ({
+            ...prev,
+            universities: formattedUni,
+          }));
+        }
+      } catch {
+        showToast("Failed to load initial data", "error");
+      } finally {
+        setIsInitialized(true);
+        setLoading(false);
+      }
+    };
+    initialize();
+  }, [token, lang, user?.email, user?.role, t]);
+
+  useEffect(() => {
+    if (!isInitialized || isInstructor || !token) return;
     if (selections.university) {
       fetchData("/faculty", { university_id: selections.university }).then(
         (data) =>
           data &&
           setOptions((prev: any) => ({
             ...prev,
-            faculties: data.map((f: any) => ({ label: f.name, value: f.id })),
+            faculties: data.map((f: any) => ({
+              label: lang === "th" ? f.name_th : f.name,
+              value: f.id,
+            })),
             programs: [],
             years: [],
             courses: [],
@@ -105,6 +191,7 @@ export default function PLOChart() {
   }, [selections.university]);
 
   useEffect(() => {
+    // if (!isInitialized || isInstructor || !token) return;
     if (selections.faculty) {
       fetchData("/program", { facultyId: selections.faculty }).then((data) => {
         if (data) {
@@ -114,7 +201,8 @@ export default function PLOChart() {
           setOptions((prev: any) => ({
             ...prev,
             programs: unique.map((p: any) => ({
-              label: p.program_shortname_en,
+              label:
+                lang === "th" ? p.program_shortname_th : p.program_shortname_en,
               value: p.program_code,
             })),
             years: [],
@@ -157,6 +245,8 @@ export default function PLOChart() {
   }, [selections.program]);
 
   useEffect(() => {
+    console.log(selections.year);
+
     if (selections.year) {
       fetchData("/course/forSummary", { programId: selections.year }).then(
         (data) =>
@@ -164,7 +254,9 @@ export default function PLOChart() {
           setOptions((prev: any) => ({
             ...prev,
             courses: data.map((c: any) => ({
-              label: `${c.code} - ${c.name}`,
+              label:
+                `${c.code}` +
+                (lang === "th" ? ` ${c.name_th}` : ` ${c.name_en}`),
               value: c.id,
             })),
           })),
@@ -373,207 +465,346 @@ export default function PLOChart() {
     },
   };
 
-  
+  const [studentCourseCloScoreData, setStudentCourseCloScoreData] = useState<
+    any[]
+  >([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await apiClient.get(
+          `/calculation/ass-clo/allStudentCourse?courseId=${selections.courseId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        // 1. Get the array from the response object
+        const rawList = res.data.cloScoresPerStudent || [];
+
+        // 2. Transform (flatten) the data so the table can map it easily
+        const flattenedData = rawList.map((item: any) => {
+          // Create the base row object
+          const row: any = {
+            studentId: item.student_id,
+            studentName: item.studentName || `Student ${item.student_id}`,
+          };
+
+          // Turn the cloScores array into direct keys (e.g., { CLO1: 8.45, CLO2: 14.09 })
+          item.cloScores.forEach((clo: any) => {
+            row[clo.cloCode] = clo.cloScore;
+          });
+
+          return row;
+        });
+
+        // 3. Set the state with the ARRAY, not the object
+        setStudentCourseCloScoreData(flattenedData);
+      } catch (error) {
+        showToast("Failed to fetch data", "error");
+        console.error(error);
+      }
+    };
+
+    if (token && selections.courseId) fetchData();
+  }, [token, selections.courseId]);
+
+  const [studentCourseAssScoreData, setStudentCourseAssScoreData] = useState<
+    any[]
+  >([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await apiClient.get(
+          `/calculation/realScoreAndGrade/allStudentCourse`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { courseId: selections.courseId },
+          },
+        );
+
+        const rawResults = res.data.studentResults || [];
+
+        // 1. First, find EVERY unique category across all students
+        const allCategories = new Set<string>();
+        rawResults.forEach((s: any) => {
+          s.categoryScores?.forEach((c: any) => allCategories.add(c.category));
+        });
+
+        // 2. Map the data and fill in missing categories with "0.00"
+        const flattened = rawResults.map((student: any) => {
+          const row: any = {
+            studentName: student.studentName,
+            totalScore: (student.totalScore ?? 0).toFixed(2),
+            grade: student.grade || "F",
+          };
+
+          // Pre-fill all known categories with "0.00"
+          allCategories.forEach((cat) => {
+            row[cat] = "0.00";
+          });
+
+          // Overwrite with real scores where they exist
+          student.categoryScores?.forEach((c: any) => {
+            row[c.category] = Number(c.realScore ?? 0).toFixed(2);
+          });
+
+          return row;
+        });
+
+        setStudentCourseAssScoreData(flattened);
+      } catch (error) {
+        console.error("Error fetching student course data:", error);
+      }
+    };
+
+    if (token && selections.courseId) {
+      fetchData();
+    }
+  }, [token, selections.courseId]);
+
+  const CloScoreColumns: Column<any>[] = [
+    { header: "Student Name", accessor: "studentName" },
+    ...Object.keys(studentCourseCloScoreData[0] || {})
+      .filter((key) => key.startsWith("CLO"))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((clo) => ({ header: clo, accessor: clo })),
+  ];
+
+  const AssScoreColumn: Column<any>[] = [
+    { header: "Student Name", accessor: "studentName" },
+
+    // 1. We look at the first student's data to find all categories
+    ...(studentCourseAssScoreData[0]
+      ? Object.keys(studentCourseAssScoreData[0])
+          .filter(
+            (key) => !["studentName", "totalScore", "grade"].includes(key),
+          )
+          .map((cat) => ({
+            header: cat.charAt(0).toUpperCase() + cat.slice(1), // e.g. "midtermExam" -> "MidtermExam"
+            accessor: cat,
+          }))
+      : []),
+
+    // 2. Add summary columns at the end
+    // { header: "Total Score", accessor: "totalScore" },
+    // { header: "Grade", accessor: "grade" },
+  ];
 
   return (
-    <div className="bg-[#f8fafc] min-h-screen font-sans text-slate-900 pb-12">
-      {/* 1. MASTER STICKY CONTROL PANEL */}
-      <div className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-md">
-        <div className="max-w-7xl mx-auto px-4">
-          {/* TOP ROW: Brand & Global Filters */}
-          <div className="py-4 flex flex-col justify-between gap-4 border-b border-slate-100">
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-200">
-                <FaChartLine className="text-white text-lg" />
-              </div>
-              <h1 className="text-lg font-bold tracking-tight">
-                Analytics Dashboard
-              </h1>
-            </div>
+    <div className="bg-[#f8fafc] min-h-screen text-slate-900 pb-12">
+      {loading && <LoadingOverlay />}
+      <ToastElement />
 
-            {/* PERMANENT TOP FILTERS - Adjusted to 5 columns for better fit */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 w-full max-w-5xl">
-              <DropdownSelect
-                options={options.universities}
-                value={selections.university}
-                onChange={(v) =>
-                  setSelections((s) => ({ ...s, university: v as string }))
-                }
-                label="University"
-              />
-              <DropdownSelect
-                options={options.faculties}
-                value={selections.faculty}
-                onChange={(v) =>
-                  setSelections((s) => ({ ...s, faculty: v as string }))
-                }
-                label="Faculty"
-                disabled={!selections.university}
-              />
-              <DropdownSelect
-                options={options.programs}
-                value={selections.program}
-                onChange={(v) =>
-                  setSelections((s) => ({ ...s, program: v as string }))
-                }
-                label="Program"
-                disabled={!selections.faculty}
-              />
-              <DropdownSelect
-                options={options.years}
-                value={selections.year}
-                onChange={(v) =>
-                  setSelections((s) => ({ ...s, year: v as string }))
-                }
-                label="Year"
-                disabled={!selections.program}
-              />
-              <DropdownSelect
-                options={options.courses}
-                value={selections.courseId}
-                onChange={(v) =>
-                  setSelections((s) => ({ ...s, courseId: v as string }))
-                }
-                label="Course"
-                disabled={!selections.year}
-              />
+      {/* 1. TOP STICKY FILTERS */}
+      <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          {/* Dashboard Identity */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-100">
+              <FaChartLine className="text-white text-xl" />
             </div>
+            <h1 className="text-lg font-extrabold tracking-tight text-slate-800">
+              Analytics Dashboard
+            </h1>
+          </div>
+
+          {/* Selection Filters */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-5xl">
+            <DropdownSelect
+              label="University"
+              options={options.universities}
+              value={selections.university}
+              disabled={isInstructor}
+              onChange={(v) =>
+                setSelections({
+                  university: v as string,
+                  faculty: "",
+                  program: "",
+                  year: "",
+                  courseId: "",
+                })
+              }
+            />
+
+            <DropdownSelect
+              label="Faculty"
+              options={options.faculties}
+              value={selections.faculty}
+              disabled={!selections.university || isInstructor}
+              onChange={(v) =>
+                setSelections({
+                  ...selections,
+                  faculty: v as string,
+                  program: "",
+                  year: "",
+                  courseId: "",
+                })
+              }
+            />
+
+            <DropdownSelect
+              label="Program"
+              options={options.programs}
+              value={selections.program}
+              disabled={!selections.faculty}
+              onChange={(v) =>
+                setSelections({
+                  ...selections,
+                  program: v as string,
+                  year: "",
+                  courseId: "",
+                })
+              }
+            />
+
+            <DropdownSelect
+              label="Year"
+              options={options.years}
+              value={selections.year}
+              disabled={!selections.program}
+              onChange={(v) =>
+                setSelections({
+                  ...selections,
+                  year: v as string,
+                  courseId: "",
+                })
+              }
+            />
+
+            <DropdownSelect
+              label="Course"
+              options={options.courses}
+              value={selections.courseId}
+              disabled={!selections.year}
+              onChange={(v) =>
+                setSelections({
+                  ...selections,
+                  courseId: v as string,
+                })
+              }
+            />
           </div>
         </div>
       </div>
 
-      {/* 2. MAIN CONTENT AREA */}
+      {/* 2. MAIN CONTENT */}
       <div className="max-w-7xl mx-auto px-4 mt-8 space-y-8">
         {!summaryData ? (
           <div className="flex flex-col items-center justify-center py-40 bg-white rounded-3xl border-2 border-dashed border-slate-200">
-            <FaUniversity className="text-6xl text-slate-200 mb-4" />
-            <h2 className="text-slate-400 font-semibold text-lg">
-              Dashboard Ready
+            <FaUniversity className="text-6xl text-slate-100 mb-4" />
+            <h2 className="text-slate-400 font-semibold">
+              Select course details to begin
             </h2>
-            <p className="text-slate-400 text-sm">
-              Select course details above to begin analysis
-            </p>
           </div>
         ) : (
           <>
-            <div className="">
-              {activeMetric === "CLO" && (
-                <PerformanceTable
-                  title="CLO Performance Analysis"
-                  summaryData={summaryData}
-                  cloAveragesByGrade={formattedCLOChartData}
-                  getGradeColor={getGradeColor}
-                />
-              )}
-              {activeMetric === "PLO" && (
-                <PerformanceTable
-                  title="PLO Performance Analysis"
-                  summaryData={summaryData}
-                  cloAveragesByGrade={ploAveragesByGrade}
-                  getGradeColor={getGradeColor}
-                />
-              )}
-              {activeMetric === "Ass" && (
-                <PerformanceTable
-                  title="Assignment Category Performance Analysis"
-                  summaryData={summaryData}
-                  cloAveragesByGrade={categoryChartData}
-                  getGradeColor={getGradeColor}
-                />
-              )}
-            </div>
-
-            {/* BOTTOM ROW: Dynamic Analytics Controls */}
-            {summaryData && (
-              <div className="py-3 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-4">
-                  {/* Metric Type */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-                    {(["CLO", "PLO", "Ass"] as const).map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => setActiveMetric(m)}
-                        className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          activeMetric === m
-                            ? "bg-white text-blue-600 shadow-sm"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                      >
-                        {m === "Ass" ? "Assignments" : m}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Chart Style */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+            {/* A. PERFORMANCE TABLES SECTION */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-xl font-bold text-slate-800">
+                  Individual Student Performance
+                </h3>
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  {(["CLO", "PLO", "Ass"] as const).map((m) => (
                     <button
-                      onClick={() => setActiveTab("line")}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "line" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
+                      key={m}
+                      onClick={() => setActiveMetric(m)}
+                      className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeMetric === m ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
                     >
-                      Trend
+                      {m === "Ass" ? "Assignments" : m}
                     </button>
-                    <button
-                      onClick={() => setActiveTab("radar")}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "radar" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
-                    >
-                      Balance
-                    </button>
-                  </div>
-                </div>
-
-                {/* GRADE & AVG TOGGLES (THE BUTTONS YOU WANTED) */}
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full">
-                  <ToggleButton
-                    label="Max Score"
-                    active={visibleLines.maxScore}
-                    onClick={() => toggleLine("maxScore")}
-                    color="#22c55e"
-                  />
-                  <ToggleButton
-                    label="Min Score"
-                    active={visibleLines.minScore}
-                    onClick={() => toggleLine("minScore")}
-                    color="#ef4444"
-                  />
-                  <ToggleButton
-                    label="Class Average"
-                    active={visibleLines.allAvg}
-                    onClick={() => toggleLine("allAvg")}
-                    color="#6366f1"
-                  />
-
-                  <div className="h-4 w-[1px] bg-slate-200 mx-1" />
-                  {Array.from(
-                    new Set(summaryData?.students?.map((s: any) => s.grade)),
-                  )
-                    .filter(Boolean)
-                    .sort()
-                    .map((grade: any) => (
-                      <button
-                        key={grade}
-                        onClick={() => toggleLine(`avg_grade_${grade}`)}
-                        className={`whitespace-nowrap px-3 py-1 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
-                          visibleLines[`avg_grade_${grade}`]
-                            ? "bg-white shadow-sm border-slate-300 text-slate-800"
-                            : "bg-slate-50 text-slate-300 border-transparent opacity-50"
-                        }`}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: getGradeColor(grade) }}
-                        />
-                        {grade}
-                      </button>
-                    ))}
+                  ))}
                 </div>
               </div>
-            )}
 
-            {/* CHARTS ROW */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-8 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+              <div>
+                {activeMetric === "CLO" &&
+                  studentCourseCloScoreData.length > 0 && (
+                    <Table
+                      columns={CloScoreColumns}
+                      data={studentCourseCloScoreData}
+                    />
+                  )}
+                {activeMetric === "Ass" &&
+                  studentCourseAssScoreData.length > 0 && (
+                    <Table
+                      columns={AssScoreColumn}
+                      data={studentCourseAssScoreData}
+                    />
+                  )}
+              </div>
+            </div>
+
+            {/* B. ANALYTICS CONTROL PANEL (MOVED HERE) */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-6">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-black uppercase text-slate-400 tracking-widest">
+                  Chart Style:
+                </span>
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    onClick={() => setActiveTab("line")}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "line" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
+                  >
+                    Trend
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("radar")}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "radar" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}
+                  >
+                    Balance
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full lg:w-auto">
+                <ToggleButton
+                  label="Max Score"
+                  active={visibleLines.maxScore}
+                  onClick={() => toggleLine("maxScore")}
+                  color="#22c55e"
+                />
+                <ToggleButton
+                  label="Min Score"
+                  active={visibleLines.minScore}
+                  onClick={() => toggleLine("minScore")}
+                  color="#ef4444"
+                />
+                <ToggleButton
+                  label="Class Avg"
+                  active={visibleLines.allAvg}
+                  onClick={() => toggleLine("allAvg")}
+                  color="#6366f1"
+                />
+                <div className="h-6 w-px bg-slate-200 mx-2" />
+                {Array.from(
+                  new Set(summaryData?.students?.map((s: any) => s.grade)),
+                )
+                  .filter(Boolean)
+                  .sort()
+                  .map((grade: any) => (
+                    <button
+                      key={grade}
+                      onClick={() => toggleLine(`avg_grade_${grade}`)}
+                      className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${visibleLines[`avg_grade_${grade}`] ? "bg-white shadow-sm border-slate-300 text-slate-800" : "bg-slate-50 text-slate-300 border-transparent opacity-50"}`}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: getGradeColor(grade) }}
+                      />
+                      {grade}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            {/* C. VISUALIZATION SECTION */}
+            <div className="flex flex-col gap-8">
+              <div className="w-full bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
                 <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-                  <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
+                  <div className="bg-blue-50 p-2 rounded-lg text-blue-600 shadow-inner">
                     <FaThLarge />
                   </div>
                   <h3 className="font-bold text-slate-800">
@@ -609,16 +840,16 @@ export default function PLOChart() {
                 </div>
               </div>
 
-              <div className="lg:col-span-4 bg-white border border-slate-200 rounded-3xl shadow-sm p-8 flex flex-col">
+              <div className="w-full bg-white border border-slate-200 rounded-3xl shadow-sm p-8 flex flex-col">
                 <div className="flex items-center gap-3 mb-8">
-                  <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600">
+                  <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600 shadow-inner">
                     <FaUserGraduate />
                   </div>
                   <h3 className="font-bold text-slate-800">
                     Grade Distribution
                   </h3>
                 </div>
-                <div className="flex-1 min-h-[300px]">
+                <div className="h-[400px]">
                   <GradeDistributionChart data={gradeDistribution} />
                 </div>
               </div>

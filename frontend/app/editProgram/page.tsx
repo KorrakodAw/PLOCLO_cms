@@ -7,7 +7,7 @@ import DropdownSelect from "../../components/DropdownSelect";
 import ProgramManagement from "./ProgramManagement";
 import ProtectedRoute from "../../components/ProtectedRoute";
 
-import { getUniversities } from "../../utils/universityApi";
+import { getUniversities, University } from "../../utils/universityApi";
 import { getFaculties, Faculty } from "../../utils/facultyApi";
 import { getPrograms, Program } from "../../utils/programApi";
 import SearchBar from "@/components/SearchBar";
@@ -20,7 +20,6 @@ interface Option {
 }
 
 export default function EditProgram() {
-  
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
 
@@ -38,8 +37,8 @@ export default function EditProgram() {
     programs: [] as Option[],
   });
 
-const { user, token } = useAuth();
-const isInstructor = user?.role === "instructor";
+  const { user, token } = useAuth();
+  const isInstructor = user?.role === "instructor";
 
   // --- 2. HANDLERS ---
   const updateSelections = (updates: Partial<typeof selections>) => {
@@ -64,22 +63,30 @@ const isInstructor = user?.role === "instructor";
     if (!token) return;
     getUniversities(token)
       .then((data) => {
+        // 🟢 ต้อง Format ข้อมูลให้เป็น Option[] ก่อนเก็บเข้า State
+        const formatted = data.map((u: University) => ({
+          label: lang === "th" ? u.name_th || u.name : u.name,
+          value: String(u.id),
+        }));
         setOptions((prev) => ({
           ...prev,
-          universities: data,
+          universities: [{ label: t("all"), value: "" }, ...formatted],
         }));
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Load Universities Error:", err);
         setOptions((p) => ({ ...p, universities: [] }));
       });
-  }, [token]);
+  }, [token, lang, t]); // เพิ่ม lang และ t เพื่อให้แปลภาษาทันทีที่เปลี่ยน
 
   // Load Faculties when University changes
   useEffect(() => {
+    // 🟢 เคลียร์ค่าเก่าทิ้งทันทีที่เปลี่ยน University เพื่อป้องกันข้อมูลข้ามกัน
     if (!token || !selections.university) {
       setOptions((p) => ({ ...p, faculties: [], programs: [] }));
       return;
     }
+
     getFaculties(token, selections.university)
       .then((data) => {
         const formatted = data.map((f: Faculty) => ({
@@ -92,7 +99,7 @@ const isInstructor = user?.role === "instructor";
         }));
       })
       .catch(() => setOptions((p) => ({ ...p, faculties: [] })));
-  }, [selections.university, lang, t]);
+  }, [selections.university, token, lang, t]);
 
   // Load Programs when Faculty changes
   useEffect(() => {
@@ -100,19 +107,35 @@ const isInstructor = user?.role === "instructor";
       setOptions((p) => ({ ...p, programs: [] }));
       return;
     }
+
     getPrograms(token, selections.faculty)
       .then((data) => {
-        const formatted = data.map((p: Program) => ({
-          label: lang === "th" ? p.program_name_th : p.program_name_en,
-          value: String(p.id),
-        }));
+        // 🟢 1. กรองข้อมูลให้เหลือแค่ชื่อที่ไม่ซ้ำกัน (Deduplication)
+        // ใช้ Map โดยยึด 'label' (ชื่อโปรแกรม) เป็น Key
+        const uniqueMap = new Map();
+
+        data.forEach((p: Program) => {
+          const label =
+            lang === "th" ? p.program_shortname_th : p.program_shortname_en;
+          // หากยังไม่มีชื่อนี้ใน Map ให้เพิ่มเข้าไป (จะเก็บตัวแรกที่เจอ)
+          if (!uniqueMap.has(label)) {
+            uniqueMap.set(label, {
+              label: label,
+              value: String(p.program_code),
+            });
+          }
+        });
+
+        // 🟢 2. แปลง Map กลับเป็น Array ของ Options
+        const formatted = Array.from(uniqueMap.values());
+
         setOptions((prev) => ({
           ...prev,
           programs: [{ label: t("all"), value: "" }, ...formatted],
         }));
       })
       .catch(() => setOptions((p) => ({ ...p, programs: [] })));
-  }, [selections.faculty, lang, t]);
+  }, [selections.faculty, token, lang, t]);
 
   // --- 4. RENDER ---
   return (
@@ -188,7 +211,6 @@ const isInstructor = user?.role === "instructor";
               onClick={clearFilters}
               className="px-6 py-2.5 text-slate-500 hover:text-orange-600 font-semibold transition-all hover:bg-orange-50 rounded-xl flex items-center gap-2 border border-slate-100 hover:border-orange-200"
             >
-              <span className="text-xl leading-none">×</span>
               {t("clear")}
             </button>
           </div>
