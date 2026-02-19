@@ -511,7 +511,7 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     const cloStatsBase = Object.entries(cloGroups).map(([cloCode, scores]) => {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
-      const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+      const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
       return { cloCode, min, max, mean };
     });
 
@@ -912,7 +912,7 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
       ([category, scores]) => {
         const min = Math.min(...scores);
         const max = Math.max(...scores);
-        const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+        const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
         return { category, min, max, mean };
       }
     );
@@ -1269,7 +1269,7 @@ export async function getPloProgramWhereScoreComeFrom(
 }
 
 /////////////////////////////////////////////////////////////
-// คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 course
+// คำนวณ Min, Max, Mean, highestPossible ของ PLO แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////
 export async function getPloStatsPerCourse(tx: any, courseId: number) {
   const students = await tx.studentScore.findMany({
@@ -1303,12 +1303,47 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
     ([ploCode, scores]) => {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
-      const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+      const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
       return { ploCode, min, max, mean };
     }
   );
 
-  return { ploStats };
+  // 1) ดึง CLO highestPossible จาก function เดิม
+  const { cloStats } = await getCloStatsPerCourse(tx, courseId);
+
+  // 2) ดึง CloPloMapping ของ course นี้
+  const cloPloMappings = await tx.cloPloMapping.findMany({
+    where: {
+      clo: { course_id: Number(courseId) },
+    },
+    select: {
+      clo: { select: { code: true } },
+      plo: { select: { code: true } },
+      weight: true,
+    },
+  });
+
+  // 3) รวม CLO highestPossible → PLO highestPossible
+  const highestPloMap: Record<string, number> = {};
+  cloPloMappings.forEach((mapping: { clo: { code: string }, plo: { code: string }, weight: number | null }) => {
+    const cloCode = mapping.clo.code;
+    const ploCode = mapping.plo.code;
+    const cloHighest = cloStats.find((c) => c.cloCode === cloCode)?.highestPossible ?? 0;
+
+    const contribution = cloHighest * (Number(mapping.weight) / 100);
+
+    highestPloMap[ploCode] = (highestPloMap[ploCode] ?? 0) + contribution;
+  });
+
+  // 4) merge เข้าไปใน ploStats
+  const ploStatsWithHighest = ploStats.map((stat) => ({
+    ...stat,
+    highestPossible: highestPloMap[stat.ploCode] ?? 0,
+  }));
+
+  return { ploStats: ploStatsWithHighest };
+
+  //return { ploStats };
 }
 
 /////////////////////////////////////////////////////////////

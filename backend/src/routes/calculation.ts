@@ -355,7 +355,7 @@ router.get("/clo-plo/wherePloComeFrom", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////
-// คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 course
+// คำนวณ Min, Max, Mean, highestPossible ของ PLO แต่ละตัว ใน 1 course
 // GET http://localhost:9771/api/calculation/clo-plo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////
