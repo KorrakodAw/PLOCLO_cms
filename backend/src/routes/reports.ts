@@ -13,4 +13,6 @@ router.get("/summary", getSectionGradeSummary,authenticateToken);
 router.get("/individual", getIndividualStudentSummary,authenticateToken);
 router.get("/gradeSummary", getGradeSummary,authenticateToken);
 
+
+
 export default router;

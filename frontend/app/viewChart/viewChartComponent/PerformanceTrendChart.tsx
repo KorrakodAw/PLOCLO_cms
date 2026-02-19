@@ -13,7 +13,6 @@ import {
 
 interface PerformanceTrendChartProps {
   chartData: any[];
-  summaryData: any[];
   visibleLines?: Record<string, boolean>;
   getGradeColor?: (grade: string) => string;
   xAxisKey: string;
@@ -25,7 +24,6 @@ interface PerformanceTrendChartProps {
 
 export const PerformanceTrendChart = ({
   chartData,
-  summaryData,
   visibleLines,
   getGradeColor,
   xAxisKey,
@@ -34,10 +32,8 @@ export const PerformanceTrendChart = ({
   minScoreKey,
   allAvgKey,
 }: PerformanceTrendChartProps) => {
-
-
   const uniqueGrades = useMemo(() => {
-    if (!summaryData || chartData.length === 0) return [];
+    if (chartData.length === 0) return [];
 
     // 1. Get all keys from the first data object (e.g., "cloCode", "avg_grade_A", etc.)
     const keys = Object.keys(chartData[0]);
@@ -48,8 +44,6 @@ export const PerformanceTrendChart = ({
       .map((key) => key.replace("avg_grade_", ""))
       .sort(); // Sorts them as A, B, C, F
   }, [chartData]);
-
-  
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -138,7 +132,6 @@ export const PerformanceTrendChart = ({
               />
             ),
         )}
-        
       </ComposedChart>
     </ResponsiveContainer>
   );

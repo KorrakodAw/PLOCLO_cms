@@ -31,7 +31,7 @@ router.get("/", authenticateToken, async (_req, res) => {
       JOIN program p ON student.program_id = p.id
       WHERE student.program_id = $1
       ORDER BY student.id DESC`,
-      [programId]
+      [programId],
     );
     res.json(result.rows);
   } catch (err) {
@@ -56,7 +56,7 @@ router.post("/", authenticateToken, async (req, res) => {
         (student_code, first_name, last_name, program_id , email)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [student_code, first_name, last_name, program_id, email]
+      [student_code, first_name, last_name, program_id, email],
     );
 
     res.status(201).json(result.rows[0]);
@@ -189,7 +189,7 @@ router.patch("/:id", authenticateToken, async (req, res) => {
            email = $4
        WHERE id = $5
        RETURNING *`,
-      [first_name, last_name, student_code, email, studentId]
+      [first_name, last_name, student_code, email, studentId],
     );
 
     if (result.rows.length === 0) {
@@ -209,7 +209,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `DELETE FROM student WHERE id = $1 RETURNING *`,
-      [studentId]
+      [studentId],
     );
 
     if (result.rows.length === 0) {
@@ -220,6 +220,39 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   } catch (err: any) {
     console.error("Error deleting student:", err);
     res.status(500).json({ error: "Failed to delete student" });
+  }
+});
+
+router.get("/:id", authenticateToken, async (req, res) => {
+  const studentId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+        student.id,
+        student.student_code,
+        student.first_name,
+        student.last_name,
+        student.email,
+        student.program_id,
+        p.program_shortname_en,
+        p.program_shortname_th,
+        p.program_name_en,
+        p.program_name_th
+      FROM student 
+      JOIN program p ON student.program_id = p.id
+      WHERE student.id = $1`,
+      [studentId],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error fetching student:", err);
+    res.status(500).json({ error: "Failed to fetch student" });
   }
 });
 

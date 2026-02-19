@@ -353,7 +353,7 @@ export async function getCloScoreAllStudentPerCourse(
 export async function getCloStatsPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
     // -----------------------------
-    // 1) คำนวณ min, max, mean จาก student scores
+    // 1) คำนวณ min, max, mean จาก student scores (โค้ดเดิม)
     // -----------------------------
     const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
     const cloScoresPerStudent = perStudent.cloScoresPerStudent;
@@ -371,14 +371,7 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
       const mean = scores.reduce((sum, s) => sum + s, 0) / scores.length;
-
-      return {
-        cloCode,
-        // Rounding to 2 digits
-        min: Number(min.toFixed(2)),
-        max: Number(max.toFixed(2)),
-        mean: Number(mean.toFixed(2)),
-      };
+      return { cloCode, min, max, mean };
     });
 
     // -----------------------------
@@ -409,19 +402,12 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     });
 
     // -----------------------------
-    // 3) merge + Round 2 digits + Natural Sort
+    // 3) merge cloStatsBase + highestClo
     // -----------------------------
-    const cloStats = cloStatsBase
-      .map((stat) => ({
-        ...stat,
-        highestPossible: Number((highestCloMap[stat.cloCode] ?? 0).toFixed(2)),
-      }))
-      .sort((a, b) =>
-        a.cloCode.localeCompare(b.cloCode, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
-      );
+    const cloStats = cloStatsBase.map((stat) => ({
+      ...stat,
+      highestPossible: highestCloMap[stat.cloCode] ?? 0,
+    }));
 
     return { cloStats };
   });
@@ -528,45 +514,17 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
       }
     }
 
-    // 4) Calculate averages per grade (Keep current logic for intermediate steps)
+    // 4) หาค่าเฉลี่ยต่อ grade
     for (const grade in gradeSummary) {
       const summary = gradeSummary[grade];
       for (const cloCode in summary.categoryAverages) {
-        summary.categoryAverages[cloCode] = Number(
-          (summary.categoryAverages[cloCode] / summary.count).toFixed(2),
-        );
+        summary.categoryAverages[cloCode] =
+          summary.categoryAverages[cloCode] / summary.count;
       }
-      summary.totalAverage = Number(
-        (summary.totalAverage / summary.count).toFixed(2),
-      );
+      summary.totalAverage = summary.totalAverage / summary.count;
     }
 
-    // 5) Pivot Data: Group by CLO Code instead of Grade
-    // Get all unique CLO codes present in the data
-    const allCloCodes = Array.from(
-      new Set(
-        cloScoresPerStudent.flatMap((s) => s.cloScores.map((c) => c.cloCode)),
-      ),
-    );
-
-    const result = allCloCodes
-      .map((cloCode) => {
-        const entry: any = { cloCode };
-
-        // For this CLO, pull the average from every grade
-        for (const grade in gradeSummary) {
-          const avg = gradeSummary[grade].categoryAverages[cloCode];
-          // Dynamic key: avg_grade_A, avg_grade_B, etc.
-          entry[grade] = avg !== undefined ? avg : 0;
-        }
-
-        return entry;
-      })
-      .sort((a, b) =>
-        a.cloCode.localeCompare(b.cloCode, undefined, { numeric: true }),
-      );
-
-    return result; // Now returns [{ cloCode: "CLO1", avg_grade_A: 7.48, ... }, ...]
+    return gradeSummary;
   });
 
   return result;
@@ -750,46 +708,26 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
   courseId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Get raw scores
+    // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category ของนักเรียนทุกคน
     const { realScoresPerStudent } = await getRealScoreAllStudentPerCourse(
       tx,
       courseId,
     );
 
-    // 2. NEW: Fetch all student names in ONE batch query
-    const studentIds = realScoresPerStudent.map((s) => s.student_id);
-    const students = await tx.student.findMany({
-      where: { id: { in: studentIds } },
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        student_code: true,
-      },
-    });
-
-    // Create a lookup map for easy access: { 1: "John Doe", 2: "Jane Smith" }
-    const nameMap = Object.fromEntries(
-      students.map((s) => [s.id, `${s.first_name} ${s.last_name} `]),
-    );
-    const studentCodeMap = Object.fromEntries(
-      students.map((s) => [s.id, s.student_code]),
-    );
-
-    // 3. Get grade settings
+    // 2. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
       where: { course_id: Number(courseId) },
-      orderBy: { score: "desc" },
+      orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
-    // 4. Map results and attach the name from the nameMap
+    // 3. รวมคะแนน และหาเกรดของนักเรียนแต่ละคน
     const results = realScoresPerStudent.map((student) => {
       const totalScore = student.categoryScores.reduce(
         (sum, c) => sum + c.realScore,
         0,
       );
 
-      let grade = "F";
+      let grade = "F"; // default ถ้าไม่เข้าเงื่อนไข
       for (const gs of gradeSettings) {
         if (totalScore >= Number(gs.score)) {
           grade = gs.grade;
@@ -799,25 +737,15 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 
       return {
         student_id: student.student_id,
-        studentName: nameMap[student.student_id] || "Unknown",
-        studentCode: studentCodeMap[student.student_id] || "",
         totalScore,
         grade,
-        categoryScores: student.categoryScores,
+        categoryScores: student.categoryScores, // เก็บรายละเอียด category ด้วย
       };
     });
 
-    results.sort((a, b) => {
-      return a.studentCode.localeCompare(b.studentCode, undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
-
+    // 4. คำนวณ mean ของคะแนนนักเรียนทั้งหมด
     const meanScore =
-      results.length > 0
-        ? results.reduce((sum, s) => sum + s.totalScore, 0) / results.length
-        : 0;
+      results.reduce((sum, s) => sum + s.totalScore, 0) / results.length;
 
     return { studentResults: results, meanScore };
   });

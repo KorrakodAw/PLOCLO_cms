@@ -54,11 +54,13 @@ export default function PLOChart() {
     courseId: "",
   });
 
-  const [summaryData, setSummaryData] = useState<any>(null);
   const [cloStudentData, setCloStudentData] = useState<any>(null);
   const [ploStudentData, setPloStudentData] = useState<any>(null);
   const [cloBalanceData, setCloBalanceData] = useState<any>(null);
   const [ploBalanceData, setPloBalanceData] = useState<any>(null);
+  const [studentCourseAssScoreData, setStudentCourseAssScoreData] = useState<
+    any[]
+  >([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   const { showToast, ToastElement } = useToast();
@@ -270,8 +272,6 @@ export default function PLOChart() {
   }, [selections.program]);
 
   useEffect(() => {
-    console.log(selections.year);
-
     if (selections.year) {
       fetchData("/course/forSummary", { programId: selections.year }).then(
         (data) =>
@@ -291,253 +291,32 @@ export default function PLOChart() {
 
   useEffect(() => {
     if (selections.courseId) {
-      fetchData("/reports/gradeSummary", {
-        courseId: selections.courseId,
-      }).then(setSummaryData);
-      fetchData("/calculation/ass-clo/gradeSummary", {
-        courseId: selections.courseId,
-      }).then(setCloStudentData);
+      // fetch the count of grade , average score per grade for each clo
+      // fetchData("/calculation/ass-clo/gradeSummary", {
+      //   courseId: selections.courseId,
+      // }).then(setCloStudentData);
+      // fetch the ploScore of each student
       fetchData("/calculation/clo-plo/allStudentCourse", {
         courseId: selections.courseId,
       }).then(setPloStudentData);
+      //fetch the cloScore of each student
+      fetchData("/calculation/ass-clo/allStudentCourse", {
+        courseId: selections.courseId,
+      }).then(setCloStudentData);
+      //fetch the min,max,mean,maxposs of clo
       fetchData("/calculation/ass-clo/course/stats", {
         courseId: selections.courseId,
       }).then(setCloBalanceData);
+      //fetch the min,max,mean,maxposs of plo
       fetchData("/calculation/clo-plo/course/stats", {
         courseId: selections.courseId,
       }).then(setPloBalanceData);
     }
   }, [selections.courseId]);
 
-  // --- DATA TRANSFORMATIONS ---
-  const categoryChartData = useMemo(() => {
-    if (!summaryData?.categoryFullScores || !summaryData?.students) return [];
-    const categories = Object.keys(summaryData.categoryFullScores);
-
-    return categories.map((cat) => {
-      const scores = summaryData.students.map(
-        (s: any) => Number(s.categoryEarnedScores[cat]) || 0,
-      );
-      const dataPoint: any = {
-        name: cat,
-        fullScore: summaryData.categoryFullScores[cat],
-        maxScore: Math.max(...scores),
-        minScore: Math.min(...scores),
-        allAvg: Number(
-          (
-            scores.reduce((a: number, b: number) => a + b, 0) / scores.length
-          ).toFixed(2),
-        ),
-      };
-
-      const studentsByGrade = summaryData.students.reduce(
-        (acc: any, s: any) => {
-          const g = s.grade || "N/A";
-          if (!acc[g]) acc[g] = { sum: 0, count: 0 };
-          acc[g].sum += s.categoryEarnedScores[cat] || 0;
-          acc[g].count++;
-          return acc;
-        },
-        {},
-      );
-
-      Object.keys(studentsByGrade).forEach((g) => {
-        dataPoint[`avg_grade_${g}`] = Number(
-          (studentsByGrade[g].sum / studentsByGrade[g].count).toFixed(2),
-        );
-      });
-      return dataPoint;
-    });
-  }, [summaryData]);
-
-  const ploAveragesByGrade = useMemo(() => {
-    if (!Array.isArray(ploStudentData) || !summaryData?.students) return [];
-    const gradeMap = summaryData.students.reduce(
-      (acc: any, s: any) => ({ ...acc, [s.student_id]: s.grade || "N/A" }),
-      {},
-    );
-    const groups: any = {};
-    ploStudentData.forEach((st: any) => {
-      const grade = gradeMap[st.studentId];
-      if (!grade) return;
-      if (!groups[grade]) groups[grade] = {};
-      st.ploScores.forEach((p: any) => {
-        if (!groups[grade][p.ploCode])
-          groups[grade][p.ploCode] = { sum: 0, count: 0 };
-        groups[grade][p.ploCode].sum += p.ploScore;
-        groups[grade][p.ploCode].count++;
-      });
-    });
-    const allPloCodes = Array.from(
-      new Set(
-        ploStudentData.flatMap((s: any) =>
-          s.ploScores.map((p: any) => p.ploCode),
-        ),
-      ),
-    ).sort();
-    return allPloCodes.map((code) => {
-      const dp: any = { name: code };
-      Object.keys(groups).forEach((g) => {
-        const stats = groups[g][code];
-        dp[`avg_grade_${g}`] = stats
-          ? Number((stats.sum / stats.count).toFixed(2))
-          : 0;
-      });
-      return dp;
-    });
-  }, [ploStudentData, summaryData]);
-
-  const gradeDistribution = useMemo(() => {
-    if (!summaryData?.students) return [];
-    const counts = summaryData.students.reduce((acc: any, s: any) => {
-      const g = s.grade || "N/A";
-      acc[g] = (acc[g] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.keys(counts)
-      .sort()
-      .map((grade) => ({ grade, count: counts[grade] }));
-  }, [summaryData]);
-
-  const getGradeColor = (grade: string) => {
-    const colors: any = {
-      A: "#22c55e",
-      "B+": "#3b82f6",
-      B: "#60a5fa",
-      "C+": "#eab308",
-      C: "#fde047",
-      "D+": "#f97316",
-      D: "#fb923c",
-      F: "#ef4444",
-    };
-    return colors[grade] || "#94a3b8";
-  };
-
-  const formattedCLOChartData = useMemo(() => {
-    const baseArray = Array.isArray(cloBalanceData)
-      ? cloBalanceData
-      : (cloBalanceData as any)?.cloStats || [];
-
-    if (baseArray.length === 0 || !Array.isArray(cloStudentData)) {
-      return [];
-    }
-
-    // 1. Create a quick lookup map for student data using cloCode as the key
-    const studentDataMap = new Map(
-      cloStudentData.map((item: any) => [item.cloCode, item]),
-    );
-
-    // 2. Merge base data with student data
-    return baseArray.map((baseItem: any) => {
-      const studentEntry = studentDataMap.get(baseItem.cloCode) || {};
-
-      // Define the grades we want to extract (A, C+, F, etc.)
-      // We filter out 'cloCode' so we only get the actual grade keys
-      const gradeKeys = Object.keys(studentEntry).filter(
-        (key) => key !== "cloCode",
-      );
-
-      const formattedGrades: any = {};
-      gradeKeys.forEach((grade) => {
-        const val = studentEntry[grade];
-        // Format as avg_grade_A, avg_grade_C+, etc.
-        formattedGrades[`avg_grade_${grade}`] = val
-          ? Number(Number(val).toFixed(2))
-          : 0;
-      });
-
-      return {
-        ...baseItem, // Original stats (min, max, mean)
-        ...formattedGrades, // Merged grade averages
-      };
-    });
-  }, [cloBalanceData, cloStudentData]);
-
-  const toggleLine = (key: string) =>
-    setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
-
-  // --- UNIFIED CHART CONFIGURATION ---
-  const metricConfig = {
-    CLO: {
-      title: "CLO Analysis",
-      trendData: formattedCLOChartData,
-      balanceData: formattedCLOChartData,
-      xAxis: "cloCode",
-      maxPos: "highestPossible",
-      avg: "mean",
-      max: "max",
-      min: "min",
-    },
-    PLO: {
-      title: "PLO Analysis",
-      trendData: ploBalanceData?.ploStats || [],
-      balanceData: ploAveragesByGrade,
-      xAxis: "ploCode",
-      maxPos: "maxPloScore",
-      avg: "mean",
-      max: "max",
-      min: "min",
-    },
-    Ass: {
-      title: "Assignment Analysis",
-      trendData: categoryChartData,
-      balanceData: categoryChartData,
-      xAxis: "name",
-      maxPos: "fullScore",
-      avg: "allAvg",
-      max: "maxScore",
-      min: "minScore",
-    },
-  };
-
-  const [studentCourseCloScoreData, setStudentCourseCloScoreData] = useState<
-    any[]
-  >([]);
-
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await apiClient.get(
-          `/calculation/ass-clo/allStudentCourse?courseId=${selections.courseId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-
-        // 1. Get the array from the response object
-        const rawList = res.data.cloScoresPerStudent || [];
-
-        // 2. Transform (flatten) the data so the table can map it easily
-        const flattenedData = rawList.map((item: any) => {
-          // Create the base row object
-          const row: any = {
-            studentId: item.student_id,
-            studentName: item.studentName || `Student ${item.student_id}`,
-            studentCode: item.student_code || "",
-          };
-
-          // Turn the cloScores array into direct keys (e.g., { CLO1: 8.45, CLO2: 14.09 })
-          item.cloScores.forEach((clo: any) => {
-            row[clo.cloCode] = clo.cloScore;
-          });
-
-          return row;
-        });
-
-        // 3. Set the state with the ARRAY, not the object
-        setStudentCourseCloScoreData(flattenedData);
-      } catch (error) {
-        showToast("Failed to fetch data", "error");
-        console.error(error);
-      }
-    };
-
-    if (token && selections.courseId) fetchData();
-  }, [token, selections.courseId]);
-
-  const [studentCourseAssScoreData, setStudentCourseAssScoreData] = useState<
-    any[]
-  >([]);
+    console.log(cloStudentData);
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -551,8 +330,6 @@ export default function PLOChart() {
         );
 
         const rawResults = res.data.studentResults || [];
-
-        console.log(res.data);
 
         // 1. First, find EVERY unique category across all students
         const allCategories = new Set<string>();
@@ -593,13 +370,100 @@ export default function PLOChart() {
     }
   }, [token, selections.courseId]);
 
+  const getGradeColor = (grade: string) => {
+    const colors: any = {
+      A: "#22c55e",
+      "B+": "#3b82f6",
+      B: "#60a5fa",
+      "C+": "#eab308",
+      C: "#fde047",
+      "D+": "#f97316",
+      D: "#fb923c",
+      F: "#ef4444",
+    };
+    return colors[grade] || "#94a3b8";
+  };
+
+  // แปลงข้อมูลจาก Object ซ้อน Array ให้กลายเป็น Array ของ Object โดยตรง
+  const flattenedCLOTableData = useMemo(() => {
+    // ดึงรายการนิสิตออกมาจากคีย์ cloScoresPerStudent
+    const rawList = cloStudentData?.cloScoresPerStudent || [];
+
+    return rawList.map((item: any) => {
+      // 1. สร้างแถวข้อมูลพื้นฐาน
+      const row: any = {
+        student_id: item.student_id,
+        student_code: item.studentCode || item.student_code,
+        studentName: item.studentName,
+      };
+
+      // 2. ดึงคะแนน CLO จาก Array ออกมาเป็น Key โดยตรง (เช่น CLO1, CLO2)
+      item.cloScores?.forEach((clo: any) => {
+        row[clo.cloCode] = clo.cloScore;
+      });
+
+      return row;
+    });
+  }, [cloStudentData]);
+
+  useEffect(() => {
+    console.log("ploBalanceData", ploBalanceData);
+  });
+
+  const toggleLine = (key: string) =>
+    setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  // --- UNIFIED CHART CONFIGURATION ---
+  const metricConfig = {
+    CLO: {
+      title: "CLO Analysis",
+      trendData: cloBalanceData?.cloStats || [],
+      balanceData: [],
+      xAxis: "cloCode",
+      maxPos: "highestPossible",
+      avg: "mean",
+      max: "max",
+      min: "min",
+    },
+    PLO: {
+      title: "PLO Analysis",
+      trendData: ploBalanceData?.ploStats || [],
+      balanceData: [],
+      xAxis: "ploCode",
+      maxPos: "maxPloScore",
+      avg: "mean",
+      max: "max",
+      min: "min",
+    },
+    Ass: {
+      title: "Assignment Analysis",
+      trendData: [],
+      balanceData: [],
+      xAxis: "name",
+      maxPos: "fullScore",
+      avg: "allAvg",
+      max: "maxScore",
+      min: "minScore",
+    },
+  };
+
   const CloScoreColumns: Column<any>[] = [
-    { header: "Student Code", accessor: "studentCode" },
-    { header: "Student Name", accessor: "studentName" },
-    ...Object.keys(studentCourseCloScoreData[0] || {})
+    {
+      header: "Student Code",
+      accessor: "student_code",
+    },
+    {
+      header: "Student Name",
+      accessor: "studentName",
+    },
+    // 🟢 แก้ไขจุดนี้: ใช้ ?. และ ?? [] เพื่อป้องกัน Error
+    ...Object.keys(flattenedCLOTableData?.[0] ?? {})
       .filter((key) => key.startsWith("CLO"))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-      .map((clo) => ({ header: clo, accessor: clo })),
+      .map((clo) => ({
+        header: clo,
+        accessor: clo,
+      })),
   ];
 
   const AssScoreColumn: Column<any>[] = [
@@ -753,7 +617,7 @@ export default function PLOChart() {
 
       {/* 2. MAIN CONTENT */}
       <div className="max-w-7xl mx-auto px-4 mt-8 space-y-8">
-        {!summaryData ? (
+        {!selections.courseId ? (
           <div className="flex flex-col items-center justify-center py-40 bg-white rounded-3xl border-2 border-dashed border-slate-200">
             <FaUniversity className="text-6xl text-slate-100 mb-4" />
             <h2 className="text-slate-400 font-semibold">
@@ -782,13 +646,12 @@ export default function PLOChart() {
               </div>
 
               <div>
-                {activeMetric === "CLO" &&
-                  studentCourseCloScoreData.length > 0 && (
-                    <Table
-                      columns={CloScoreColumns}
-                      data={studentCourseCloScoreData}
-                    />
-                  )}
+                {activeMetric === "CLO" && flattenedCLOTableData.length > 0 && (
+                  <Table
+                    columns={CloScoreColumns}
+                    data={flattenedCLOTableData}
+                  />
+                )}
                 {activeMetric === "Ass" &&
                   studentCourseAssScoreData.length > 0 && (
                     <Table
@@ -841,7 +704,7 @@ export default function PLOChart() {
                   color="#6366f1"
                 />
                 <div className="h-6 w-px bg-slate-200 mx-2" />
-                {Array.from(
+                {/* {Array.from(
                   new Set(summaryData?.students?.map((s: any) => s.grade)),
                 )
                   .filter(Boolean)
@@ -858,7 +721,7 @@ export default function PLOChart() {
                       />
                       {grade}
                     </button>
-                  ))}
+                  ))} */}
               </div>
             </div>
 
@@ -882,22 +745,22 @@ export default function PLOChart() {
                       maxScoreKey={metricConfig[activeMetric].max}
                       minScoreKey={metricConfig[activeMetric].min}
                       allAvgKey={metricConfig[activeMetric].avg}
-                      summaryData={summaryData}
                       visibleLines={visibleLines}
                       getGradeColor={getGradeColor}
                     />
                   ) : (
-                    <PerformanceBalanceChart
-                      chartData={metricConfig[activeMetric].trendData}
-                      xAxisKey={metricConfig[activeMetric].xAxis}
-                      maxScorePosKey={metricConfig[activeMetric].maxPos}
-                      maxScoreKey={metricConfig[activeMetric].max}
-                      minScoreKey={metricConfig[activeMetric].min}
-                      allAvgKey={metricConfig[activeMetric].avg}
-                      summaryData={summaryData}
-                      visibleLines={visibleLines}
-                      getGradeColor={getGradeColor}
-                    />
+                    ""
+                    // <PerformanceBalanceChart
+                    //   chartData={metricConfig[activeMetric].trendData}
+                    //   xAxisKey={metricConfig[activeMetric].xAxis}
+                    //   maxScorePosKey={metricConfig[activeMetric].maxPos}
+                    //   maxScoreKey={metricConfig[activeMetric].max}
+                    //   minScoreKey={metricConfig[activeMetric].min}
+                    //   allAvgKey={metricConfig[activeMetric].avg}
+                    //   summaryData={summaryData}
+                    //   visibleLines={visibleLines}
+                    //   getGradeColor={getGradeColor}
+                    // />
                   )}
                 </div>
               </div>
@@ -911,9 +774,9 @@ export default function PLOChart() {
                     Grade Distribution
                   </h3>
                 </div>
-                <div className="h-[400px]">
+                {/* <div className="h-[400px]">
                   <GradeDistributionChart data={gradeDistribution} />
-                </div>
+                </div> */}
               </div>
             </div>
           </>
