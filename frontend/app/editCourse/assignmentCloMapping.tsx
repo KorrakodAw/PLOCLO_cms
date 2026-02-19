@@ -16,6 +16,7 @@ interface Assignment {
   name: string;
   max_score: number;
   weight: number;
+  category: string;
 }
 
 export default function AssignmentCloMapping({
@@ -91,7 +92,7 @@ export default function AssignmentCloMapping({
       setSelectedClo(
         `${firstClo.code} : ${
           lang === "th" ? firstClo.name_th || firstClo.name : firstClo.name
-        }`
+        }`,
       );
     }
     if (assignments.length === 0 || clos.length === 0) {
@@ -101,14 +102,35 @@ export default function AssignmentCloMapping({
 
   // 2. Sort Assignments Logic
   const sortedAssignments = useMemo(() => {
-    const sortOrder = ["presentation", "assignment", "midterm", "final"];
-    const getSortScore = (name: string) => {
+    // 1. กำหนดลำดับความสำคัญของหมวดหมู่ (Category)
+    const categoryOrder: Record<string, number> = {
+      presentation: 1,
+      assignment: 2,
+      midtermExam: 3,
+      finalExam: 4,
+      project: 5,
+      quiz: 6,
+    };
+
+    // 2. ลำดับ Keyword ในชื่อ (กรณี Category เหมือนกัน แต่อยากเช็ค Keyword ในชื่อต่อ)
+    const keywordOrder = [
+      "presentation",
+      "assignment",
+      "midterm",
+      "final",
+      "project",
+      "quiz",
+    ];
+
+    const getKeywordScore = (name: string) => {
       const lowerName = name.toLowerCase();
-      const index = sortOrder.findIndex((keyword) =>
-        lowerName.includes(keyword)
+      const index = keywordOrder.findIndex((keyword) =>
+        lowerName.includes(keyword),
       );
       return index === -1 ? 999 : index;
     };
+
+    // 3. แปลงเลขโรมันเป็นตัวเลขเพื่อให้เรียงลำดับได้ถูกต้อง
     const romanMap: Record<string, number> = {
       i: 1,
       ii: 2,
@@ -123,17 +145,29 @@ export default function AssignmentCloMapping({
       xi: 11,
       xii: 12,
     };
+
     const normalizeName = (name: string) => {
       return name
         .toLowerCase()
         .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
-          return romanMap[match].toString();
+          // ใช้ padStart(2, '0') เพื่อให้ "10" เรียงต่อจาก "09" ได้ถูกต้อง
+          return romanMap[match].toString().padStart(2, "0");
         });
     };
+
+    // 4. เริ่มการเรียงลำดับแบบหลายชั้น
     return [...assignments].sort((a, b) => {
-      const scoreA = getSortScore(a.name);
-      const scoreB = getSortScore(b.name);
+      // ชั้นที่ 1: เรียงตาม Category (เช่น Presentation ขึ้นก่อน Assignment)
+      const catA = categoryOrder[a.category] || 99;
+      const catB = categoryOrder[b.category] || 99;
+      if (catA !== catB) return catA - catB;
+
+      // ชั้นที่ 2: เรียงตาม Keyword ที่ปรากฏในชื่อ (ถ้ามี)
+      const scoreA = getKeywordScore(a.name);
+      const scoreB = getKeywordScore(b.name);
       if (scoreA !== scoreB) return scoreA - scoreB;
+
+      // ชั้นที่ 3: เรียงตามชื่อแบบ Natural Sort (รองรับทั้งตัวเลขและเลขโรมัน)
       const normA = normalizeName(a.name);
       const normB = normalizeName(b.name);
       return normA.localeCompare(normB, undefined, { numeric: true });
@@ -170,7 +204,7 @@ export default function AssignmentCloMapping({
 
   const totalCourseWeight = useMemo(
     () => assignments.reduce((sum, a) => sum + Number(a.weight), 0),
-    [assignments]
+    [assignments],
   );
 
   // 🟢 4. Calculate CLO Total Weights (Matches the Image Logic)
@@ -219,7 +253,7 @@ export default function AssignmentCloMapping({
       await apiClient.post(
         "/mapping/assignment-clo",
         { updates },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       showToast("Mapping saved successfully!", "success");
       setChangedKeys(new Set());
@@ -348,7 +382,7 @@ export default function AssignmentCloMapping({
                         setSelectedClo(
                           `${clo.code} : ${
                             lang === "th" ? clo.name_th || clo.name : clo.name
-                          }`
+                          }`,
                         )
                       }
                     >
@@ -440,7 +474,7 @@ export default function AssignmentCloMapping({
                                 handleWeightChange(
                                   assign.id,
                                   clo.id,
-                                  e.target.value
+                                  e.target.value,
                                 )
                               }
                             />
@@ -453,9 +487,9 @@ export default function AssignmentCloMapping({
                             isTotalValid
                               ? ""
                               : // ? "bg-green-100 text-green-700"
-                              rowTotal === 0
-                              ? "bg-gray-100 text-gray-400"
-                              : "bg-red-100 text-red-600"
+                                rowTotal === 0
+                                ? "bg-gray-100 text-gray-400"
+                                : "bg-red-100 text-red-600"
                           }`}
                         >
                           {100 - rowTotal}%

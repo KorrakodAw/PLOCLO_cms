@@ -2,8 +2,10 @@ import { Router } from "express";
 import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { authorizeRoles } from "../middleware/roleMiddleware";
-
+import { duplicateProgram } from "../controllers/programController";
 const router = Router();
+
+router.post("/duplicate", authenticateToken, duplicateProgram);
 
 // =========================================
 // 1. GET ALL (Dropdowns / Non-paginated)
@@ -435,5 +437,60 @@ router.get("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch program details" });
   }
 });
+
+router.post(
+  "/duplicate",
+  authenticateToken,
+  authorizeRoles("instructor", "system_admin", "Super_admin"),
+  async (req, res) => {
+    const { programId } = req.body;
+
+    if (!programId) {
+      return res.status(400).json({ error: "programId is required" });
+    }
+
+    try {
+      // Step 1: Fetch the original program
+      const originalResult = await pool.query(
+        `SELECT * FROM program WHERE id = $1`,
+        [programId],
+      );
+
+      if (originalResult.rows.length === 0) {
+        return res.status(404).json({ error: "Original program not found" });
+      }
+
+      const original = originalResult.rows[0];
+
+      // Step 2: Create a new program with the same details but a new year
+      const nextYear = original.program_year + 1;
+      const duplicateResult = await pool.query(
+        `INSERT INTO program 
+          (faculty_id, program_code, program_name_en, program_name_th, program_shortname_en, program_shortname_th, program_year)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
+          RETURNING *`,
+        [
+          original.faculty_id,
+          original.program_code,
+          original.program_name_en,
+          original.program_name_th,
+          original.program_shortname_en,
+          original.program_shortname_th,
+          nextYear,
+        ],
+      );
+
+      res.status(201).json(duplicateResult.rows[0]);
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === "23505") {
+        return res.status(409).json({
+          error: "A program with the same code and year already exists",
+        });
+      }
+      res.status(500).json({ error: "Failed to duplicate program" });
+    }
+  },
+);
 
 export default router;

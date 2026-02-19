@@ -12,12 +12,13 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import DropdownSelect from "@/components/DropdownSelect";
 import FormEditPopup from "@/components/EditPopup";
 import BreadCrumb from "@/components/BreadCrumb";
+import AlertPopup from "@/components/AlertPopup";
+import { FaCopy, FaEdit, FaTrash } from "react-icons/fa";
 
 // Import Child Components
 import AddPlo from "../AddPlo";
 import AddStudent from "../AddStudent";
 
-// --- Types ---
 interface PaginatedResponse {
   data: Program[];
   total: number;
@@ -28,32 +29,26 @@ interface PaginatedResponse {
 
 interface Option {
   label: string;
-  value: string;
+  value: string ;
 }
 
-// --- API Fetch Function ---
 async function fetchMatchingPrograms(
   token: string,
   programCode: string,
 ): Promise<PaginatedResponse> {
   const limit = 100;
   const page = 1;
-
   try {
     const response = await getProgramsPaginated(token, page, limit, {
       programId: programCode,
     });
     return response as PaginatedResponse;
   } catch (error) {
-    console.error(
-      `Error fetching matching programs for ${programCode}:`,
-      error,
-    );
+    console.error(`Error fetching matching programs:`, error);
     throw error;
   }
 }
 
-// --- Component ---
 export default function EditProgramClient({
   programCode,
 }: {
@@ -68,77 +63,54 @@ export default function EditProgramClient({
   const [formData, setFormData] = useState<Program | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Stores all years/variants of this program
   const [duplicatePrograms, setDuplicatePrograms] = useState<Program[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string | number>(
     "",
   );
 
   const [showEditPopup, setShowEditPopup] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false); // New Popup State
 
-  // Tab State: 'plo' or 'student'
   const [activeTab, setActiveTab] = useState<"plo" | "student">("plo");
+  const [shouldCopyPlo, setShouldCopyPlo] = useState(true);
 
-  // --- Memoized Dropdown Options ---
+  // --- Dropdown Options ---
   const programOptions: Option[] = useMemo(() => {
     if (duplicatePrograms.length === 0) return [];
-
-    // Sort variants by year (most recent first)
-    const sortedPrograms = [...duplicatePrograms].sort(
-      (a, b) => b.program_year - a.program_year,
-    );
-
-    return sortedPrograms.map((p) => ({
-      label: `${p.program_year}`,
-      value: String(p.id),
-    }));
+    return [...duplicatePrograms]
+      .sort((a, b) => b.program_year - a.program_year)
+      .map((p) => ({ label: `${p.program_year}`, value: String(p.id) }));
   }, [duplicatePrograms]);
 
-  // Options for the View Mode Dropdown
   const viewModeOptions: Option[] = [
     { label: t("PLO"), value: "plo" },
     { label: t("student"), value: "student" },
   ];
 
-  // --- 1. Initial Data Fetch ---
+  // --- 1. Initial Fetch ---
   useEffect(() => {
     if (!isLoggedIn || !token || !programCode) {
       setLoading(false);
       return;
     }
-    setError(null);
-    setDuplicatePrograms([]);
-
     fetchMatchingPrograms(token, programCode)
       .then((response) => {
-        const matchingPrograms = response.data || [];
-        setDuplicatePrograms(matchingPrograms);
-
-        if (matchingPrograms.length > 0) {
-          // Default to the newest year
-          const latestProgram = matchingPrograms.sort(
+        const matching = response.data || [];
+        setDuplicatePrograms(matching);
+        if (matching.length > 0) {
+          const latest = [...matching].sort(
             (a, b) => b.program_year - a.program_year,
           )[0];
-          setSelectedProgramId(String(latestProgram.id));
-        } else {
-          setError(t("Program data not found or inaccessible."));
+          setSelectedProgramId(String(latest.id));
         }
       })
-      .catch((err) => {
-        console.error(err);
-        setError(t("Failed to load program data for editing."));
-        showToast(t("Failed to load data."), "error");
-      })
+      .catch(() => setError(t("Failed to load program data.")))
       .finally(() => setLoading(false));
-  }, [isLoggedIn, token, programCode, t, showToast]);
+  }, [isLoggedIn, token, programCode, t]);
 
-  // --- 2. Sync Selected Program to Form Data ---
+  // --- 2. Sync Selection ---
   useEffect(() => {
-    if (!selectedProgramId) {
-      setFormData(null);
-      return;
-    }
     const selected = duplicatePrograms.find(
       (p) => String(p.id) === selectedProgramId,
     );
@@ -147,25 +119,24 @@ export default function EditProgramClient({
 
   // --- Handlers ---
 
-  const handleDuplicateProgram = async () => {
-    if (!formData || !token) return;
-
-    const currentYear = Number(formData.program_year);
-    const nextYear = currentYear + 1;
-
-    // Check if next year already exists
-    const isDuplicate = duplicatePrograms.some(
-      (p) => p.program_year === nextYear,
-    );
-    if (isDuplicate) {
+  const triggerDuplicateConfirm = () => {
+    if (!formData) return;
+    const nextYear = Number(formData.program_year) + 1;
+    if (duplicatePrograms.some((p) => p.program_year === nextYear)) {
       showToast(
         `${t("Program for year")} ${nextYear} ${t("already exists.")}`,
         "error",
       );
       return;
     }
+    setShowDuplicateConfirm(true);
+  };
 
-    // Prepare payload (same data, new year)
+  const handleDuplicateProgram = async () => {
+    setShowDuplicateConfirm(false);
+    if (!formData || !token) return;
+
+    const nextYear = Number(formData.program_year) + 1;
     const payload = {
       program_code: formData.program_code,
       program_name_en: formData.program_name_en,
@@ -174,31 +145,23 @@ export default function EditProgramClient({
       program_shortname_th: formData.program_shortname_th,
       program_year: nextYear,
       faculty_id: formData.faculty_id,
+      copy_from_id: shouldCopyPlo ? formData.id : null,
     };
 
     try {
       setLoading(true);
-      await apiClient.post("/program", payload, {
+      await apiClient.post("/program/duplicate", payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      showToast(
-        `${t("Program duplicated to year")} ${nextYear} ${t("successfully!")}`,
-        "success",
-      );
+      showToast(t("Program duplicated successfully!"), "success");
+      const res = await fetchMatchingPrograms(token, programCode);
+      const updated = res.data || [];
+      setDuplicatePrograms(updated);
 
-      // Refresh list
-      const response = await fetchMatchingPrograms(token, programCode);
-      const updatedPrograms = response.data || [];
-      setDuplicatePrograms(updatedPrograms);
-
-      // Select new year
-      const newVariant = updatedPrograms.find(
-        (p) => p.program_year === nextYear,
-      );
-      if (newVariant) setSelectedProgramId(String(newVariant.id));
-    } catch (err: unknown) {
-      console.error(err);
+      const newVar = updated.find((p: Program) => p.program_year === nextYear);
+      if (newVar) setSelectedProgramId(String(newVar.id));
+    } catch {
       showToast(t("Failed to duplicate program."), "error");
     } finally {
       setLoading(false);
@@ -211,34 +174,51 @@ export default function EditProgramClient({
       await apiClient.patch(`/program/${formData.id}`, formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      showToast("Program updated successfully", "success");
+      showToast("Updated successfully", "success");
       setShowEditPopup(false);
-
-      // Refresh local data
-      const response = await fetchMatchingPrograms(token, programCode);
-      setDuplicatePrograms(response.data || []);
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to update program", "error");
+      const res = await fetchMatchingPrograms(token, programCode);
+      setDuplicatePrograms(res.data || []);
+    } catch {
+      showToast("Update failed", "error");
     }
   };
 
-  // --- Render ---
+  const handleDeleteProgram = async () => {
+    if (!formData || !token) return;
+    try {
+      setLoading(true);
+      await apiClient.delete(`/program/${formData.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast("Deleted successfully", "success");
+      setShowDeleteConfirm(false);
+
+      const res = await fetchMatchingPrograms(token, programCode);
+      const updated = res.data || [];
+      setDuplicatePrograms(updated);
+
+      if (updated.length > 0) {
+        const sorted = [...updated].sort(
+          (a, b) => b.program_year - a.program_year,
+        );
+        setSelectedProgramId(String(sorted[0].id));
+      } else {
+        setSelectedProgramId("");
+        setFormData(null);
+      }
+    } catch {
+      showToast("Delete failed", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) return <LoadingOverlay />;
-
-  if (error || !formData) {
-    return (
-      <div className="mt-8 p-6 bg-red-50 border border-red-300 text-red-700 rounded-lg max-w-2xl mx-auto">
-        <h2 className="text-xl font-bold mb-2">{t("Error")}</h2>
-        <p>{error || t("Could not load program data.")}</p>
-        <ToastElement />
-      </div>
-    );
-  }
+  if (error || !formData)
+    return <div className="p-10 text-red-500 font-bold">{error}</div>;
 
   return (
-    <div className="p-5 md:p-8 min-h-screen">
+    <div className="p-5 md:p-8 min-h-screen bg-slate-50">
       <BreadCrumb
         items={[
           { label: t("manage programs"), href: "/editProgram" },
@@ -251,118 +231,110 @@ export default function EditProgramClient({
           },
         ]}
       />
-      {loading && <LoadingOverlay />}
       <ToastElement />
 
-      {/* HEADER */}
-      <div className="mb-8 border-b pb-4">
-        <h1 className="text-3xl font-light text-gray-800">
+      <div className="mb-8 border-b pb-6">
+        <h1 className="text-3xl font-bold text-slate-800">
           {lang === "en"
             ? formData.program_shortname_en
             : formData.program_shortname_th}
-          : <span className="text-orange-600">{programCode}</span>
+          <span className="ml-3 text-orange-600 font-light tracking-tighter italic">
+            {programCode}
+          </span>
         </h1>
-        {/* <p className="text-sm text-gray-500 mt-1">
-          {t("Currently editing ID")}: {formData.id}
-        </p> */}
       </div>
 
-      {/* CONTROL PANEL */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
-        <div className="flex flex-col space-y-6">
-          {/* Upper Row: Actions */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-light text-gray-800">
-              {t("Manage Program Variants & Data")}
-            </h2>
+      <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 mb-8">
+        <div className="flex flex-col lg:flex-row justify-between gap-8">
+          <div className="flex-1 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-lg">
+                <FaEdit />
+              </div>
+              <h2 className="text-lg font-extrabold text-slate-800">
+                {t("Manage Program Variant")}
+              </h2>
+            </div>
 
-            <div className="flex items-center gap-2">
-              {/* Duplicate Button */}
-              <button
-                onClick={handleDuplicateProgram}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-light text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all active:scale-95 border border-blue-100 shadow-sm"
-                title={`${t("Create variant for year")} ${
-                  Number(formData?.program_year || 0) + 1
-                }`}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="flex flex-col gap-2 p-4 bg-blue-50/50 border border-blue-100 rounded-3xl">
+                <button
+                  onClick={triggerDuplicateConfirm}
+                  className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-md active:scale-95"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
+                  <FaCopy /> {t("Duplicate to")}{" "}
+                  {Number(formData.program_year) + 1}
+                </button>
+                <label className="flex items-center gap-2 px-1 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={shouldCopyPlo}
+                    onChange={(e) => setShouldCopyPlo(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
-                </svg>
-                {t("Add Program Variant")} (
-                {Number(formData?.program_year || 0) + 1})
-              </button>
+                  <span className="text-[10px] font-black uppercase tracking-tight text-slate-400 group-hover:text-slate-600">
+                    Copy PLOs & Course Mappings
+                  </span>
+                </label>
+              </div>
 
-              {/* Edit Button */}
-              <button
-                onClick={() => setShowEditPopup(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition-all active:scale-95"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowEditPopup(true)}
+                  className="flex items-center gap-2 px-6 py-2.5 h-fit text-sm font-bold text-orange-700 bg-orange-50 border border-orange-100 rounded-xl hover:bg-orange-100 transition-all"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-                {t("edit")}
-              </button>
+                  <FaEdit /> {t("edit")}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-2 px-6 py-2.5 h-fit text-sm font-bold text-red-700 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-all"
+                >
+                  <FaTrash /> {t("delete")}
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Lower Row: Selectors (Both Dropdowns) */}
-          {/* Filter Toolbar */}
-          <div className="mt-6 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4">
-            {/* Year Dropdown */}
-            <div className="w-full sm:w-64">
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
+          <div className="lg:w-80 flex flex-col gap-4 border-l border-slate-100 lg:pl-8 justify-center">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                 {t("Program Year")}
               </label>
               <DropdownSelect
-                // Remove the internal label prop if you use the external label above for better styling
                 value={selectedProgramId}
                 options={programOptions}
-                onChange={(value) => setSelectedProgramId(value)}
-                disabled={duplicatePrograms.length === 0}
+                onChange={(v) => setSelectedProgramId(v)}
               />
             </div>
-
-            {/* View Mode Dropdown */}
-            <div className="w-full sm:w-50">
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                 {t("View Mode")}
               </label>
-              <DropdownSelect
-                value={activeTab}
-                options={viewModeOptions}
-                onChange={(value) => setActiveTab(value as "plo" | "student")}
-              />
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                {viewModeOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setActiveTab(opt.value as Option)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === opt.value ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- EDIT POPUP --- */}
-      {showEditPopup && formData && (
+      <div className="transition-all duration-300">
+        {activeTab === "student" && <AddStudent programId={formData.id} />}
+        {activeTab === "plo" && <AddPlo programId={formData.id} />}
+      </div>
+
+      {/* POPUPS */}
+      {showEditPopup && (
         <FormEditPopup
-          title="Edit Program"
+          title="Edit Program Details"
           data={formData}
           fields={[
             {
@@ -376,12 +348,12 @@ export default function EditProgramClient({
               type: "text",
             },
             {
-              label: t("Program Short Name (EN)"),
+              label: t("Short Name (EN)"),
               key: "program_shortname_en",
               type: "text",
             },
             {
-              label: t("Program Short Name (TH)"),
+              label: t("Short Name (TH)"),
               key: "program_shortname_th",
               type: "text",
             },
@@ -392,9 +364,25 @@ export default function EditProgramClient({
         />
       )}
 
-      {/* --- CONTENT --- */}
-      {activeTab === "student" && <AddStudent programId={formData.id} />}
-      {activeTab === "plo" && <AddPlo programId={formData.id} />}
+      <AlertPopup
+        isOpen={showDuplicateConfirm}
+        type="confirm"
+        title={t("Confirm Duplication")}
+        message={`${t("Confirm duplicate to year")} ${Number(formData.program_year) + 1}? ${shouldCopyPlo ? t("PLO data will be copied.") : ""}`}
+        onConfirm={handleDuplicateProgram}
+        onCancel={() => setShowDuplicateConfirm(false)}
+      />
+
+      <AlertPopup
+        isOpen={showDeleteConfirm}
+        type="confirm"
+        title={t("Confirm Deletion")}
+        message={t(
+          "Are you sure? All associated data for this year will be lost.",
+        )}
+        onConfirm={handleDeleteProgram}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

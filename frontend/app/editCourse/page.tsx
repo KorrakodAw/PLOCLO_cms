@@ -44,6 +44,26 @@ export default function EditCourse() {
   });
 
   const allLabel = t("all");
+  const [isHydrated, setIsHydrated] = useState(false); // Flag to check if localStorage has been loaded
+
+  useEffect(() => {
+    const saved = localStorage.getItem("edit_program_filters");
+    if (saved && token) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSelections(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved filters:", e);
+      }
+    }
+    setIsHydrated(true); // Mark as hydrated after attempting to load from localStorage
+  }, [token]);
+
+  useEffect(() => {
+    if (selections.university || selections.faculty || selections.program) {
+      localStorage.setItem("edit_course_filters", JSON.stringify(selections));
+    }
+  }, [selections]);
 
   // --- 2. HANDLERS ---
   const updateSelections = (updates: Partial<typeof selections>) => {
@@ -52,6 +72,7 @@ export default function EditCourse() {
   };
 
   const handleClear = () => {
+    localStorage.removeItem("edit_program_filters");
     if (isInstructor) {
       setSearchTerm("");
     } else {
@@ -250,8 +271,9 @@ export default function EditCourse() {
 
             <button
               onClick={handleClear}
-              className="px-6 py-2.5 text-slate-500 hover:text-orange-600 font-semibold transition-all hover:bg-orange-50 rounded-xl border border-slate-100"
+              className="h-[42px] flex items-center justify-center gap-2 px-6 text-sm font-bold text-slate-400 hover:text-orange-600 bg-white border border-slate-200 rounded-xl transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:shadow-md active:scale-95"
             >
+              <span className="text-lg">↺</span>
               {t("clear")}
             </button>
           </div>
@@ -259,12 +281,14 @@ export default function EditCourse() {
 
         <section className="flex-1 bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-200/60 overflow-hidden mb-8 p-1">
           {/* 🟢 CourseManagement will now mount ONLY with correct initial IDs */}
-          <CourseManagement
-            universityId={selections.university}
-            facultyId={selections.faculty}
-            programId={selections.program}
-            searchTerm={searchTerm}
-          />
+          {isHydrated && (
+            <CourseManagement
+              universityId={selections.university}
+              facultyId={selections.faculty}
+              programId={selections.program}
+              searchTerm={searchTerm}
+            />
+          )}
         </section>
       </div>
     </ProtectedRoute>

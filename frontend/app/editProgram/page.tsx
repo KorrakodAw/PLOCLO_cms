@@ -13,6 +13,7 @@ import { getPrograms, Program } from "../../utils/programApi";
 import SearchBar from "@/components/SearchBar";
 
 import { useAuth } from "../context/AuthContext";
+import { clear } from "console";
 
 interface Option {
   label: string;
@@ -39,6 +40,26 @@ export default function EditProgram() {
 
   const { user, token } = useAuth();
   const isInstructor = user?.role === "instructor";
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("edit_program_filters");
+    if (saved && token) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSelections(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved filters:", e);
+      }
+    }
+    setIsHydrated(true);
+  }, [token]);
+
+  useEffect(() => {
+    if (selections.university || selections.faculty || selections.program) {
+      localStorage.setItem("edit_program_filters", JSON.stringify(selections));
+    }
+  });
 
   // --- 2. HANDLERS ---
   const updateSelections = (updates: Partial<typeof selections>) => {
@@ -48,10 +69,15 @@ export default function EditProgram() {
   };
 
   const clearFilters = () => {
+    // 🟢 ลบข้อมูลออกจาก localStorage ทันทีที่กดปุ่ม Clear
+    localStorage.removeItem("edit_program_filters");
+
     if (isInstructor) {
-      setSearchTerm(""); // Instructors can only clear the search, not the program lock
+      setSearchTerm("");
       return;
     }
+
+    // ล้างค่าใน State เพื่อให้ UI อัปเดตทันที
     setSelections({ university: "", faculty: "", program: "" });
     setSearchTerm("");
   };
@@ -209,8 +235,9 @@ export default function EditProgram() {
 
             <button
               onClick={clearFilters}
-              className="px-6 py-2.5 text-slate-500 hover:text-orange-600 font-semibold transition-all hover:bg-orange-50 rounded-xl flex items-center gap-2 border border-slate-100 hover:border-orange-200"
+              className="h-[42px] flex items-center justify-center gap-2 px-6 text-sm font-bold text-slate-400 hover:text-orange-600 bg-white border border-slate-200 rounded-xl transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:shadow-md active:scale-95"
             >
+              <span className="text-lg">↺</span>
               {t("clear")}
             </button>
           </div>
@@ -218,12 +245,15 @@ export default function EditProgram() {
 
         {/* Data Content */}
         <section className="flex-1 bg-white rounded-3xl shadow-xl shadow-slate-200/40 border border-slate-200/60 overflow-hidden mb-8 p-1">
-          <ProgramManagement
-            universityId={selections.university}
-            facultyId={selections.faculty}
-            programId={selections.program}
-            searchTerm={searchTerm} // อย่าลืมส่ง searchTerm เข้าไปที่ Component ลูกเพื่อ Filter ข้อมูล
-          />
+          {/* เช็ค isHydrated เพื่อป้องกันไม่ให้ตารางโหลดข้อมูล "ทั้งหมด" ขึ้นมาก่อนที่ค่าจาก LocalStorage จะถูกใส่ลงไป */}
+          {isHydrated && (
+            <ProgramManagement
+              universityId={selections.university}
+              facultyId={selections.faculty}
+              programId={selections.program}
+              searchTerm={searchTerm}
+            />
+          )}
         </section>
       </div>
     </ProtectedRoute>

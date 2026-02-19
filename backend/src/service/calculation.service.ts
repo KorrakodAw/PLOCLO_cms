@@ -265,6 +265,7 @@ export async function getCloScoreAllStudentPerCourse(
         id: true,
         first_name: true,
         last_name: true,
+        student_code: true,
       },
     });
 
@@ -292,6 +293,7 @@ export async function getCloScoreAllStudentPerCourse(
     // 3) คำนวณ cloScore ต่อ student ต่อ clo (ไม่ normalize)
     const results: {
       student_id: number;
+      student_code: string;
       studentName: string;
       cloScores: { cloCode: string; cloScore: number }[];
     }[] = [];
@@ -324,6 +326,9 @@ export async function getCloScoreAllStudentPerCourse(
       results.push({
         student_id: Number(student_id),
         cloScores,
+        student_code:
+          studentNames.find((s) => s.id === Number(student_id))?.student_code ||
+          "",
         studentName:
           studentNames.find((s) => s.id === Number(student_id))?.first_name +
             " " +
@@ -332,8 +337,8 @@ export async function getCloScoreAllStudentPerCourse(
       });
     });
 
-    // --- SORT STUDENTS (by student_id) ---
-    results.sort((a, b) => a.student_id - b.student_id);
+    // --- SORT STUDENTS (by student_code) ---
+    results.sort((a, b) => a.student_code.localeCompare(b.student_code));
 
     return { cloScoresPerStudent: results };
   });
@@ -755,12 +760,20 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
     const studentIds = realScoresPerStudent.map((s) => s.student_id);
     const students = await tx.student.findMany({
       where: { id: { in: studentIds } },
-      select: { id: true, first_name: true, last_name: true },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        student_code: true,
+      },
     });
 
     // Create a lookup map for easy access: { 1: "John Doe", 2: "Jane Smith" }
     const nameMap = Object.fromEntries(
-      students.map((s) => [s.id, `${s.first_name} ${s.last_name}`]),
+      students.map((s) => [s.id, `${s.first_name} ${s.last_name} `]),
+    );
+    const studentCodeMap = Object.fromEntries(
+      students.map((s) => [s.id, s.student_code]),
     );
 
     // 3. Get grade settings
@@ -786,12 +799,19 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 
       return {
         student_id: student.student_id,
-        // ADDED: Pull name from our lookup map
         studentName: nameMap[student.student_id] || "Unknown",
+        studentCode: studentCodeMap[student.student_id] || "",
         totalScore,
         grade,
         categoryScores: student.categoryScores,
       };
+    });
+
+    results.sort((a, b) => {
+      return a.studentCode.localeCompare(b.studentCode, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
     });
 
     const meanScore =

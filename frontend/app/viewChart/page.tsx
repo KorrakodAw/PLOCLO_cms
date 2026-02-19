@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useMemo, useEffect, use } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   FaUserGraduate,
   FaChartLine,
@@ -75,6 +75,18 @@ export default function PLOChart() {
     minScore: true,
     allAvg: true,
   });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("edit_program_filters");
+    if (saved && token) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSelections(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved filters:", e);
+      }
+    }
+  }, [token]);
 
   // --- API FETCHERS ---
   const fetchData = async (endpoint: string, params = {}) => {
@@ -167,28 +179,27 @@ export default function PLOChart() {
     if (!isInitialized || isInstructor || !token) return;
     if (selections.university) {
       fetchData("/faculty", { university_id: selections.university }).then(
-        (data) =>
-          data &&
-          setOptions((prev: any) => ({
-            ...prev,
-            faculties: data.map((f: any) => ({
-              label: lang === "th" ? f.name_th : f.name,
-              value: f.id,
-            })),
-            programs: [],
-            years: [],
-            courses: [],
-          })),
+        (data) => {
+          if (data) {
+            setOptions((prev: any) => ({
+              ...prev,
+              faculties: data.map((f: any) => ({
+                label: lang === "th" ? f.name_th : f.name,
+                value: String(f.id),
+              })),
+            }));
+          }
+        },
       );
-      setSelections((s) => ({
-        ...s,
-        faculty: "",
-        program: "",
-        year: "",
-        courseId: "",
-      }));
+      // setSelections((s) => ({
+      //   ...s,
+      //   faculty: "",
+      //   program: "",
+      //   year: "",
+      //   courseId: "",
+      // }));
     }
-  }, [selections.university]);
+  }, [selections.university, token, lang, isInitialized]);
 
   useEffect(() => {
     // if (!isInitialized || isInstructor || !token) return;
@@ -210,9 +221,23 @@ export default function PLOChart() {
           }));
         }
       });
-      setSelections((s) => ({ ...s, program: "", year: "", courseId: "" }));
+      // setSelections((s) => ({ ...s, program: "", year: "", courseId: "" }));
     }
   }, [selections.faculty]);
+
+  const handleClear = () => {
+    localStorage.removeItem("edit_program_filters");
+    if (isInstructor) {
+    } else {
+      setSelections({
+        university: "",
+        faculty: "",
+        program: "",
+        year: "",
+        courseId: "",
+      });
+    }
+  };
 
   useEffect(() => {
     if (selections.program) {
@@ -240,7 +265,7 @@ export default function PLOChart() {
           }
         },
       );
-      setSelections((s) => ({ ...s, year: "", courseId: "" }));
+      // setSelections((s) => ({ ...s, year: "", courseId: "" }));
     }
   }, [selections.program]);
 
@@ -488,6 +513,7 @@ export default function PLOChart() {
           const row: any = {
             studentId: item.student_id,
             studentName: item.studentName || `Student ${item.student_id}`,
+            studentCode: item.student_code || "",
           };
 
           // Turn the cloScores array into direct keys (e.g., { CLO1: 8.45, CLO2: 14.09 })
@@ -526,6 +552,8 @@ export default function PLOChart() {
 
         const rawResults = res.data.studentResults || [];
 
+        console.log(res.data);
+
         // 1. First, find EVERY unique category across all students
         const allCategories = new Set<string>();
         rawResults.forEach((s: any) => {
@@ -535,6 +563,7 @@ export default function PLOChart() {
         // 2. Map the data and fill in missing categories with "0.00"
         const flattened = rawResults.map((student: any) => {
           const row: any = {
+            studentCode: student.studentCode || "",
             studentName: student.studentName,
             totalScore: (student.totalScore ?? 0).toFixed(2),
             grade: student.grade || "F",
@@ -565,6 +594,7 @@ export default function PLOChart() {
   }, [token, selections.courseId]);
 
   const CloScoreColumns: Column<any>[] = [
+    { header: "Student Code", accessor: "studentCode" },
     { header: "Student Name", accessor: "studentName" },
     ...Object.keys(studentCourseCloScoreData[0] || {})
       .filter((key) => key.startsWith("CLO"))
@@ -573,13 +603,17 @@ export default function PLOChart() {
   ];
 
   const AssScoreColumn: Column<any>[] = [
+    { header: "Student Code", accessor: "studentCode" },
     { header: "Student Name", accessor: "studentName" },
 
     // 1. We look at the first student's data to find all categories
     ...(studentCourseAssScoreData[0]
       ? Object.keys(studentCourseAssScoreData[0])
           .filter(
-            (key) => !["studentName", "totalScore", "grade"].includes(key),
+            (key) =>
+              !["studentName", "totalScore", "grade", "studentCode"].includes(
+                key,
+              ),
           )
           .map((cat) => ({
             header: cat.charAt(0).toUpperCase() + cat.slice(1), // e.g. "midtermExam" -> "MidtermExam"
@@ -599,92 +633,120 @@ export default function PLOChart() {
 
       {/* 1. TOP STICKY FILTERS */}
       <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          {/* Dashboard Identity */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-100">
-              <FaChartLine className="text-white text-xl" />
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex flex-col gap-6">
+            {/* 1. Dashboard Header Section */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-2.5 rounded-2xl shadow-lg shadow-blue-200">
+                  <FaChartLine className="text-white text-xl" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-black tracking-tight text-slate-800 leading-none">
+                    Analytics Dashboard
+                  </h1>
+                  <p className="text-xs text-slate-400 font-medium mt-1">
+                    Course Performance & Outcome Tracking
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Summary Badge (Optional UX addition) */}
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Live Data Updated
+                </span>
+              </div>
             </div>
-            <h1 className="text-lg font-extrabold tracking-tight text-slate-800">
-              Analytics Dashboard
-            </h1>
-          </div>
 
-          {/* Selection Filters */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-5xl">
-            <DropdownSelect
-              label="University"
-              options={options.universities}
-              value={selections.university}
-              disabled={isInstructor}
-              onChange={(v) =>
-                setSelections({
-                  university: v as string,
-                  faculty: "",
-                  program: "",
-                  year: "",
-                  courseId: "",
-                })
-              }
-            />
+            {/* 2. Unified Filter Section */}
+            <div className="bg-slate-50/50 p-4 rounded-[2rem] border border-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-end">
+                <DropdownSelect
+                  label="University"
+                  options={options.universities}
+                  value={selections.university}
+                  disabled={isInstructor}
+                  onChange={(v) =>
+                    setSelections({
+                      university: v as string,
+                      faculty: "",
+                      program: "",
+                      year: "",
+                      courseId: "",
+                    })
+                  }
+                />
 
-            <DropdownSelect
-              label="Faculty"
-              options={options.faculties}
-              value={selections.faculty}
-              disabled={!selections.university || isInstructor}
-              onChange={(v) =>
-                setSelections({
-                  ...selections,
-                  faculty: v as string,
-                  program: "",
-                  year: "",
-                  courseId: "",
-                })
-              }
-            />
+                <DropdownSelect
+                  label="Faculty"
+                  options={options.faculties}
+                  value={selections.faculty}
+                  disabled={!selections.university || isInstructor}
+                  onChange={(v) =>
+                    setSelections({
+                      ...selections,
+                      faculty: v as string,
+                      program: "",
+                      year: "",
+                      courseId: "",
+                    })
+                  }
+                />
 
-            <DropdownSelect
-              label="Program"
-              options={options.programs}
-              value={selections.program}
-              disabled={!selections.faculty}
-              onChange={(v) =>
-                setSelections({
-                  ...selections,
-                  program: v as string,
-                  year: "",
-                  courseId: "",
-                })
-              }
-            />
+                <DropdownSelect
+                  label="Program"
+                  options={options.programs}
+                  value={selections.program}
+                  disabled={!selections.faculty}
+                  onChange={(v) =>
+                    setSelections({
+                      ...selections,
+                      program: v as string,
+                      year: "",
+                      courseId: "",
+                    })
+                  }
+                />
 
-            <DropdownSelect
-              label="Year"
-              options={options.years}
-              value={selections.year}
-              disabled={!selections.program}
-              onChange={(v) =>
-                setSelections({
-                  ...selections,
-                  year: v as string,
-                  courseId: "",
-                })
-              }
-            />
+                <DropdownSelect
+                  label="Year"
+                  options={options.years}
+                  value={selections.year}
+                  disabled={!selections.program}
+                  onChange={(v) =>
+                    setSelections({
+                      ...selections,
+                      year: v as string,
+                      courseId: "",
+                    })
+                  }
+                />
 
-            <DropdownSelect
-              label="Course"
-              options={options.courses}
-              value={selections.courseId}
-              disabled={!selections.year}
-              onChange={(v) =>
-                setSelections({
-                  ...selections,
-                  courseId: v as string,
-                })
-              }
-            />
+                <DropdownSelect
+                  label="Course"
+                  options={options.courses}
+                  value={selections.courseId}
+                  disabled={!selections.year}
+                  onChange={(v) =>
+                    setSelections({
+                      ...selections,
+                      courseId: v as string,
+                    })
+                  }
+                />
+
+                {/* Action Button: Clear */}
+                <button
+                  onClick={handleClear}
+                  className="h-[42px] flex items-center justify-center gap-2 px-6 text-sm font-bold text-slate-400 hover:text-orange-600 bg-white border border-slate-200 rounded-xl transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:shadow-md active:scale-95"
+                >
+                  <span className="text-lg">↺</span>
+                  {t("clear")}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

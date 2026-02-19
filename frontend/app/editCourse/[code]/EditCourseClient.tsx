@@ -26,7 +26,6 @@ import AddStudentCourse from "../addStudentCourse";
 import CloPloMapping from "../cloploMapping";
 import AssignmentMapping from "../assignmentMapping";
 import AssignmentCloMapping from "../assignmentCloMapping";
-import AssignmentPloMapping from "../assignmentPloMapping";
 import ScoreMapping from "../scoreMapping";
 import GradeSetting from "../gradeSetting";
 import ScoreCalculated from "../scoreCalculatedforGrade";
@@ -95,8 +94,6 @@ export default function EditCourseClient({
   const [showAssignmentTable, setShowAssignmentTable] = useState(false);
   const [showCloTable, setShowCloTable] = useState(true);
   const [showAssignmentCloMappingTable, setShowAssignmentCloMappingTable] =
-    useState(false);
-  const [showAssignmentPloMappingTable, setShowAssignmentPloMappingTable] =
     useState(false);
   const [showScoreMappingTable, setShowScoreMappingTable] = useState(false);
   const [showGradeSettingTable, setShowGradeSettingTable] = useState(false);
@@ -178,13 +175,7 @@ export default function EditCourseClient({
       dot: "bg-rose-500",
       state: showAssignmentCloMappingTable,
     },
-    {
-      id: "assignment-plo-mapping",
-      label: t("Assignment–PLO Mapping"),
-      color: "text-indigo-600",
-      dot: "bg-indigo-500",
-      state: showAssignmentPloMappingTable,
-    },
+
     {
       id: "grade-setting",
       label: t("Grade Setting"),
@@ -204,7 +195,7 @@ export default function EditCourseClient({
     },
     {
       id: "score-calculated",
-      label: "Score Calculated",
+      label: t("Score Calculated"),
       color: "text-green-600",
       dot: "bg-green-500",
       state: showScoreCalculatedTable,
@@ -220,7 +211,6 @@ export default function EditCourseClient({
     setShowCloPloMappingTable(false);
     setShowAssignmentTable(false);
     setShowAssignmentCloMappingTable(false);
-    setShowAssignmentPloMappingTable(false);
     setShowScoreMappingTable(false);
     setShowGradeSettingTable(false);
     setShowScoreCalculatedTable(false);
@@ -231,8 +221,6 @@ export default function EditCourseClient({
     if (tabId === "assignment") setShowAssignmentTable(true);
     if (tabId === "assignment-clo-mapping")
       setShowAssignmentCloMappingTable(true);
-    if (tabId === "assignment-plo-mapping")
-      setShowAssignmentPloMappingTable(true);
     if (tabId === "score-mapping") setShowScoreMappingTable(true);
     if (tabId === "grade-setting") setShowGradeSettingTable(true);
     if (tabId === "score-calculated") setShowScoreCalculatedTable(true);
@@ -286,6 +274,8 @@ export default function EditCourseClient({
     } catch {
       showToast(t("Failed to duplicate section"), "error");
     } finally {
+      // Refresh the page to ensure all data is up-to-date after duplication
+      window.location.reload();
       setLoading(false);
     }
   };
@@ -524,37 +514,47 @@ export default function EditCourseClient({
         </div>
 
         {/* --- NAVIGATION CONTROLS --- */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 sticky top-4 z-20 mt-6">
-          {/* Switcher: Styled like a segmented control */}
-          <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-lg border border-gray-200 flex w-full lg:w-auto">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4 sticky top-4 z-20 mt-6">
+          {/* 1. Switcher: Course Setup vs Grading */}
+          <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-lg border border-gray-200 flex w-full lg:w-auto">
             <button
               onClick={() => handleModeChange("setup")}
-              className={`flex-1 lg:px-8 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-200
-      ${viewMode === "setup" ? "bg-gray-900 text-white shadow-lg scale-[1.02]" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`flex-1 lg:px-8 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200
+      ${viewMode === "setup" ? "bg-gray-900 text-white shadow-md scale-[1.02]" : "text-gray-500 hover:bg-gray-100"}`}
             >
               <BookOpen size={18} />
               {t("Course Setup")}
             </button>
             <button
               onClick={() => handleModeChange("grading")}
-              className={`flex-1 lg:px-8 py-2.5 rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 transition-all duration-200
-      ${viewMode === "grading" ? "bg-emerald-600 text-white shadow-lg scale-[1.02]" : "text-gray-500 hover:bg-gray-50"}`}
+              className={`flex-1 lg:px-8 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200
+      ${viewMode === "grading" ? "bg-emerald-600 text-white shadow-md scale-[1.02]" : "text-gray-500 hover:bg-gray-100"}`}
             >
               <Calculator size={18} />
               {t("Grading & Scores")}
             </button>
           </div>
 
-          {/* Tab Selector: Increased width for better readability of tab labels */}
-          <div className="w-full lg:w-80 shadow-lg rounded-2xl bg-white">
-            <DropdownSelect
-              value={activeTabObj.id}
-              options={currentTabs.map((tab) => ({
-                label: tab.label,
-                value: tab.id,
-              }))}
-              onChange={(value) => handleTabChange(String(value))}
-            />
+          {/* 2. Tab Selector: Dynamic Tabs */}
+          <div className="p-1.5 bg-slate-100/80 backdrop-blur-md rounded-2xl border border-slate-200 flex min-w-[100px] lg:w-auto overflow-x-auto no-scrollbar shadow-lg">
+            <div className="flex gap-1">
+              {currentTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`
+            px-6 py-2.5  rounded-xl text-sm font-bold transition-all duration-200 whitespace-nowrap
+            ${
+              activeTabObj.id === tab.id
+                ? "bg-white text-blue-600 shadow-sm scale-[1.02]"
+                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+            }
+          `}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -591,9 +591,6 @@ export default function EditCourseClient({
               )}
               {showAssignmentCloMappingTable && (
                 <AssignmentCloMapping courseId={String(formData.course_id)} />
-              )}
-              {showAssignmentPloMappingTable && (
-                <AssignmentPloMapping courseId={String(formData.course_id)} />
               )}
               {showScoreMappingTable && (
                 <ScoreMapping

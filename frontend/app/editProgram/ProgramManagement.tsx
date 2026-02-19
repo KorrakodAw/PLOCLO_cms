@@ -280,7 +280,6 @@ export default function ProgramManagement({
 
       if (axios.isAxiosError(err)) {
         // Log the server response to see the REAL error message
-       
 
         const errorMsg = err.response?.data?.error || "Upload failed";
         showToast(errorMsg, "error");
@@ -368,33 +367,33 @@ export default function ProgramManagement({
     }
   };
 
-  const confirmDelete = async () => {
-    if (!programToDelete || !token) return;
+  // const confirmDelete = async () => {
+  //   if (!programToDelete || !token) return;
 
-    try {
-      await apiClient.delete(`/program/${programToDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setPrograms((prev) =>
-        prev.filter((prog) => prog.id !== programToDelete.id),
-      );
-      showToast("Program deleted successfully", "success");
-    } catch (err) {
-      if (err instanceof Error) {
-        showToast("Failed to delete program: " + err.message, "error");
-      } else if (typeof err === "string") {
-        showToast("Failed to delete program: " + err, "error");
-      } else {
-        showToast(
-          "Failed to delete program: An unknown error occurred",
-          "error",
-        );
-      }
-    } finally {
-      setShowDeletePopup(false);
-      setProgramToDelete(null);
-    }
-  };
+  //   try {
+  //     await apiClient.delete(`/program/${programToDelete.id}`, {
+  //       headers: { Authorization: `Bearer ${token}` },
+  //     });
+  //     setPrograms((prev) =>
+  //       prev.filter((prog) => prog.id !== programToDelete.id),
+  //     );
+  //     showToast("Program deleted successfully", "success");
+  //   } catch (err) {
+  //     if (err instanceof Error) {
+  //       showToast("Failed to delete program: " + err.message, "error");
+  //     } else if (typeof err === "string") {
+  //       showToast("Failed to delete program: " + err, "error");
+  //     } else {
+  //       showToast(
+  //         "Failed to delete program: An unknown error occurred",
+  //         "error",
+  //       );
+  //     }
+  //   } finally {
+  //     setShowDeletePopup(false);
+  //     setProgramToDelete(null);
+  //   }
+  // };
 
   useEffect(() => {
     fetchPrograms();
@@ -511,7 +510,7 @@ export default function ProgramManagement({
           onSave={saveEdit}
         />
       )}
-      <AlertPopup
+      {/* <AlertPopup
         title={t("confirm deletion")}
         type="confirm"
         message={`${t("Are you sure you want to delete the program")} "${
@@ -523,7 +522,7 @@ export default function ProgramManagement({
           setProgramToDelete(null);
         }}
         onConfirm={confirmDelete}
-      />
+      /> */}
     </div>
   );
 }

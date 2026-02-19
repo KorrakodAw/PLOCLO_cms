@@ -87,8 +87,8 @@ export default function AddStudent({ programId }: AddStudentProps) {
     { header: "student code", accessor: "student_code" },
     {
       header: "full name",
-      accessor: "name",
-      render: (value, row) => `${row.first_name} ${row.last_name}`,
+      accessor: "first_name",
+      // render: (value, row) => `${row.first_name} ${row.last_name}`,
     },
     // {
     //   header: t("program"),
@@ -98,7 +98,7 @@ export default function AddStudent({ programId }: AddStudentProps) {
     {
       header: t("email"),
       accessor: "email",
-      render: (v) => v || "-",
+     
     },
     {
       header: t("actions"),

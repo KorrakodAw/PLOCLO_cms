@@ -106,9 +106,9 @@ export default function AssignmentMapping({
       );
 
       showToast("Assignment added!", "success");
-      setNewAssignName("");
-      setNewAssignWeight("");
-      setNewAssignMaxScore("");
+      // setNewAssignName("");
+      // setNewAssignWeight("");
+      // setNewAssignMaxScore("");
       fetchAssignments();
     } catch {
       showToast("Failed to add assignment", "error");
@@ -199,20 +199,62 @@ export default function AssignmentMapping({
 
   // 5. Corrected Filtering Logic (Filtering by category string)
   const filteredData = useMemo(() => {
+    // 1. Initial Filtering by Category
     const data =
       activeFilter === "all"
         ? assignments
         : assignments.filter((a) => a.category === activeFilter);
 
-    const sortOrder: Record<string, number> = {
-      presentation: 0,
-      assignment: 1,
-      midtermExam: 2,
-      finalExam: 3,
+    // 2. Configuration for Sorting
+    const categoryOrder: Record<string, number> = {
+      presentation: 1,
+      assignment: 2,
+      midtermExam: 3,
+      finalExam: 4,
+      project: 5,
+      quiz: 6,
     };
-    return [...data].sort(
-      (a, b) => (sortOrder[a.category] || 99) - (sortOrder[b.category] || 99),
-    );
+
+    const romanMap: Record<string, number> = {
+      i: 1,
+      ii: 2,
+      iii: 3,
+      iv: 4,
+      v: 5,
+      vi: 6,
+      vii: 7,
+      viii: 8,
+      ix: 9,
+      x: 10,
+      xi: 11,
+      xii: 12,
+    };
+
+    // 3. Helper to normalize Roman Numerals to Numbers for localCompare
+    const normalizeName = (name: string) => {
+      return name
+        .toLowerCase()
+        .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
+          return romanMap[match].toString().padStart(2, "0"); // pad ensures "10" comes after "02"
+        });
+    };
+
+    // 4. Final Multi-Level Sort
+    return [...data].sort((a, b) => {
+      // Level 1: Sort by Category Order
+      const catA = categoryOrder[a.category] || 99;
+      const catB = categoryOrder[b.category] || 99;
+
+      if (catA !== catB) {
+        return catA - catB;
+      }
+
+      // Level 2: Natural Sort by Name (handling Roman Numerals and Numbers)
+      const normA = normalizeName(a.name);
+      const normB = normalizeName(b.name);
+
+      return normA.localeCompare(normB, undefined, { numeric: true });
+    });
   }, [assignments, activeFilter]);
 
   const assignmentOptions = [
@@ -402,7 +444,7 @@ export default function AssignmentMapping({
                     onClick={() => setActiveFilter(filterValue)}
                     className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeFilter === filterValue ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"}`}
                   >
-                    {(key)}
+                    {key}
                   </button>
                 );
               })}
