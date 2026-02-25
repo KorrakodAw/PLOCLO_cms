@@ -106,7 +106,7 @@ router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของ clo แต่ละตัว ใน 1 course
 // GET http://localhost:9771/api/calculation/ass-clo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
@@ -192,7 +192,7 @@ router.get("/realScoreAndGrade/allStudentCourse", authenticateToken, async (req,
 });
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของแต่ละ category ใน 1 course
 // GET http://localhost:9771/api/calculation/realScoreAndGrade/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
@@ -356,7 +356,7 @@ router.get("/clo-plo/wherePloComeFrom", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////
-// คำนวณ Min, Max, Mean, highestPossible ของ PLO แต่ละตัว ใน 1 course
+// คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
 // GET http://localhost:9771/api/calculation/clo-plo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////
