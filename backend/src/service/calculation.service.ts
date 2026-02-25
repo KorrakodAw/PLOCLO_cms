@@ -489,7 +489,7 @@ export async function getCloScoreAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของ clo แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////////////////
 export async function getCloStatsPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
@@ -512,7 +512,20 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
       const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
-      return { cloCode, min, max, mean };
+
+       // --- คำนวณ median ---
+      let median = 0;
+      if (scores.length > 0) {
+        const sorted = [...scores].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+          median = (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+          median = sorted[mid];
+        }
+      }
+
+      return { cloCode, min, max, mean, median };
     });
 
     // -----------------------------
@@ -889,7 +902,7 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของแต่ละ category ใน 1 course
 /////////////////////////////////////////////////////////////////////////
 export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
@@ -913,7 +926,20 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
         const min = Math.min(...scores);
         const max = Math.max(...scores);
         const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
-        return { category, min, max, mean };
+
+      // --- คำนวณ median ---
+      let median = 0;
+      if (scores.length > 0) {
+        const sorted = [...scores].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+          median = (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+          median = sorted[mid];
+        }
+      }
+
+        return { category, min, max, mean, median };
       }
     );
 
@@ -1269,7 +1295,7 @@ export async function getPloProgramWhereScoreComeFrom(
 }
 
 /////////////////////////////////////////////////////////////
-// คำนวณ Min, Max, Mean, highestPossible ของ PLO แต่ละตัว ใน 1 course
+// คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////
 export async function getPloStatsPerCourse(tx: any, courseId: number) {
   const students = await tx.studentScore.findMany({
@@ -1304,7 +1330,20 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
       const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
-      return { ploCode, min, max, mean };
+
+      // --- คำนวณ median ---
+      let median = 0;
+      if (scores.length > 0) {
+        const sorted = [...scores].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+          median = (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+          median = sorted[mid];
+        }
+      }
+
+      return { ploCode, min, max, mean, median };
     }
   );
 
