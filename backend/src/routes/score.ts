@@ -8,23 +8,29 @@ const prisma = new PrismaClient();
 // POST: Batch save/update scores
 router.post("/", authenticateToken, async (req, res) => {
   try {
-    const { updates } = req.body;
+    const { updates, sectionId } = req.body; // 🟢 แนะนำให้ส่ง sectionId มาใน body ด้วย
 
-    // 🟢 แก้ไขเงื่อนไข: ตรวจสอบแค่ว่าส่ง updates มาหรือไม่ (แม้จะเป็น Array ว่างก็ยอมรับได้ถ้าต้องการ)
     if (!updates || !Array.isArray(updates)) {
       return res.status(400).json({ error: "Invalid updates format" });
     }
 
     const results = await prisma.$transaction(
       updates.map((item) => {
-        // 🟢 จัดการค่า score: ถ้าส่งมาเป็นค่าว่าง หรือ null ให้เซตเป็น 0 (หรือตาม Business Logic ของคุณ)
         const scoreValue =
           item.score === null || item.score === undefined || item.score === ""
             ? 0
             : Number(item.score);
 
+        // ดึง sectionId จากตัว item เอง หรือจากตัวแปรกลางที่ส่งมา
+        const currentSectionId = Number(item.section_id || sectionId);
+
+        if (isNaN(currentSectionId)) {
+          throw new Error("Missing section_id for one or more entries");
+        }
+
         return prisma.studentScore.upsert({
           where: {
+            // 🟢 อ้างอิงตาม Unique Constraint ที่คุณตั้งไว้
             student_id_assignment_id: {
               student_id: Number(item.student_id),
               assignment_id: Number(item.assignment_id),
@@ -32,11 +38,13 @@ router.post("/", authenticateToken, async (req, res) => {
           },
           update: {
             score: scoreValue,
+            section_id: currentSectionId, // 🟢 อัปเดตเพื่อให้แน่ใจว่าข้อมูลถูกต้อง
             updatedAt: new Date(),
           },
           create: {
             student_id: Number(item.student_id),
             assignment_id: Number(item.assignment_id),
+            section_id: currentSectionId, // 🟢 บันทึก ID ของ Section ลงไป
             score: scoreValue,
           },
         });
@@ -59,40 +67,18 @@ router.get("/", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid or missing sectionId" });
     }
 
-    // 1. Get the Master Course ID for this section
-    const sectionInfo = await prisma.courseSection.findUnique({
-      where: { id: sectionId },
-      select: { course_id: true },
-    });
-
-    if (!sectionInfo) {
-      return res.status(404).json({ error: "Section not found" });
-    }
-
-    // 2. Fetch Scores based on the Relationship logic
-    // We want scores where:
-    // A. The Assignment belongs to this Master Course
-    // B. The Student is enrolled in this specific Section
+    // 🟢 ตอนนี้เรากรองจาก section_id ในตาราง StudentScore ได้โดยตรงแล้ว
+    // เพราะเราได้ย้ายความสัมพันธ์มาเก็บไว้ที่นี่แล้ว
     const result = await prisma.studentScore.findMany({
       where: {
-        assignment: {
-          course_id: sectionInfo.course_id,
-        },
-        student: {
-          sections: {
-            some: {
-              section_id: sectionId,
-            },
-          },
-        },
+        section_id: sectionId,
       },
-      // 🟢 Select specific fields to keep the response clean and matching frontend
       select: {
         id: true,
         student_id: true,
         assignment_id: true,
+        section_id: true, // เพิ่มกลับเข้าไปในชุดข้อมูลที่ส่งออก
         score: true,
-        // Optional: Include student details for display if needed
         student: {
           select: {
             student_code: true,
@@ -106,17 +92,15 @@ router.get("/", authenticateToken, async (req, res) => {
 
     res.status(200).json(result);
   } catch (err: any) {
-    console.error(err);
+    console.error("Error fetching scores:", err);
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
 
-
-
 // PATCH: Update a single score
 router.patch("/:id", authenticateToken, async (req, res) => {
   const scoreId = Number(req.params.id);
-  const { score } = req.body; // Usually we only patch the score value
+  const { score } = req.body;
 
   if (isNaN(scoreId)) return res.status(400).json({ error: "Invalid ID" });
 

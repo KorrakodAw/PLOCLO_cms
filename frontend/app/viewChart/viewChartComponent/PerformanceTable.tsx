@@ -65,23 +65,28 @@ export const PerformanceTable = ({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[600px] relative no-scrollbar">
         <table className="w-full text-left border-collapse table-fixed min-w-[800px]">
           <thead>
             <tr className="bg-white">
-              <th className="sticky left-0 z-10 bg-white p-6 text-[11px] font-black text-slate-400 uppercase border-b tracking-[0.2em] w-32 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+              {/* เพิ่ม sticky top-0 และ z-20 เพื่อให้อยู่เหนือคอลัมน์ซ้าย */}
+              <th className="sticky top-0 left-0 z-30 bg-slate-50 p-6 text-[11px] font-black text-slate-400 uppercase border-b tracking-[0.2em] w-32 shadow-[2px_2px_5px_-2px_rgba(0,0,0,0.1)]">
                 Grade
               </th>
               {cloAveragesByGrade.map((item) => (
                 <th
                   key={item.cloCode || item.ploCode || item.name}
-                  className="p-6 border-b text-center group"
+                  // เพิ่ม sticky top-0 และ z-20
+                  className="sticky top-0 z-20 bg-slate-50 p-6 border-b text-center group shadow-[0_2px_5px_-2px_rgba(0,0,0,0.1)]"
                 >
                   <div className="flex flex-col gap-1 transition-transform group-hover:scale-105 duration-200">
                     <span className="text-sm font-black text-slate-800 tracking-tighter">
-                      {(item.cloCode || item.ploCode || item.name).toUpperCase()}
+                      {(
+                        item.cloCode ||
+                        item.ploCode ||
+                        item.name
+                      ).toUpperCase()}
                     </span>
-                  
                   </div>
                 </th>
               ))}
@@ -96,7 +101,7 @@ export const PerformanceTable = ({
                 {/* Sticky Grade Label */}
                 <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 p-6 border-b border-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                   <span
-                    className="flex items-center justify-center w-12 py-1.5 rounded-xl text-white text-[11px] font-black shadow-lg shadow-current/20 transition-transform group-hover:scale-110"
+                    className="flex items-center justify-center w-12 py-1.5 rounded-xl text-white text-[11px] font-black shadow-lg"
                     style={{ backgroundColor: getGradeColor(grade) }}
                   >
                     {grade}

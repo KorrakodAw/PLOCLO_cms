@@ -13,6 +13,7 @@ import {
 
 interface PerformanceTrendChartProps {
   chartData: any[];
+  balanceData?: any[];
   visibleLines?: Record<string, boolean>;
   getGradeColor?: (grade: string) => string;
   xAxisKey: string;
@@ -24,6 +25,7 @@ interface PerformanceTrendChartProps {
 
 export const PerformanceTrendChart = ({
   chartData,
+  balanceData,
   visibleLines,
   getGradeColor,
   xAxisKey,
@@ -32,23 +34,42 @@ export const PerformanceTrendChart = ({
   minScoreKey,
   allAvgKey,
 }: PerformanceTrendChartProps) => {
+  // Extract unique grades to show individual grade radars if toggled
+  // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
   const uniqueGrades = useMemo(() => {
-    if (chartData.length === 0) return [];
+    if (!balanceData) return [];
+    return balanceData.map((d) => d.grade);
+  }, [balanceData]);
 
-    // 1. Get all keys from the first data object (e.g., "cloCode", "avg_grade_A", etc.)
-    const keys = Object.keys(chartData[0]);
+  // 2. รวมข้อมูลเพื่อให้ Radar ของเกรดแสดงผลบนแกนเดียวกับภาพรวม
+  // เราจะนำค่าเฉลี่ยของแต่ละเกรดไปใส่ใน chartData เพื่อให้ Recharts วาดได้
+  const finalChartData = useMemo(() => {
+    return chartData.map((point) => {
+      const updatedPoint = { ...point };
 
-    // 2. Filter for keys that start with 'avg_grade_' and extract the grade name
-    return keys
-      .filter((key) => key.startsWith("avg_grade_"))
-      .map((key) => key.replace("avg_grade_", ""))
-      .sort(); // Sorts them as A, B, C, F
-  }, [chartData]);
+      uniqueGrades.forEach((grade) => {
+        const gradeInfo = balanceData?.find((d) => d.grade === grade);
+        // ค้นหาค่าคะแนนจาก ploScores, cloScores หรือ assignmentScores
+        const scoreEntry =
+          gradeInfo?.ploScores?.find((p: any) => p.label === point[xAxisKey]) ||
+          gradeInfo?.cloScores?.find((c: any) => c.label === point[xAxisKey]) ||
+          gradeInfo?.assignmentScores?.find(
+            (a: any) => a.label === point[xAxisKey],
+          );
+
+        if (scoreEntry) {
+          updatedPoint[`avg_grade_${grade}`] = scoreEntry.value;
+        }
+      });
+
+      return updatedPoint;
+    });
+  }, [chartData, balanceData, uniqueGrades, xAxisKey]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart
-        data={chartData}
+        data={finalChartData}
         margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
       >
         <CartesianGrid
@@ -75,6 +96,7 @@ export const PerformanceTrendChart = ({
             boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
           }}
           cursor={{ fill: "#f8fafc" }}
+          formatter={(value: number) => value.toFixed(2)}
         />
         <Legend
           verticalAlign="top"
@@ -119,16 +141,16 @@ export const PerformanceTrendChart = ({
           />
         )}
         {uniqueGrades.map(
-          (grade: any) =>
+          (grade) =>
             visibleLines?.[`avg_grade_${grade}`] && (
               <Line
                 key={grade}
-                type="monotone"
-                dataKey={`avg_grade_${grade}`}
                 name={`Grade ${grade}`}
-                stroke={getGradeColor ? getGradeColor(grade) : undefined}
-                strokeWidth={3}
-                dot={{ r: 4 }}
+                dataKey={`avg_grade_${grade}`}
+                stroke={getGradeColor?.(grade)}
+                fill={getGradeColor?.(grade)}
+                fillOpacity={0.3}
+                strokeWidth={2}
               />
             ),
         )}

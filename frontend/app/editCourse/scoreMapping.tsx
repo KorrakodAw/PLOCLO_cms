@@ -187,51 +187,32 @@ export default function ScoreMapping({
   };
 
   const handleSave = async () => {
-    if (!token) return;
-
-    if (changedKeys.size === 0) {
-      showToast("No changes to save", "success");
-      return;
-    }
+    if (!token || changedKeys.size === 0) return;
 
     setLoading(true);
 
-    const updates = Array.from(changedKeys)
-      .map((key) => {
-        // 1. บอก TypeScript ว่า val อาจเป็น string, number หรือ null
-        const val = scoreGrid[key] as string | number | null;
-
-        if (val !== undefined) {
-          const [studentId, assignId] = key.split("_");
-
-          // 2. ใช้การเช็คค่าว่างที่ครอบคลุมทั้ง string และ null
-          // และใช้ Number(val) เฉพาะเมื่อมีค่าจริงเท่านั้น
-          const isBlank = val === "" || val === null;
-          const finalScore = isBlank ? null : Number(val);
-
-          return {
-            student_id: Number(studentId),
-            assignment_id: Number(assignId),
-            course_id: Number(masterCourseId),
-            score: finalScore,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
+    // 🟢 ดึงข้อมูลการอัปเดต โดยแนบ sectionId เข้าไปด้วย
+    const updates = Array.from(changedKeys).map((key) => {
+      const [studentId, assignId] = key.split("_");
+      return {
+        student_id: Number(studentId),
+        assignment_id: Number(assignId),
+        score: scoreGrid[key] ?? 0,
+        section_id: Number(sectionId), // 👈 เพิ่มฟิลด์นี้เพื่อให้ Backend นำไปสร้าง/อัปเดต
+      };
+    });
 
     try {
       await apiClient.post(
-        "/score",
-        { updates },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        "/score", // แก้ไข URL ตามที่คุณตั้งค่าไว้ใน Backend
+        { updates, sectionId: Number(sectionId) }, // แนบไปทั้งในรายตัวและเป็นส่วนกลาง
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      showToast("Scores saved successfully", "success");
-      setChangedKeys(new Set());
+
+      showToast("Scores saved successfully!", "success");
+      setChangedKeys(new Set()); // ล้างรายการที่เปลี่ยนแปลง
     } catch (err) {
-      console.error(err);
+      console.error("Save error:", err);
       showToast("Failed to save scores", "error");
     } finally {
       setLoading(false);

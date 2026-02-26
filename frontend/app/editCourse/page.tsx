@@ -47,7 +47,7 @@ export default function EditCourse() {
   const [isHydrated, setIsHydrated] = useState(false); // Flag to check if localStorage has been loaded
 
   useEffect(() => {
-    const saved = localStorage.getItem("edit_program_filters");
+    const saved = localStorage.getItem("edit_fix_filters");
     if (saved && token) {
       try {
         const parsed = JSON.parse(saved);
@@ -61,7 +61,7 @@ export default function EditCourse() {
 
   useEffect(() => {
     if (selections.university || selections.faculty || selections.program) {
-      localStorage.setItem("edit_course_filters", JSON.stringify(selections));
+      localStorage.setItem("edit_fix_filters", JSON.stringify(selections));
     }
   }, [selections]);
 
@@ -72,7 +72,7 @@ export default function EditCourse() {
   };
 
   const handleClear = () => {
-    localStorage.removeItem("edit_program_filters");
+    localStorage.removeItem("edit_fix_filters");
     if (isInstructor) {
       setSearchTerm("");
     } else {

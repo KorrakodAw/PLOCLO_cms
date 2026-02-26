@@ -255,19 +255,19 @@ export async function getCloScoreAllStudentPerCourse(
       },
     });
 
-    const studentNames = await tx.student.findMany({
-      where: {
-        id: {
-          in: studentClo.map((sc) => sc.student_id),
-        },
-      },
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        student_code: true,
-      },
-    });
+    // const studentNames = await tx.student.findMany({
+    //   where: {
+    //     id: {
+    //       in: studentClo.map((sc) => sc.student_id),
+    //     },
+    //   },
+    //   select: {
+    //     id: true,
+    //     first_name: true,
+    //     last_name: true,
+    //     student_code: true,
+    //   },
+    // });
 
     // 2) Group ตาม student_id -> cloCode
     const studentGroups = studentClo.reduce(
@@ -293,8 +293,8 @@ export async function getCloScoreAllStudentPerCourse(
     // 3) คำนวณ cloScore ต่อ student ต่อ clo (ไม่ normalize)
     const results: {
       student_id: number;
-      student_code: string;
-      studentName: string;
+      // student_code: string;
+      // studentName: string;
       cloScores: { cloCode: string; cloScore: number }[];
     }[] = [];
 
@@ -326,19 +326,20 @@ export async function getCloScoreAllStudentPerCourse(
       results.push({
         student_id: Number(student_id),
         cloScores,
-        student_code:
-          studentNames.find((s) => s.id === Number(student_id))?.student_code ||
-          "",
-        studentName:
-          studentNames.find((s) => s.id === Number(student_id))?.first_name +
-            " " +
-            studentNames.find((s) => s.id === Number(student_id))?.last_name ||
-          "",
+        // student_code:
+        //   studentNames.find((s) => s.id === Number(student_id))?.student_code ||
+        //   "",
+        // studentName:
+        //   studentNames.find((s) => s.id === Number(student_id))?.first_name +
+        //     " " +
+        //     studentNames.find((s) => s.id === Number(student_id))?.last_name ||
+        //   "",
       });
     });
 
     // --- SORT STUDENTS (by student_code) ---
-    results.sort((a, b) => a.student_code.localeCompare(b.student_code));
+    // results.sort((a, b) => a.student_code.localeCompare(b.student_code));
+    
 
     return { cloScoresPerStudent: results };
   });
@@ -370,7 +371,10 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     const cloStatsBase = Object.entries(cloGroups).map(([cloCode, scores]) => {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
-      const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+      const mean =
+        scores.length > 0
+          ? scores.reduce((sum, s) => sum + s, 0) / scores.length
+          : 0;
       return { cloCode, min, max, mean };
     });
 
@@ -777,7 +781,10 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
       ([category, scores]) => {
         const min = Math.min(...scores);
         const max = Math.max(...scores);
-        const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+        const mean =
+          scores.length > 0
+            ? scores.reduce((sum, s) => sum + s, 0) / scores.length
+            : 0;
         return { category, min, max, mean };
       },
     );
@@ -1004,7 +1011,7 @@ export async function getPloScoreAllStudentPerCourse(
       courseId,
     );
     results.push({
-      studentId: s.student_id,
+      student_id: s.student_id,
       ploScores: ploResult.ploScores,
     });
   }
@@ -1178,7 +1185,10 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
     ([ploCode, scores]) => {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
-      const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+      const mean =
+        scores.length > 0
+          ? scores.reduce((sum, s) => sum + s, 0) / scores.length
+          : 0;
       return { ploCode, min, max, mean };
     },
   );
@@ -1200,27 +1210,43 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
 
   // 3) รวม CLO highestPossible → PLO highestPossible
   const highestPloMap: Record<string, number> = {};
-  cloPloMappings.forEach((mapping: { clo: { code: string }, plo: { code: string }, weight: number | null }) => {
-    const cloCode = mapping.clo.code;
-    const ploCode = mapping.plo.code;
-    const cloHighest = cloStats.find((c) => c.cloCode === cloCode)?.highestPossible ?? 0;
+  cloPloMappings.forEach(
+    (mapping: {
+      clo: { code: string };
+      plo: { code: string };
+      weight: number | null;
+    }) => {
+      const cloCode = mapping.clo.code;
+      const ploCode = mapping.plo.code;
+      const cloHighest =
+        cloStats.find((c) => c.cloCode === cloCode)?.highestPossible ?? 0;
 
-    const contribution = cloHighest * (Number(mapping.weight) / 100);
+      const contribution = cloHighest * (Number(mapping.weight) / 100);
 
-    highestPloMap[ploCode] = (highestPloMap[ploCode] ?? 0) + contribution;
-  });
+      highestPloMap[ploCode] = (highestPloMap[ploCode] ?? 0) + contribution;
+    },
+  );
 
   // 4) merge เข้าไปใน ploStats
   const ploStatsWithHighest = ploStats.map((stat) => ({
-    ...stat,
-    highestPossible: highestPloMap[stat.ploCode] ?? 0,
+    ploCode: stat.ploCode,
+    // 🟢 บังคับทศนิยม 2 ตำแหน่ง และแปลงกลับเป็น Number
+    min: Number(stat.min.toFixed(2)),
+    max: Number(stat.max.toFixed(2)),
+    mean: Number(stat.mean.toFixed(2)),
+    highestPossible: Number((highestPloMap[stat.ploCode] ?? 0).toFixed(2)),
   }));
 
+  // 🟢 เพิ่มส่วนนี้: จัดเรียง ploStats ตามชื่อ ploCode (Alpha-numeric sort)
+  ploStatsWithHighest.sort((a, b) =>
+    a.ploCode.localeCompare(b.ploCode, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
+  );
+
   return { ploStats: ploStatsWithHighest };
-
-  //return { ploStats };
 }
-
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 program
 /////////////////////////////////////////////////////////////

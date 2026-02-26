@@ -101,6 +101,7 @@ export default function EditCourseClient({
     useState(false);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [, setCourseToDelete] = useState<Course | null>(null);
+  const [showDuplicatePopup, setShowDuplicatePopup] = useState(false);
 
   // ... [Keep Fetch Matching Variants useEffect] ...
   useEffect(() => {
@@ -236,11 +237,11 @@ export default function EditCourseClient({
   };
 
   // --- Handlers ---
-  // ... [Keep handleDuplicateSection, deleteCourseVariant] ...
 
   const handleDuplicateSection = async () => {
     if (!formData || !token) return;
-    // ... (logic omitted for brevity, keep your original code) ...
+
+    // 1. คำนวณเลข Section ถัดไปจากข้อมูลล่าสุดใน State
     const existingSectionsInTerm = duplicateCourses.filter(
       (c) =>
         String(c.year) === String(formData.year) &&
@@ -267,15 +268,34 @@ export default function EditCourseClient({
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      showToast(`${t("Created Section")} ${nextSection}`, "success");
-      const updatedResponse = await fetchMatchingCourses(token, courseCode);
-      setDuplicateCourses(updatedResponse.data);
-      setSelectedSectionId(String(res.data.id));
-    } catch {
+      // 🟢 2. ดึงข้อมูลใหม่จาก Server ทันที
+      const response = await fetchMatchingCourses(token, courseCode);
+      const updatedList = response.data || [];
+
+      // 🟢 3. หาข้อมูลของเซกชันที่เพิ่งสร้างเสร็จ (จาก Response ของ Backend: res.data.data)
+      const newSectionData = updatedList.find(
+        (c) => String(c.id) === String(res.data.data.id),
+      );
+
+      if (newSectionData) {
+        // 🟢 4. บังคับอัปเดต State ทุกตัวพร้อมกันเพื่อให้ React Render รอบเดียว
+        setDuplicateCourses(updatedList);
+
+        // 🟢 5. สำคัญมาก: สลับปีการศึกษา/เทอมใน Dropdown ให้ตรงกับตัวที่เพิ่งสร้าง
+        setSelectedTerm(`${newSectionData.year}-${newSectionData.semester}`);
+
+        // 🟢 6. ตั้งค่า ID และข้อมูลแสดงผลให้เป็นตัวใหม่ล่าสุด
+        setSelectedSectionId(String(newSectionData.id));
+        setFormData(newSectionData);
+
+        // แสดง Toast แจ้งเตือนหลังจาก UI เปลี่ยนแล้ว
+        showToast(`${t("Created Section")} ${nextSection}`, "success");
+      }
+    } catch (err) {
+      console.error("Duplicate Error:", err);
       showToast(t("Failed to duplicate section"), "error");
     } finally {
-      // Refresh the page to ensure all data is up-to-date after duplication
-      window.location.reload();
+      // 🟢 7. ปิด LoadingOverlay โดยห้ามใช้ window.location.reload()
       setLoading(false);
     }
   };
@@ -389,8 +409,21 @@ export default function EditCourseClient({
   }, [duplicateCourses]);
 
   // --- Render ---
-  if (loading && !formData) return <LoadingOverlay />;
   if (error || !formData) return <LoadingOverlay />;
+
+  if (!loading && !formData && duplicateCourses.length > 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <p className="text-gray-400 italic">Selecting course data...</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="text-blue-600 underline"
+        >
+          Reload if stuck
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20">
@@ -495,8 +528,9 @@ export default function EditCourseClient({
 
           {/* Footer Row: Low-frequency actions (Duplicate/Delete) */}
           <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end items-center gap-3">
+            {/* แก้ไขในส่วน Footer Row ของ Main Header Card */}
             <button
-              onClick={handleDuplicateSection}
+              onClick={() => setShowDuplicatePopup(true)} // 🟢 เปลี่ยนจาก handleDuplicateSection เป็นการเปิด Popup
               className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-blue-600 transition-all"
             >
               <Copy size={14} />
@@ -628,6 +662,18 @@ export default function EditCourseClient({
           onClose={() => setShowEditPopup(false)}
         />
       )}
+
+      <AlertPopup
+        title={t("confirm duplication")}
+        type="confirm"
+        message={`${t("Are you sure you want to duplicate this course content to a new section?")} ${t("This will create a new section with the same course structure.")}`}
+        isOpen={showDuplicatePopup}
+        onCancel={() => setShowDuplicatePopup(false)}
+        onConfirm={() => {
+          setShowDuplicatePopup(false);
+          handleDuplicateSection(); // 🔵 รันฟังก์ชันคัดลอกจริงเมื่อกดยืนยัน
+        }}
+      />
 
       <AlertPopup
         title={t("confirm deletion")}

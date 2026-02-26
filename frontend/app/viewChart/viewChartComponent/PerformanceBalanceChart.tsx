@@ -12,7 +12,6 @@ import {
 
 interface PerformanceBalanceChartProps {
   chartData: any[];
-  summaryData: { students: { grade: string }[] };
   visibleLines?: Record<string, boolean>;
   getGradeColor?: (grade: string) => string;
   xAxisKey: string; // e.g., "cloCode"
@@ -20,11 +19,12 @@ interface PerformanceBalanceChartProps {
   minScoreKey?: string; // e.g., "min"
   allAvgKey?: string; // e.g., "mean"
   maxScorePosKey: string; // e.g., "maxCloScore"
+  balanceData?: any[];
 }
 
 export const PerformanceBalanceChart = ({
   chartData,
-  summaryData,
+  balanceData,
   visibleLines,
   getGradeColor,
   xAxisKey,
@@ -34,19 +34,40 @@ export const PerformanceBalanceChart = ({
   allAvgKey,
 }: PerformanceBalanceChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
-  const uniqueGrades = useMemo(
-    () =>
-      Array.from(
-        new Set(summaryData?.students?.map((s: { grade: string }) => s.grade)),
-      )
-        .filter(Boolean)
-        .sort(),
-    [summaryData],
-  );
+  // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
+  const uniqueGrades = useMemo(() => {
+    if (!balanceData) return [];
+    return balanceData.map((d) => d.grade);
+  }, [balanceData]);
+
+  // 2. รวมข้อมูลเพื่อให้ Radar ของเกรดแสดงผลบนแกนเดียวกับภาพรวม
+  // เราจะนำค่าเฉลี่ยของแต่ละเกรดไปใส่ใน chartData เพื่อให้ Recharts วาดได้
+  const finalChartData = useMemo(() => {
+    return chartData.map((point) => {
+      const updatedPoint = { ...point };
+
+      uniqueGrades.forEach((grade) => {
+        const gradeInfo = balanceData?.find((d) => d.grade === grade);
+        // ค้นหาค่าคะแนนจาก ploScores, cloScores หรือ assignmentScores
+        const scoreEntry =
+          gradeInfo?.ploScores?.find((p: any) => p.label === point[xAxisKey]) ||
+          gradeInfo?.cloScores?.find((c: any) => c.label === point[xAxisKey]) ||
+          gradeInfo?.assignmentScores?.find(
+            (a: any) => a.label === point[xAxisKey],
+          );
+
+        if (scoreEntry) {
+          updatedPoint[`avg_grade_${grade}`] = scoreEntry.value;
+        }
+      });
+
+      return updatedPoint;
+    });
+  }, [chartData, balanceData, uniqueGrades, xAxisKey]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
+      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={finalChartData}>
         <PolarGrid stroke="#e2e8f0" />
         <PolarAngleAxis
           dataKey={xAxisKey} // This will now correctly use "cloCode" or "ploCode"
@@ -63,6 +84,7 @@ export const PerformanceBalanceChart = ({
             border: "none",
             boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
           }}
+          formatter={(value: number) => value.toFixed(2)}
         />
 
         {/* Background Radar: Total Possible Score */}
@@ -109,7 +131,7 @@ export const PerformanceBalanceChart = ({
 
         {/* Individual Grade Radars */}
         {uniqueGrades.map(
-          (grade: any) =>
+          (grade) =>
             visibleLines?.[`avg_grade_${grade}`] && (
               <Radar
                 key={grade}
@@ -117,7 +139,7 @@ export const PerformanceBalanceChart = ({
                 dataKey={`avg_grade_${grade}`}
                 stroke={getGradeColor?.(grade)}
                 fill={getGradeColor?.(grade)}
-                fillOpacity={0.4}
+                fillOpacity={0.3}
                 strokeWidth={2}
               />
             ),

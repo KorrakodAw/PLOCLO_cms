@@ -100,6 +100,7 @@ model CourseSection {
   course     Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
   
   students      StudentOnSection[]
+  scores     StudentScore[]
   @@map("course_section")
 }
 
@@ -213,6 +214,7 @@ model AssignmentCloMapping {
 model StudentScore {
   id            Int      @id @default(autoincrement())
   student_id    Int
+  section_id    Int
   assignment_id Int
   score         Decimal  @default(0) @db.Decimal(7, 4)
   createdAt     DateTime @default(now()) @map("created_at")
@@ -222,6 +224,7 @@ model StudentScore {
   // The assignment belongs to the Course
   student    Student    @relation(fields: [student_id], references: [id], onDelete: Cascade)
   assignment Assignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  section         CourseSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
 
   @@unique([student_id, assignment_id])
   @@map("student_score")

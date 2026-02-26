@@ -13,7 +13,6 @@ import { getPrograms, Program } from "../../utils/programApi";
 import SearchBar from "@/components/SearchBar";
 
 import { useAuth } from "../context/AuthContext";
-import { clear } from "console";
 
 interface Option {
   label: string;
@@ -43,7 +42,7 @@ export default function EditProgram() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("edit_program_filters");
+    const saved = localStorage.getItem("edit_fix_filters");
     if (saved && token) {
       try {
         const parsed = JSON.parse(saved);
@@ -57,7 +56,7 @@ export default function EditProgram() {
 
   useEffect(() => {
     if (selections.university || selections.faculty || selections.program) {
-      localStorage.setItem("edit_program_filters", JSON.stringify(selections));
+      localStorage.setItem("edit_fix_filters", JSON.stringify(selections));
     }
   });
 
@@ -70,7 +69,7 @@ export default function EditProgram() {
 
   const clearFilters = () => {
     // 🟢 ลบข้อมูลออกจาก localStorage ทันทีที่กดปุ่ม Clear
-    localStorage.removeItem("edit_program_filters");
+    localStorage.removeItem("edit_fix_filters");
 
     if (isInstructor) {
       setSearchTerm("");

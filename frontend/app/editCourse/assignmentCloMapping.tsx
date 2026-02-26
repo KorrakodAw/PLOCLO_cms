@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -8,7 +9,7 @@ import { useToast } from "../../components/Toast";
 import { apiClient } from "../../utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { CLO } from "@/utils/cloApi";
-import { Info, Calculator } from "lucide-react";
+import { Info, Calculator, FilterX } from "lucide-react";
 
 interface Assignment {
   id: number;
@@ -84,25 +85,10 @@ export default function AssignmentCloMapping({
     };
 
     fetchData();
-  }, [courseId, token, showToast]);
-
-  useEffect(() => {
-    if (clos.length > 0 && !selectedClo) {
-      const firstClo = clos[0];
-      setSelectedClo(
-        `${firstClo.code} : ${
-          lang === "th" ? firstClo.name_th || firstClo.name : firstClo.name
-        }`,
-      );
-    }
-    if (assignments.length === 0 || clos.length === 0) {
-      setSelectedClo(null);
-    }
-  }, [clos, lang, selectedClo, assignments]);
+  }, [courseId, token]);
 
   // 2. Sort Assignments Logic
   const sortedAssignments = useMemo(() => {
-    // 1. กำหนดลำดับความสำคัญของหมวดหมู่ (Category)
     const categoryOrder: Record<string, number> = {
       presentation: 1,
       assignment: 2,
@@ -112,7 +98,6 @@ export default function AssignmentCloMapping({
       quiz: 6,
     };
 
-    // 2. ลำดับ Keyword ในชื่อ (กรณี Category เหมือนกัน แต่อยากเช็ค Keyword ในชื่อต่อ)
     const keywordOrder = [
       "presentation",
       "assignment",
@@ -130,7 +115,6 @@ export default function AssignmentCloMapping({
       return index === -1 ? 999 : index;
     };
 
-    // 3. แปลงเลขโรมันเป็นตัวเลขเพื่อให้เรียงลำดับได้ถูกต้อง
     const romanMap: Record<string, number> = {
       i: 1,
       ii: 2,
@@ -150,31 +134,40 @@ export default function AssignmentCloMapping({
       return name
         .toLowerCase()
         .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
-          // ใช้ padStart(2, '0') เพื่อให้ "10" เรียงต่อจาก "09" ได้ถูกต้อง
           return romanMap[match].toString().padStart(2, "0");
         });
     };
 
-    // 4. เริ่มการเรียงลำดับแบบหลายชั้น
     return [...assignments].sort((a, b) => {
-      // ชั้นที่ 1: เรียงตาม Category (เช่น Presentation ขึ้นก่อน Assignment)
       const catA = categoryOrder[a.category] || 99;
       const catB = categoryOrder[b.category] || 99;
       if (catA !== catB) return catA - catB;
 
-      // ชั้นที่ 2: เรียงตาม Keyword ที่ปรากฏในชื่อ (ถ้ามี)
       const scoreA = getKeywordScore(a.name);
       const scoreB = getKeywordScore(b.name);
       if (scoreA !== scoreB) return scoreA - scoreB;
 
-      // ชั้นที่ 3: เรียงตามชื่อแบบ Natural Sort (รองรับทั้งตัวเลขและเลขโรมัน)
       const normA = normalizeName(a.name);
       const normB = normalizeName(b.name);
       return normA.localeCompare(normB, undefined, { numeric: true });
     });
   }, [assignments]);
 
-  // 3. Weight Summary (Group by keyword)
+  // 🟢 3. Filter Logic (NEW: Filters table by selected CLO)
+  const filteredAssignments = useMemo(() => {
+    if (!selectedClo) return sortedAssignments;
+
+    const selectedCloCode = selectedClo.split(" : ")[0];
+    const targetClo = clos.find((c) => c.code === selectedCloCode);
+
+    if (!targetClo) return sortedAssignments;
+
+    return sortedAssignments.filter((assign) => {
+      const weight = mappingGrid[`${assign.id}_${targetClo.id}`];
+      return weight !== undefined && weight > 0;
+    });
+  }, [sortedAssignments, selectedClo, mappingGrid, clos]);
+
   const weightSummary = useMemo(() => {
     const summary: Record<string, number> = {
       Assignment: 0,
@@ -185,7 +178,6 @@ export default function AssignmentCloMapping({
       Final: 0,
       Other: 0,
     };
-
     assignments.forEach((a) => {
       const name = a.name.toLowerCase();
       const weight = Number(a.weight);
@@ -198,7 +190,6 @@ export default function AssignmentCloMapping({
         summary["Assignment"] += weight;
       else summary["Other"] += weight;
     });
-
     return Object.entries(summary).filter(([, val]) => val > 0);
   }, [assignments]);
 
@@ -207,15 +198,12 @@ export default function AssignmentCloMapping({
     [assignments],
   );
 
-  // 🟢 4. Calculate CLO Total Weights (Matches the Image Logic)
-  // Logic: Sum of (AssignmentWeight * MappingPercentage / 100)
   const cloCourseWeights = useMemo(() => {
     const totals: Record<number, number> = {};
     clos.forEach((clo) => {
       let sum = 0;
       sortedAssignments.forEach((assign) => {
         const mapWeight = mappingGrid[`${assign.id}_${clo.id}`] || 0;
-        // Example: 10% weight * 100% mapping = 10 points
         sum += Number(assign.weight) * (mapWeight / 100);
       });
       totals[clo.id] = sum;
@@ -234,11 +222,7 @@ export default function AssignmentCloMapping({
   };
 
   const handleSave = async () => {
-    if (!token) return;
-    if (changedKeys.size === 0) {
-      showToast("No changes to save.", "success");
-      return;
-    }
+    if (!token || changedKeys.size === 0) return;
     setLoading(true);
     const updates = Array.from(changedKeys).map((key) => {
       const [assignId, cloId] = key.split("_");
@@ -248,7 +232,6 @@ export default function AssignmentCloMapping({
         weight: mappingGrid[key],
       };
     });
-
     try {
       await apiClient.post(
         "/mapping/assignment-clo",
@@ -257,8 +240,7 @@ export default function AssignmentCloMapping({
       );
       showToast("Mapping saved successfully!", "success");
       setChangedKeys(new Set());
-    } catch (err) {
-      console.error(err);
+    } catch {
       showToast("Failed to save mapping", "error");
     } finally {
       setLoading(false);
@@ -267,7 +249,8 @@ export default function AssignmentCloMapping({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 🟢 Weight Breakdown Summary (Top Cards) */}
+      <ToastElement />
+      {/* Weight Breakdown Summary */}
       {weightSummary.length > 0 && (
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
           <div className="flex items-center gap-2 mb-4 text-gray-800">
@@ -276,7 +259,6 @@ export default function AssignmentCloMapping({
               Course Weight Distribution
             </h3>
           </div>
-
           <div className="flex flex-wrap gap-4">
             {weightSummary.map(([category, weight]) => (
               <div
@@ -291,25 +273,16 @@ export default function AssignmentCloMapping({
                 </span>
               </div>
             ))}
-
             <div
-              className={`flex flex-col justify-center items-center p-4 rounded-xl border min-w-[100px] ${
-                totalCourseWeight === 100
-                  ? "bg-green-50 border-green-100"
-                  : "bg-red-50 border-red-100"
-              }`}
+              className={`flex flex-col justify-center items-center p-4 rounded-xl border min-w-[100px] ${totalCourseWeight === 100 ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"}`}
             >
               <span
-                className={`text-[10px] font-bold uppercase mb-1 ${
-                  totalCourseWeight === 100 ? "text-green-600" : "text-red-500"
-                }`}
+                className={`text-[10px] font-bold uppercase mb-1 ${totalCourseWeight === 100 ? "text-green-600" : "text-red-500"}`}
               >
                 Total
               </span>
               <span
-                className={`text-2xl font-black ${
-                  totalCourseWeight === 100 ? "text-green-700" : "text-red-600"
-                }`}
+                className={`text-2xl font-black ${totalCourseWeight === 100 ? "text-green-700" : "text-red-600"}`}
               >
                 {totalCourseWeight.toFixed(0)}%
               </span>
@@ -318,10 +291,9 @@ export default function AssignmentCloMapping({
         </div>
       )}
 
-      {/* Main Table */}
+      {/* Main Table Container */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden relative min-h-[400px]">
         {loading && <LoadingOverlay />}
-        <ToastElement />
 
         <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
           <h3 className="font-bold text-gray-800 uppercase text-xs tracking-widest">
@@ -330,114 +302,129 @@ export default function AssignmentCloMapping({
           <button
             onClick={handleSave}
             disabled={loading || changedKeys.size === 0}
-            className={`px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-              changedKeys.size === 0
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-200"
-            }`}
+            className={`px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${changedKeys.size === 0 ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-200"}`}
           >
             {loading ? "Saving..." : `Save Changes`}
           </button>
         </div>
 
-        <div className="bg-blue-50/50 px-6 py-3 border-b border-blue-100 min-h-[48px] flex items-center transition-all">
+        {/* 🟢 Interactive Filter Info Bar */}
+        <div
+          className={`px-6 py-3 border-b flex items-center justify-between transition-all ${selectedClo ? "bg-blue-600" : "bg-blue-50/50"}`}
+        >
           {selectedClo ? (
-            <div className="flex items-center gap-2 animate-fadeIn">
-              <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
-                <Info size={12} strokeWidth={3} />
-                INFO
-              </span>
-              <span className="text-sm text-blue-900 font-medium">
-                {selectedClo}
-              </span>
+            <div className="flex items-center justify-between w-full animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <span className="bg-white text-blue-600 text-[10px] font-black px-2 py-0.5 rounded flex items-center gap-1">
+                  FILTERING ACTIVE
+                </span>
+                <span className="text-sm text-white font-bold">
+                  {selectedClo}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedClo(null)}
+                className="flex items-center gap-1 text-xs text-white/80 hover:text-white font-bold transition-colors"
+              >
+                <FilterX size={14} /> CLEAR FILTER
+              </button>
             </div>
           ) : (
-            <span className="text-xs text-blue-300 italic font-medium">
-              Hover over or click a CLO code to see its full description
+            <span className="text-xs text-blue-400 italic font-medium flex items-center gap-2">
+              <Info size={14} /> Click a CLO code in the header to filter the
+              assignment list
             </span>
           )}
         </div>
 
         <div className="overflow-x-auto p-4">
-          {sortedAssignments.length > 0 && clos.length > 0 ? (
+          {filteredAssignments.length > 0 && clos.length > 0 ? (
             <table className="w-full text-left border-collapse text-sm">
               <thead className="bg-gray-50/50 text-gray-500 text-[10px] uppercase font-black tracking-widest">
                 <tr>
-                  {/* 🟢 No. Index Column */}
                   <th className="p-4 border-b w-12 text-center border-r bg-gray-100">
                     No.
                   </th>
-
                   <th className="p-4 border-b w-48 sticky left-0 bg-white z-10 shadow-sm border-r">
                     Assignment Name
                   </th>
                   <th className="p-4 border-b w-24 text-center border-r bg-gray-50 text-blue-600">
                     Weight
                   </th>
-                  {clos.map((clo) => (
-                    <th
-                      key={clo.id}
-                      className="p-2 border-b text-center min-w-[80px] border-r cursor-pointer hover:bg-blue-100 transition-colors group"
-                      onClick={() =>
-                        setSelectedClo(
-                          `${clo.code} : ${
-                            lang === "th" ? clo.name_th || clo.name : clo.name
-                          }`,
-                        )
-                      }
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-blue-600 font-bold group-hover:text-blue-800">
-                          {clo.code}
-                        </span>
-                        <div className="h-1 w-1 rounded-full bg-blue-300 group-hover:bg-blue-600"></div>
-                      </div>
-                    </th>
-                  ))}
-                  <th className="p-4 border-b text-center w-24">Row Total</th>
+                  {clos.map((clo) => {
+                    // ตรวจสอบว่า CLO นี้ถูกเลือกอยู่หรือไม่
+                    const isSelected = selectedClo?.startsWith(clo.code);
+                    const cloLabel = `${clo.code} : ${lang === "th" ? clo.name_th || clo.name : clo.name}`;
+
+                    return (
+                      <th
+                        key={clo.id}
+                        className={`p-2 border-b text-center min-w-[80px] border-r cursor-pointer transition-colors group ${
+                          isSelected ? "bg-blue-100" : "hover:bg-blue-50"
+                        }`}
+                        onClick={() => {
+                          // 🟢 ถ้าคลิกตัวเดิม ให้ Clear Filter (set เป็น null) ถ้าไม่ใช่ให้เลือกตัวใหม่
+                          setSelectedClo(isSelected ? null : cloLabel);
+                        }}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <span
+                            className={`font-bold ${
+                              isSelected
+                                ? "text-blue-800 scale-110"
+                                : "text-blue-600 group-hover:text-blue-800"
+                            }`}
+                          >
+                            {clo.code}
+                          </span>
+                          <div
+                            className={`h-1 w-1 rounded-full ${
+                              isSelected
+                                ? "bg-blue-800"
+                                : "bg-blue-300 group-hover:bg-blue-600"
+                            }`}
+                          ></div>
+                        </div>
+                      </th>
+                    );
+                  })}
+                  <th className="p-4 border-b text-center w-24">Balance</th>
                 </tr>
               </thead>
-
               <tbody className="divide-y divide-gray-50">
-                {/* 🟢 TOTAL CLO WEIGHT Row (At the Top) */}
+                {/* Total Row (Top) */}
                 <tr className="bg-gray-100 border-b border-gray-300 shadow-sm">
                   <td className="p-4 border-r border-gray-300"></td>
                   <td className="p-4 font-black text-gray-700 sticky left-0 bg-gray-100 flex items-center gap-2 text-xs uppercase tracking-wider">
                     TOTAL CLO WEIGHT
                   </td>
-                  <td className="p-4 text-center font-bold text-gray-700 border-r border-gray-300 bg-gray-200">
-                    {/* Empty cell for Weight col */}
-                  </td>
+                  <td className="p-4 text-center border-r border-gray-300 bg-gray-200"></td>
                   {clos.map((clo) => (
                     <td
                       key={`total-${clo.id}`}
-                      className="p-4 text-center border-r border-gray-300 font-black text-gray-800 text-base bg-gray-100"
+                      className={`p-4 text-center border-r border-gray-300 font-black text-gray-800 text-base ${selectedClo?.startsWith(clo.code) ? "bg-blue-100" : "bg-gray-100"}`}
                     >
-                      {/* Calculated like your image (8.7, 15.7, etc.) */}
                       {cloCourseWeights[clo.id]?.toFixed(2)}
                     </td>
                   ))}
                   <td className="bg-gray-100"></td>
                 </tr>
-
                 {/* Assignment Rows */}
-                {sortedAssignments.map((assign, index) => {
-                  const rowTotal = clos.reduce((sum, clo) => {
-                    return sum + (mappingGrid[`${assign.id}_${clo.id}`] || 0);
-                  }, 0);
-
+                {filteredAssignments.map((assign, index) => {
+                  const rowTotal = clos.reduce(
+                    (sum, clo) =>
+                      sum + (mappingGrid[`${assign.id}_${clo.id}`] || 0),
+                    0,
+                  );
                   const isTotalValid = Math.abs(rowTotal - 100) < 0.1;
-
                   return (
                     <tr
                       key={assign.id}
                       className="group hover:bg-blue-50/30 transition-all"
                     >
-                      {/* 🟢 Index Number */}
                       <td className="p-4 text-center font-bold text-gray-400 border-r bg-gray-50/30">
                         {index + 1}
                       </td>
-
                       <td className="p-4 font-bold text-gray-700 sticky left-0 bg-white group-hover:bg-blue-50/30 border-r shadow-sm">
                         {assign.name}
                       </td>
@@ -448,28 +435,19 @@ export default function AssignmentCloMapping({
                         const weight =
                           mappingGrid[`${assign.id}_${clo.id}`] || "";
                         const hasValue = Number(weight) > 0;
+                        const isFiltered = selectedClo?.startsWith(clo.code);
                         return (
                           <td
                             key={clo.id}
-                            className={`p-1 border-r text-center ${
-                              hasValue ? "bg-blue-50/50" : ""
-                            }`}
+                            className={`p-1 border-r text-center ${hasValue ? "bg-blue-50/50" : ""} ${isFiltered ? "ring-inset ring-2 ring-blue-200" : ""}`}
                           >
                             <input
                               type="number"
                               min="0"
                               max="100"
-                              className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-transparent ${
-                                hasValue
-                                  ? "font-bold text-blue-700"
-                                  : "text-gray-400"
-                              } ${
-                                changedKeys.has(`${assign.id}_${clo.id}`)
-                                  ? "bg-yellow-50 ring-2 ring-yellow-200"
-                                  : ""
-                              }`}
                               placeholder="-"
                               value={weight}
+                              className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-transparent ${hasValue ? "font-bold text-blue-700" : "text-gray-400"} ${changedKeys.has(`${assign.id}_${clo.id}`) ? "bg-yellow-50 ring-2 ring-yellow-200" : ""}`}
                               onChange={(e) =>
                                 handleWeightChange(
                                   assign.id,
@@ -483,16 +461,11 @@ export default function AssignmentCloMapping({
                       })}
                       <td className="p-4 text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-[10px] font-black ${
-                            isTotalValid
-                              ? ""
-                              : // ? "bg-green-100 text-green-700"
-                                rowTotal === 0
-                                ? "bg-gray-100 text-gray-400"
-                                : "bg-red-100 text-red-600"
-                          }`}
+                          className={`px-3 py-1 rounded-full text-[10px] font-black ${isTotalValid ? "bg-green-100 text-green-700" : rowTotal === 0 ? "bg-gray-100 text-gray-400" : "bg-red-100 text-red-600"}`}
                         >
-                          {100 - rowTotal}%
+                          {isTotalValid
+                            ? "OK"
+                            : `${(100 - rowTotal).toFixed(0)}%`}
                         </span>
                       </td>
                     </tr>
@@ -501,9 +474,15 @@ export default function AssignmentCloMapping({
               </tbody>
             </table>
           ) : (
-            <div className="p-10 text-center text-gray-400 italic">
-              Please ensure you have both Assignments and CLOs created for this
-              course.
+            <div className="p-20 flex flex-col items-center justify-center gap-4 text-gray-400 italic">
+              <FilterX size={48} className="text-gray-200" />
+              <p>No assignments found mapping to this CLO.</p>
+              <button
+                onClick={() => setSelectedClo(null)}
+                className="text-blue-600 font-bold not-italic hover:underline"
+              >
+                Show All Assignments
+              </button>
             </div>
           )}
         </div>
