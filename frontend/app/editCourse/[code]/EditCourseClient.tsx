@@ -177,6 +177,16 @@ export default function EditCourseClient({
       state: showAssignmentCloMappingTable,
     },
 
+    // {
+    //   id: "grade-setting",
+    //   label: t("Grade Setting"),
+    //   color: "text-pink-600",
+    //   dot: "bg-pink-500",
+    //   state: showGradeSettingTable,
+    // },
+  ];
+
+  const GRADING_TABS = [
     {
       id: "grade-setting",
       label: t("Grade Setting"),
@@ -184,9 +194,6 @@ export default function EditCourseClient({
       dot: "bg-pink-500",
       state: showGradeSettingTable,
     },
-  ];
-
-  const GRADING_TABS = [
     {
       id: "score-mapping",
       label: t("Score Mapping"),
@@ -232,7 +239,7 @@ export default function EditCourseClient({
     if (mode === "setup") {
       handleTabChange("clo");
     } else {
-      handleTabChange("score-mapping");
+      handleTabChange("grade-setting");
     }
   };
 

@@ -160,6 +160,7 @@ export default function UniversityDetailPage({
           // 3. Update the OnClick to match your folder structure
           onClick: (row: Faculty) => {
             // NOTE: matches 'manageUniversity/[id]/faculty/[id]/instructor'
+            setLoading(true);
             router.push(
               `/manageUniversity/${universityId}/faculty/${row.id}/instructor`,
             );

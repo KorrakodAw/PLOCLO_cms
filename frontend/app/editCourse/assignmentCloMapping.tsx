@@ -442,7 +442,7 @@ export default function AssignmentCloMapping({
                             className={`p-1 border-r text-center ${hasValue ? "bg-blue-50/50" : ""} ${isFiltered ? "ring-inset ring-2 ring-blue-200" : ""}`}
                           >
                             <input
-                              type="number"
+                              type="text"
                               min="0"
                               max="100"
                               placeholder="-"

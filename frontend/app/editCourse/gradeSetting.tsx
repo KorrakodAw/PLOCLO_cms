@@ -124,7 +124,7 @@ export default function GradeSetting({ masterCourseId }: { masterCourseId: strin
         </button>
       </div>
 
-      <div className="overflow-hidden border border-gray-200 rounded-xl shadow-sm">
+      <div className="overflow-hidden border border-gray-200 rbounded-xl shadow-sm">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -162,7 +162,7 @@ export default function GradeSetting({ masterCourseId }: { masterCourseId: strin
                       &ge;
                     </span>
                     <input
-                      type="number"
+                      type="text"
                       min="0"
                       max="100"
                       step="0.01"

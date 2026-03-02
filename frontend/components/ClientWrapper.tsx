@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation"; // 💡 Added useRouter
+import { usePathname, useRouter } from "next/navigation";
 import LoadingOverlay from "./LoadingOverlay";
 import Navbar from "./Navbar";
 import { useAuth } from "../app/context/AuthContext";
@@ -12,20 +12,21 @@ export default function ClientWrapper({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter(); // Initialize router
-  const [loading, setLoading] = useState(false); // Global loading state
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
   const { isLoggedIn, initialized } = useAuth();
 
-  // Keep track of the *previous* pathname to properly determine navigation end
+  // 🟢 1. สร้าง State สำหรับเปิด/ปิด Navbar ที่นี่
+  const [isNavbarOpen, setIsNavbarOpen] = useState(true);
+
   const [currentPath, setCurrentPath] = useState(pathname);
 
   useEffect(() => {
-    // Only proceed if the pathname has definitively changed since the last render
     if (pathname !== currentPath) {
       setLoading(false);
       setCurrentPath(pathname);
     }
-  }, [pathname, currentPath, setLoading]); // Ensure setLoading is in dependency array
+  }, [pathname, currentPath]);
 
   const protectedRoutes = [
     "/editCourse",
@@ -37,24 +38,35 @@ export default function ClientWrapper({
 
   useEffect(() => {
     if (initialized && !isLoggedIn && protectedRoutes.includes(pathname)) {
-      if (pathname !== "/") {
-        // Use router.replace for client-side navigation (safer than window.location.replace)
-        router.replace("/");
-      }
+      router.replace("/");
     }
-  }, [initialized, isLoggedIn, pathname, protectedRoutes, router]);
+  }, [initialized, isLoggedIn, pathname, router]);
 
   if (!initialized) return null;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-white">
       {loading && <LoadingOverlay />}
-      <aside className="w-52 min-h-screen bg-white shadow fixed top-0 left-0">
-        {/* 💡 PASS SETLOADING PROP */}
-        <Navbar isLoggedIn={isLoggedIn} setLoading={setLoading} />
+
+      {/* 🟢 2. Sidebar Container: ขยับตามสถานะ isNavbarOpen */}
+      <aside
+        className={`fixed top-0 left-0 z-40 h-screen transition-all duration-300 
+          ${isNavbarOpen ? "w-52" : "w-0 -translate-x-full md:translate-x-0 md:w-20"}`}
+      >
+        {/* ส่ง State และ Function ไปให้ Navbar */}
+        <Navbar
+          isLoggedIn={isLoggedIn}
+          setLoading={setLoading}
+          isOpen={isNavbarOpen}
+          setIsOpen={setIsNavbarOpen}
+        />
       </aside>
 
-      <main className="flex-1 ml-52 p-6 bg-white overflow-x-auto">
+      {/* 🟢 3. Main Content: ปรับ Margin-Left ตามความกว้าง Sidebar */}
+      <main
+        className={`flex-1 p-6 transition-all duration-300 min-w-0
+          ${isNavbarOpen ? "ml-52" : "ml-0 md:ml-20"}`}
+      >
         {children}
       </main>
     </div>

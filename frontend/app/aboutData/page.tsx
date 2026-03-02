@@ -1,9 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import Image from "next/image";
-import { motion } from "framer-motion";
-import { FaRocket, FaCheckCircle, FaLightbulb } from "react-icons/fa";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  FaRocket,
+  FaCheckCircle,
+  FaLightbulb,
+  FaTimes,
+  FaInfoCircle,
+} from "react-icons/fa";
 
 type CardData = {
   id: number;
@@ -15,6 +22,7 @@ type CardData = {
 
 export default function AboutData() {
   const { t } = useTranslation("common");
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
   const cards: CardData[] = [
     {
@@ -69,16 +77,16 @@ export default function AboutData() {
     {
       id: 8,
       name_th: "กรกฎ อนุวรรณ์",
-      name_eng: "(KORAKOD ANUWAN)",
+      name_eng: "(KORRAKOD ANUWAN)",
       role: "Fullstack Developer",
-      image: "/images/placeholder.png",
+      image: "/images/profile/korrakod.jpg",
     },
     {
       id: 9,
       name_th: "ภัทร ทานิล",
       name_eng: "(PATTAR THANIL)",
       role: "Data Analyst",
-      image: "/images/placeholder.png",
+      image: "/images/profile/pattar.jpg",
     },
     {
       id: 10,
@@ -89,23 +97,46 @@ export default function AboutData() {
     },
   ];
 
-  // Organize by Version
   const versions = [
     {
+      id: 1,
       title: "Version 1.0",
       subtitle: "Conceptual Design & Launch",
+      description:
+        "เริ่มต้นการออกแบบระบบจากแนวคิดการวิเคราะห์ผลสัมฤทธิ์ทางการศึกษา เน้นการวางโครงสร้าง UI/UX และการทำความเข้าใจความต้องการของอาจารย์ผู้สอน",
+      features: [
+        "Initial UI Design",
+        "Database Schema Design",
+        "Stakeholder Requirements",
+      ],
       icon: <FaLightbulb />,
       team: cards.slice(0, 2),
     },
     {
+      id: 2,
       title: "Version 2.0",
       subtitle: "Core System Engineering",
+      description:
+        "พัฒนาฐานระบบหลักให้แข็งแกร่ง พัฒนาฟังก์ชันการคำนวณ PLO/CLO และระบบจัดการบัญชีผู้ใช้ให้ทำงานได้อย่างมีประสิทธิภาพ",
+      features: [
+        "API Development",
+        "Authentication System",
+        "PLO/CLO Logic Engine",
+      ],
       icon: <FaRocket />,
       team: cards.slice(2, 5),
     },
     {
+      id: 3,
       title: "Version 3.0",
       subtitle: "Analysis & Advanced Research",
+      description:
+        "มุ่งเน้นการทำ Analytics เชิงลึก การแสดงผลกราฟเปรียบเทียบผลการเรียน และการส่งออกข้อมูลรายงานในรูปแบบสากล",
+      features: [
+        "Data Visualization",
+        "Excel/Capture Export",
+        "Advanced Analytics Dashboard",
+      ],
       icon: <FaCheckCircle />,
       team: cards.slice(7, 10),
     },
@@ -115,60 +146,131 @@ export default function AboutData() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* 1. HERO TITLE */}
-      <div className="max-w-7xl mx-auto px-6 pt-24 pb-16">
+      {/* 1. HERO TITLE - Centered */}
+      <div className="max-w-7xl mx-auto px-6 pt-24 pb-16 flex flex-col items-center text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="border-l-8 border-blue-600 pl-8"
+          className="border-b-4 border-blue-600 pb-6 mb-4"
         >
           <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter">
             THE <span className="text-blue-600">TEAM</span>
           </h1>
-          <p className="text-xl text-slate-500 mt-4 font-medium uppercase tracking-widest">
-            Evolution through collaboration
-          </p>
         </motion.div>
+        <p className="text-lg text-slate-500 font-medium uppercase tracking-[0.3em]">
+          Evolution through collaboration
+        </p>
       </div>
 
-      {/* 2. VERSION SECTIONS */}
+      {/* 2. VERSION SECTIONS - Centered */}
       <div className="max-w-7xl mx-auto px-6 space-y-32 pb-32">
         {versions.map((v, idx) => (
-          <section key={idx}>
-            <div className="flex items-center gap-4 mb-12">
-              <div className="bg-slate-900 text-white p-3 rounded-2xl shadow-lg">
+          <section key={idx} className="flex flex-col items-center">
+            <div className="flex flex-col items-center gap-4 mb-12 text-center relative">
+              <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-xl mb-2">
                 {v.icon}
               </div>
-              <div>
-                <h2 className="text-3xl font-black text-slate-900 leading-none">
+              <div className="flex items-center gap-3">
+                <h2 className="text-4xl font-black text-slate-900 leading-none">
                   {v.title}
                 </h2>
-                <p className="text-slate-400 font-bold uppercase text-xs mt-1 tracking-widest">
-                  {v.subtitle}
-                </p>
+                {/* 🟢 Icon-only Detail Button */}
+                <button
+                  onClick={() => setSelectedVersion(v.id)}
+                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-full transition-all active:scale-90"
+                  title="View Details"
+                >
+                  <FaInfoCircle size={22} />
+                </button>
               </div>
+              <p className="text-blue-500 font-bold uppercase text-xs tracking-widest">
+                {v.subtitle}
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="flex flex-wrap justify-center gap-10 w-full max-w-6xl">
               {v.team.map((person) => (
-                <MemberCard key={person.id} data={person} />
+                <div key={person.id} className="flex justify-center">
+                  <MemberCard data={person} />
+                </div>
               ))}
             </div>
           </section>
         ))}
       </div>
 
-      {/* 3. FIXED BOTTOM ADVISOR SECTION */}
+      {/* 🟢 Improved Centered Modal */}
+      <AnimatePresence>
+        {selectedVersion && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedVersion(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl flex flex-col items-center text-center"
+            >
+              <button
+                onClick={() => setSelectedVersion(null)}
+                className="absolute top-8 right-8 text-slate-300 hover:text-slate-900 transition-colors"
+              >
+                <FaTimes size={20} />
+              </button>
+
+              {versions.find((v) => v.id === selectedVersion) && (
+                <>
+                  <div className="bg-blue-600 text-white p-5 rounded-3xl text-3xl mb-6 shadow-lg shadow-blue-200">
+                    {versions.find((v) => v.id === selectedVersion)?.icon}
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-900 mb-2">
+                    {versions.find((v) => v.id === selectedVersion)?.title}
+                  </h2>
+                  <p className="text-blue-600 font-bold uppercase tracking-widest text-xs mb-6">
+                    {versions.find((v) => v.id === selectedVersion)?.subtitle}
+                  </p>
+                  <p className="text-slate-600 leading-relaxed mb-8">
+                    {
+                      versions.find((v) => v.id === selectedVersion)
+                        ?.description
+                    }
+                  </p>
+                  <div className="w-full">
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {versions
+                        .find((v) => v.id === selectedVersion)
+                        ?.features.map((f, i) => (
+                          <span
+                            key={i}
+                            className="px-4 py-2 bg-slate-50 text-slate-500 rounded-xl text-xs font-semibold border border-slate-100"
+                          >
+                            {f}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. ADVISOR SECTION - Centered */}
       <section className="bg-slate-50 border-t border-slate-200 py-24">
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-black text-slate-900 mb-2">
+            <h2 className="text-4xl font-black text-slate-900 mb-4">
               Mentorship Board
             </h2>
             <div className="h-1.5 w-24 bg-blue-600 mx-auto rounded-full" />
           </div>
-
-          <div className="flex flex-wrap justify-center gap-10">
+          <div className="flex flex-wrap justify-center gap-10 w-full">
             {advisors.map((advisor) => (
               <AdvisorCard key={advisor.id} data={advisor} />
             ))}
@@ -179,42 +281,40 @@ export default function AboutData() {
   );
 }
 
-// 👤 Development Member Card
 function MemberCard({ data }: { data: CardData }) {
   return (
     <motion.div
       whileHover={{ y: -10 }}
-      className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 flex flex-col items-center text-center transition-all group"
+      className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 flex flex-col items-center text-center transition-all group w-full max-w-[280px]"
     >
-      <div className="relative w-[150px] h-[200px] aspect-square mb-6 rounded-2xl overflow-hidden bg-slate-100 shadow-inner">
+      <div className="relative w-[160px] h-[210px] mb-6 rounded-[2rem] overflow-hidden bg-slate-100 shadow-inner">
         <Image
           src={data.image || "/images/default-avatar.png"}
           alt={data.name_th}
           fill
-          className="object-cover group-hover:scale-110 transition-transform duration-500"
+          className="object-cover group-hover:scale-110 transition-transform duration-700"
         />
       </div>
-      <h3 className="text-lg font-light text-slate-800 mb-1">{data.name_th}</h3>
-      <p className="text-[15px] font-light text-slate-400 uppercase mb-4 tracking-tighter">
+      <h3 className="text-xl font-bold text-slate-800 mb-1">{data.name_th}</h3>
+      <p className="text-[13px] font-bold text-slate-400 uppercase mb-6 tracking-wider">
         {data.name_eng.replace(/[()]/g, "")}
       </p>
-      <div className="mt-auto px-4 py-1.5 bg-blue-50 text-blue-600 text-[12px] font-light rounded-full uppercase">
+      <div className="mt-auto px-5 py-2 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full uppercase tracking-widest">
         {data.role}
       </div>
     </motion.div>
   );
 }
 
-// 🎓 Advisor Card (The "Authority" Card)
 function AdvisorCard({ data }: { data: CardData }) {
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-2xl flex flex-col md:flex-row items-center gap-8 max-w-2xl w-full"
+      className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-2xl flex flex-col items-center text-center gap-6 max-w-md w-full"
     >
-      <div className="relative w-[160px] h-[220px] shrink-0">
-        <div className="absolute inset-0 bg-blue-600 rounded-3xl translate-x-3 translate-y-3 opacity-10" />
-        <div className="relative w-full h-full rounded-2xl overflow-hidden border-4 border-white shadow-xl">
+      <div className="relative w-[180px] h-[240px] shrink-0">
+        <div className="absolute inset-0 bg-blue-600 rounded-[2.5rem] translate-x-3 translate-y-3 opacity-10" />
+        <div className="relative w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-2xl">
           <Image
             src={data.image || "/images/default-avatar.png"}
             alt={data.name_th}
@@ -223,14 +323,14 @@ function AdvisorCard({ data }: { data: CardData }) {
           />
         </div>
       </div>
-      <div className="flex flex-col text-center md:text-left">
-        <span className="text-blue-600 font-black text-[11px] uppercase tracking-widest mb-2">
+      <div className="flex flex-col items-center">
+        <span className="text-blue-600 font-black text-[10px] uppercase tracking-[0.2em] mb-3">
           Project Advisor
         </span>
-        <h3 className="text-3xl font-black text-slate-900 mb-2 leading-tight">
+        <h3 className="text-2xl font-black text-slate-900 mb-2 leading-tight">
           {data.name_th}
         </h3>
-        <p className="text-sm font-bold text-slate-400 uppercase italic">
+        <p className="text-xs font-bold text-slate-400 uppercase italic tracking-wide">
           {data.name_eng.replace(/[()]/g, "")}
         </p>
       </div>

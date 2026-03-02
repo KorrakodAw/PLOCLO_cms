@@ -137,7 +137,7 @@ export default function CloPloMapping({
 
       // 🟢 FIX: Explicitly cast to Number and handle NaN/undefined
       const rawValue = mappingGrid[key];
-      const weight = rawValue === "" ? 0 : Number(rawValue);
+      const weight = Number(rawValue) || 0;
 
       if (clos.some((c) => c.id === cloId)) {
         // 🟢 FIX: Use parseFloat or Number to ensure mathematical addition
@@ -313,7 +313,7 @@ export default function CloPloMapping({
                             }`}
                           >
                             <input
-                              type="number"
+                              type="text"
                               min="0"
                               max="100"
                               className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all 

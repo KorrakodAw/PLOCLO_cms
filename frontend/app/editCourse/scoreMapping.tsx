@@ -430,7 +430,7 @@ export default function ScoreMapping({
                           }`}
                         >
                           <input
-                            type="number"
+                            type="text"
                             min="0"
                             max={assign.maxScore}
                             className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent font-medium 
