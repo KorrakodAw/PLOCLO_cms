@@ -401,6 +401,31 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
 }*/
 
 /////////////////////////////////////////////////////////////////////////
+// แปลง cloStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
+/////////////////////////////////////////////////////////////////////////
+
+export async function getCloStatsPercentagePerCourse(tx: any, courseId: number) {
+  const { cloStats } = await getCloStatsPerCourse(tx, courseId);
+
+  const cloStatsPercentage = cloStats.map((stat) => {
+    const highest = stat.highestPossible || 1; // กัน division by zero
+
+    const toPercent = (value: number) => (value / highest) * 100;
+
+    return {
+      cloCode: stat.cloCode,
+      min: toPercent(stat.min),
+      max: toPercent(stat.max),
+      mean: toPercent(stat.mean),
+      median: toPercent(stat.median),
+      highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
+    };
+  });
+
+  return { cloStatsPercentage };
+}
+
+/////////////////////////////////////////////////////////////////////////
 // สรุปจำนวน student ต่อเกรด + ค่าเฉลี่ย CLO ต่อเกรด + ค่าเฉลี่ยรวม
 /////////////////////////////////////////////////////////////////////////
 export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
@@ -776,6 +801,31 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
   });
 
   return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// แปลง realScoreStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
+/////////////////////////////////////////////////////////////////////////
+
+export async function getRealScoreStatsPercentagePerCourse(tx: any, courseId: number) {
+  const { categoryStats } = await getRealScoreStatsPerCourse(tx, courseId);
+
+  const categoryStatsPercentage = categoryStats.map((stat) => {
+    const highest = stat.highestPossible || 1; // กัน division by zero
+
+    const toPercent = (value: number) => (value / highest) * 100;
+
+    return {
+      category: stat.category,
+      min: toPercent(stat.min),
+      max: toPercent(stat.max),
+      mean: toPercent(stat.mean),
+      median: toPercent(stat.median),
+      highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
+    };
+  });
+
+  return { categoryStatsPercentage };
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -1184,6 +1234,31 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
   return { ploStats: ploStatsWithHighest };
 
   //return { ploStats };
+}
+
+/////////////////////////////////////////////////////////////////////////
+// แปลง ploStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
+/////////////////////////////////////////////////////////////////////////
+
+export async function getPloStatsPercentagePerCourse(tx: any, courseId: number) {
+  const { ploStats } = await getPloStatsPerCourse(tx, courseId);
+
+  const ploStatsPercentage = ploStats.map((stat) => {
+    const highest = stat.highestPossible || 1; // กัน division by zero
+
+    const toPercent = (value: number) => (value / highest) * 100;
+
+    return {
+      ploCode: stat.ploCode,
+      min: toPercent(stat.min),
+      max: toPercent(stat.max),
+      mean: toPercent(stat.mean),
+      median: toPercent(stat.median),
+      highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
+    };
+  });
+
+  return { ploStatsPercentage };
 }
 
 /////////////////////////////////////////////////////////////
