@@ -348,7 +348,7 @@ export async function getCloScoreAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของ clo แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////////////////
 
 export async function getCloStatsPerCourse(tx: any, courseId: number) {
@@ -371,11 +371,21 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     const cloStatsBase = Object.entries(cloGroups).map(([cloCode, scores]) => {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
-      const mean =
-        scores.length > 0
-          ? scores.reduce((sum, s) => sum + s, 0) / scores.length
-          : 0;
-      return { cloCode, min, max, mean };
+      const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+
+      // --- คำนวณ median ---
+      let median = 0;
+      if (scores.length > 0) {
+        const sorted = [...scores].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+          median = (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+          median = sorted[mid];
+        }
+      }
+
+      return { cloCode, min, max, mean, median };
     });
 
     // -----------------------------
@@ -453,6 +463,31 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
 
   return result;
 }*/
+
+/////////////////////////////////////////////////////////////////////////
+// แปลง cloStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
+/////////////////////////////////////////////////////////////////////////
+
+export async function getCloStatsPercentagePerCourse(tx: any, courseId: number) {
+  const { cloStats } = await getCloStatsPerCourse(tx, courseId);
+
+  const cloStatsPercentage = cloStats.map((stat) => {
+    const highest = stat.highestPossible || 1; // กัน division by zero
+
+    const toPercent = (value: number) => (value / highest) * 100;
+
+    return {
+      cloCode: stat.cloCode,
+      min: toPercent(stat.min),
+      max: toPercent(stat.max),
+      mean: toPercent(stat.mean),
+      median: toPercent(stat.median),
+      highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
+    };
+  });
+
+  return { cloStatsPercentage };
+}
 
 /////////////////////////////////////////////////////////////////////////
 // สรุปจำนวน student ต่อเกรด + ค่าเฉลี่ย CLO ต่อเกรด + ค่าเฉลี่ยรวม
@@ -758,7 +793,7 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของแต่ละ category ใน 1 course
 /////////////////////////////////////////////////////////////////////////
 export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
   const result = await prisma.$transaction(async (tx) => {
@@ -781,12 +816,22 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
       ([category, scores]) => {
         const min = Math.min(...scores);
         const max = Math.max(...scores);
-        const mean =
-          scores.length > 0
-            ? scores.reduce((sum, s) => sum + s, 0) / scores.length
-            : 0;
-        return { category, min, max, mean };
-      },
+        const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+
+      // --- คำนวณ median ---
+      let median = 0;
+      if (scores.length > 0) {
+        const sorted = [...scores].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+          median = (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+          median = sorted[mid];
+        }
+      }
+
+        return { category, min, max, mean, median };
+      }
     );
 
     // -----------------------------
@@ -820,6 +865,31 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
   });
 
   return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// แปลง realScoreStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
+/////////////////////////////////////////////////////////////////////////
+
+export async function getRealScoreStatsPercentagePerCourse(tx: any, courseId: number) {
+  const { categoryStats } = await getRealScoreStatsPerCourse(tx, courseId);
+
+  const categoryStatsPercentage = categoryStats.map((stat) => {
+    const highest = stat.highestPossible || 1; // กัน division by zero
+
+    const toPercent = (value: number) => (value / highest) * 100;
+
+    return {
+      category: stat.category,
+      min: toPercent(stat.min),
+      max: toPercent(stat.max),
+      mean: toPercent(stat.mean),
+      median: toPercent(stat.median),
+      highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
+    };
+  });
+
+  return { categoryStatsPercentage };
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -1151,7 +1221,7 @@ export async function getPloProgramWhereScoreComeFrom(
 }
 
 /////////////////////////////////////////////////////////////
-// คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 course
+// คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////
 export async function getPloStatsPerCourse(tx: any, courseId: number) {
   const students = await tx.studentScore.findMany({
@@ -1185,12 +1255,22 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
     ([ploCode, scores]) => {
       const min = Math.min(...scores);
       const max = Math.max(...scores);
-      const mean =
-        scores.length > 0
-          ? scores.reduce((sum, s) => sum + s, 0) / scores.length
-          : 0;
-      return { ploCode, min, max, mean };
-    },
+      const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+
+      // --- คำนวณ median ---
+      let median = 0;
+      if (scores.length > 0) {
+        const sorted = [...scores].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+          median = (sorted[mid - 1] + sorted[mid]) / 2;
+        } else {
+          median = sorted[mid];
+        }
+      }
+
+      return { ploCode, min, max, mean, median };
+    }
   );
 
   // 1) ดึง CLO highestPossible จาก function เดิม
@@ -1234,6 +1314,7 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
     min: Number(stat.min.toFixed(2)),
     max: Number(stat.max.toFixed(2)),
     mean: Number(stat.mean.toFixed(2)),
+    median: Number(stat.median.toFixed(2)),
     highestPossible: Number((highestPloMap[stat.ploCode] ?? 0).toFixed(2)),
   }));
 
@@ -1247,6 +1328,32 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
 
   return { ploStats: ploStatsWithHighest };
 }
+
+/////////////////////////////////////////////////////////////////////////
+// แปลง ploStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
+/////////////////////////////////////////////////////////////////////////
+
+export async function getPloStatsPercentagePerCourse(tx: any, courseId: number) {
+  const { ploStats } = await getPloStatsPerCourse(tx, courseId);
+
+  const ploStatsPercentage = ploStats.map((stat) => {
+    const highest = stat.highestPossible || 1; // กัน division by zero
+
+    const toPercent = (value: number) => (value / highest) * 100;
+
+    return {
+      ploCode: stat.ploCode,
+      min: toPercent(stat.min),
+      max: toPercent(stat.max),
+      mean: toPercent(stat.mean),
+      median: toPercent(stat.median),
+      highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
+    };
+  });
+
+  return { ploStatsPercentage };
+}
+
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 program
 /////////////////////////////////////////////////////////////

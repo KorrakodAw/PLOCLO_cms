@@ -20,6 +20,7 @@ interface PerformanceBalanceChartProps {
   allAvgKey?: string; // e.g., "mean"
   maxScorePosKey: string; // e.g., "maxCloScore"
   balanceData?: any[];
+  midScoreKey?: string; // e.g., "median"
 }
 
 export const PerformanceBalanceChart = ({
@@ -31,6 +32,7 @@ export const PerformanceBalanceChart = ({
   maxScoreKey,
   maxScorePosKey,
   minScoreKey,
+  midScoreKey,
   allAvgKey,
 }: PerformanceBalanceChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
@@ -128,7 +130,16 @@ export const PerformanceBalanceChart = ({
             strokeWidth={2}
           />
         )}
-
+        {visibleLines?.midScore && midScoreKey && (
+          <Radar
+            name="Median Score"
+            dataKey={midScoreKey} // Maps to "median"
+            stroke="#f59e0b"
+            fill="#f59e0b"
+            fillOpacity={0.2}
+            strokeWidth={2}
+          />
+        )}
         {/* Individual Grade Radars */}
         {uniqueGrades.map(
           (grade) =>

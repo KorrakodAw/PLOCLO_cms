@@ -21,6 +21,7 @@ interface PerformanceTrendChartProps {
   minScoreKey?: string;
   allAvgKey?: string;
   maxScorePosKey: string;
+  midScoreKey?: string;
 }
 
 export const PerformanceTrendChart = ({
@@ -32,6 +33,7 @@ export const PerformanceTrendChart = ({
   maxScoreKey,
   maxScorePosKey,
   minScoreKey,
+  midScoreKey,
   allAvgKey,
 }: PerformanceTrendChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
@@ -138,6 +140,16 @@ export const PerformanceTrendChart = ({
             stroke="#6366f1"
             strokeWidth={4}
             dot={{ r: 6, fill: "#6366f1" }}
+          />
+        )}
+        {visibleLines?.midScore && (
+          <Line
+            type="monotone"
+            dataKey={midScoreKey}
+            stroke="#f59e0b"
+            strokeDasharray="3 4 5 2"
+            dot={false}
+            strokeWidth={2}
           />
         )}
         {uniqueGrades.map(

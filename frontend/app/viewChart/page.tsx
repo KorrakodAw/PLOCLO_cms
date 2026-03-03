@@ -10,7 +10,7 @@ import {
   FaCamera,
   FaFileExcel,
 } from "react-icons/fa";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 import * as XLSX from "xlsx";
 import DropdownSelect from "@/components/DropdownSelect";
 import { apiClient } from "@/utils/apiClient";
@@ -72,51 +72,70 @@ export default function PLOChart() {
     maxScore: true,
     minScore: true,
     allAvg: true,
+    midScore: true,
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("edit_fix_filters");
+    if (saved && token) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSelections(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved filters:", e);
+      }
+    }
+    setIsHydrated(true);
+  }, [token]);
+
+  useEffect(() => {
+    if (selections.university || selections.faculty || selections.program) {
+      localStorage.setItem("edit_fix_filters", JSON.stringify(selections));
+    }
   });
 
   // 🟢 1. ฟังก์ชัน Capture รูปภาพที่แก้ปัญหา oklch และ Animation
-  // const handleCaptureGraph = async () => {
-  //   if (!graphRef.current) return;
-  //   try {
-  //     setLoading(true);
-  //     // รอให้ UI นิ่ง
-  //     await new Promise((r) => setTimeout(r, 600));
+  const handleCaptureGraph = async () => {
+    if (!graphRef.current) return;
 
-  //     const canvas = await html2canvas(graphRef.current, {
-  //       scale: 2,
-  //       useCORS: true,
-  //       backgroundColor: "#ffffff",
-  //       width: graphRef.current.offsetWidth,
-  //       height: graphRef.current.offsetHeight,
-  //       onclone: (clonedDoc) => {
-  //         const el = clonedDoc.getElementById("analytics-graph-container");
-  //         if (el) {
-  //           el.style.backgroundColor = "#ffffff";
-  //           // แก้ไขปัญหา oklch โดยบังคับสีมาตรฐาน
-  //           const all = el.querySelectorAll("*");
-  //           all.forEach((c: any) => {
-  //             const style = window.getComputedStyle(c);
-  //             if (style.backgroundColor.includes("oklch"))
-  //               c.style.backgroundColor = "#ffffff";
-  //             if (style.color.includes("oklch")) c.style.color = "#171717";
-  //             if (style.borderColor.includes("oklch"))
-  //               c.style.borderColor = "#e2e8f0";
-  //           });
-  //         }
-  //       },
-  //     });
+    try {
+      setLoading(true);
+      // 🟢 รอให้ Animation ของกราฟนิ่งสนิท
+      await new Promise((r) => setTimeout(r, 800));
 
-  //     const link = document.createElement("a");
-  //     link.download = `Performance_Analysis_${new Date().getTime()}.png`;
-  //     link.href = canvas.toDataURL("image/png");
-  //     link.click();
-  //     showToast("บันทึกรูปภาพสำเร็จ!", "success");
-  //   } catch (e) {
-  //     showToast("ไม่สามารถบันทึกภาพได้", "error");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+      // 🟢 กำหนด Filter เพื่อเอาปุ่มและขอบที่ไม่ต้องการออก
+      const dataUrl = await toPng(graphRef.current, {
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+        style: {
+          borderRadius: "0",
+          padding: "20px",
+        },
+        // 🟢 กรองเฉพาะสิ่งที่ต้องการ: เก็บเฉพาะกราฟและคำอธิบาย (Legend)
+        filter: (node) => {
+          const exclusionClasses = ["button", "toggle-btn", "no-export"];
+          if (node.classList) {
+            return !exclusionClasses.some((cls) =>
+              node.classList.contains(cls),
+            );
+          }
+          return true;
+        },
+      });
+
+      const link = document.createElement("a");
+      link.download = `CLO_Analysis_${new Date().getTime()}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      showToast("บันทึกรูปภาพสำเร็จ!", "success");
+    } catch (error) {
+      console.error("Capture Error:", error);
+      showToast("ไม่สามารถบันทึกภาพได้", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 🟢 2. ฟังก์ชัน Export Excel รวมทุก Sheet
   const handleExportAllExcel = () => {
@@ -142,7 +161,7 @@ export default function PLOChart() {
         `Academic_Report_${new Date().getFullYear()}.xlsx`,
       );
       showToast("Exported all data to Excel!", "success");
-    } catch (e) {
+    } catch {
       showToast("Export failed", "error");
     }
   };
@@ -451,6 +470,10 @@ export default function PLOChart() {
       .finally(() => setLoading(false));
   }, [selections.courseId, token]);
 
+  useEffect(() => {
+    console.log(cloBalanceData);
+  }, [cloBalanceData]);
+
   const metricConfig = {
     CLO: {
       title: "CLO Analysis",
@@ -460,6 +483,7 @@ export default function PLOChart() {
       avg: "mean",
       max: "max",
       min: "min",
+      med: "median",
     },
     PLO: {
       title: "PLO Analysis",
@@ -469,6 +493,7 @@ export default function PLOChart() {
       avg: "mean",
       max: "max",
       min: "min",
+      med: "median",
     },
     Ass: {
       title: "Assignment Analysis",
@@ -478,6 +503,7 @@ export default function PLOChart() {
       avg: "mean",
       max: "max",
       min: "min",
+      med: "median",
     },
   };
 
@@ -519,12 +545,12 @@ export default function PLOChart() {
                 >
                   <FaFileExcel className="text-sm" /> Export Report (All Sheets)
                 </button>
-                {/* <button
+                <button
                   onClick={handleCaptureGraph}
                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-2xl shadow-lg transition-all active:scale-95"
                 >
                   <FaCamera className="text-sm" /> Save Chart Image
-                </button> */}
+                </button>
               </div>
             )}
           </div>
@@ -702,6 +728,14 @@ export default function PLOChart() {
                   }
                   color="#6366f1"
                 />
+                <ToggleButton
+                  label="Median"
+                  active={visibleLines.midScore}
+                  onClick={() =>
+                    setVisibleLines((p) => ({ ...p, midScore: !p.midScore }))
+                  }
+                  color="#f59e0b"
+                />
                 <div className="h-6 w-px bg-slate-200 mx-2" />
                 <div className="flex flex-wrap gap-2">
                   {gradeGroupStats.map((item: any) => (
@@ -738,6 +772,7 @@ export default function PLOChart() {
                     maxScoreKey={metricConfig[activeMetric].max}
                     minScoreKey={metricConfig[activeMetric].min}
                     allAvgKey={metricConfig[activeMetric].avg}
+                    midScoreKey={metricConfig[activeMetric].med}
                     visibleLines={visibleLines}
                   />
                 ) : (
@@ -749,6 +784,7 @@ export default function PLOChart() {
                     maxScoreKey={metricConfig[activeMetric].max}
                     minScoreKey={metricConfig[activeMetric].min}
                     allAvgKey={metricConfig[activeMetric].avg}
+                    midScoreKey={metricConfig[activeMetric].med}
                     visibleLines={visibleLines}
                     getGradeColor={getGradeColor}
                   />

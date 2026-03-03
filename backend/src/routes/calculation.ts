@@ -8,12 +8,14 @@ import {
   getCloScorePerCourse,
   getCloScoreAllStudentPerCourse,
   getCloStatsPerCourse,
+  getCloStatsPercentagePerCourse,
   getCloGradeSummaryPerCourse,
   getRealScorePerStudentPerCourse,
   getRealScoreAllStudentPerCourse,
   getTotalScoreAndGradePerStudentPerCourse,
   getTotalScoreAndGradeAllStudentPerCourse,
   getRealScoreStatsPerCourse,
+  getRealScoreStatsPercentagePerCourse,
   getGradeSummaryPerCourse,
   getPloScorePerStudentPerCourse,
   getPloScorePerCourse,
@@ -22,6 +24,7 @@ import {
   getPloScorePerStudentFromAllCourse,
   getPloProgramWhereScoreComeFrom,
   getPloStatsPerCourse,
+  getPloStatsPercentagePerCourse,
   getPloStatsPerProgram,
   getCloBestWorstPerStudentPerCourse,
   getCloBestWorstPerCourse,
@@ -104,7 +107,7 @@ router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของ clo แต่ละตัว ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของ clo แต่ละตัว ใน 1 course
 // GET http://localhost:9771/api/calculation/ass-clo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
@@ -113,6 +116,25 @@ router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
       return await getCloStatsPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// แปลง cloStats ให้เป็นเปอร์เซ็นต์
+// GET http://localhost:9771/api/calculation/ass-clo/course/stats/percentage?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/ass-clo/course/stats/percentage", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getCloStatsPercentagePerCourse(tx, Number(courseId));
     });
 
     res.json(resultCloPerStudent);
@@ -199,7 +221,7 @@ router.get(
 );
 
 /////////////////////////////////////////////////////////////////////////
-// คำนวณ min, max, mean, highestPossible ของแต่ละ category ใน 1 course
+// คำนวณ min, max, mean, median, highestPossible ของแต่ละ category ใน 1 course
 // GET http://localhost:9771/api/calculation/realScoreAndGrade/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
@@ -208,6 +230,25 @@ router.get("/realScoreAndGrade/stats", authenticateToken, async (req, res) => {
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
       return await getRealScoreStatsPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// แปลง realScoreStats ให้เป็นเปอร์เซ็นต์
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/stats/percentage?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/realScoreAndGrade/stats/percentage", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getRealScoreStatsPercentagePerCourse(tx, Number(courseId));
     });
 
     res.json(resultCloPerStudent);
@@ -366,7 +407,7 @@ router.get("/clo-plo/wherePloComeFrom", authenticateToken, async (req, res) => {
 });
 
 /////////////////////////////////////////////////////////////
-// คำนวณ Min, Max, Mean, highestPossible ของ PLO แต่ละตัว ใน 1 course
+// คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
 // GET http://localhost:9771/api/calculation/clo-plo/course/stats?courseId=ไอดีวิชา
 // Test result: OK
 /////////////////////////////////////////////////////////////
@@ -375,6 +416,25 @@ router.get("/clo-plo/course/stats", authenticateToken, async (req, res) => {
   try {
     const resultCloStudent = await prisma.$transaction(async (tx) => {
       return await getPloStatsPerCourse(tx, Number(courseId));
+    });
+
+    res.json(resultCloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////
+// แปลง ploStats ให้เป็นเปอร์เซ็นต์ 
+// GET http://localhost:9771/api/calculation/clo-plo/course/stats/percentage?courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/course/stats/percentage", authenticateToken, async (req, res) => {
+  const { courseId } = req.query;
+  try {
+    const resultCloStudent = await prisma.$transaction(async (tx) => {
+      return await getPloStatsPercentagePerCourse(tx, Number(courseId));
     });
 
     res.json(resultCloStudent);
