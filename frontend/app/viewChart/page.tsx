@@ -24,6 +24,7 @@ import { getUniversities, University } from "@/utils/universityApi";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useTranslation } from "react-i18next";
 
+
 export default function PLOChart() {
   const { token, user } = useAuth();
   const { showToast, ToastElement } = useToast();
@@ -304,6 +305,10 @@ export default function PLOChart() {
       );
   }, [studentCourseAssScoreData, ploStudentData, cloStudentData]);
 
+  useEffect(() => {
+    console.log(gradeGroupStats);
+  });
+
   // --- API & Effects (ส่วนที่เหลือคงเดิมตามความต้องการของคุณ) ---
   useEffect(() => {
     if (!token) return;
@@ -434,6 +439,11 @@ export default function PLOChart() {
       .then((res) => setStudents(res.data || []));
   }, [selections.year, token, isHydrated, lang]);
 
+  const [cloPersentageData, setCloPercentageData] = useState<any>(null);
+  const [assignmentPersentageData, setAssignmentPercentageData] =
+    useState<any>(null);
+  const [ploPersentageData, setPloPercentageData] = useState<any>(null);
+
   useEffect(() => {
     if (!selections.courseId) return;
     setLoading(true);
@@ -458,21 +468,77 @@ export default function PLOChart() {
         params,
         headers,
       }),
+      apiClient.get("/calculation/ass-clo/course/stats/percentage", {
+        params,
+        headers,
+      }),
+      apiClient.get("/calculation/realScoreAndGrade/stats/percentage", {
+        params,
+        headers,
+      }),
+      apiClient.get("/calculation/clo-plo/course/stats/percentage", {
+        params,
+        headers,
+      }),
     ])
-      .then(([ploS, cloAll, cloB, ploB, realG, assignmentStats]) => {
-        setPloStudentData(ploS.data);
-        setCloStudentData(cloAll.data);
-        setCloBalanceData(cloB.data);
-        setPloBalanceData(ploB.data);
-        setStudentCourseAssScoreData(realG.data.studentResults || []);
-        setAssignmentBalanceData(assignmentStats.data);
-      })
+      .then(
+        ([
+          ploS,
+          cloAll,
+          cloB,
+          ploB,
+          realG,
+          assignmentStats,
+          cloPersentage,
+          assignmentPersentage,
+          ploPersentage,
+        ]) => {
+          setPloStudentData(ploS.data);
+          setCloStudentData(cloAll.data);
+          setCloBalanceData(cloB.data);
+          setPloBalanceData(ploB.data);
+          setStudentCourseAssScoreData(realG.data.studentResults || []);
+          setAssignmentBalanceData(assignmentStats.data);
+          setCloPercentageData(cloPersentage.data);
+          setAssignmentPercentageData(assignmentPersentage.data);
+          setPloPercentageData(ploPersentage.data);
+        },
+      )
       .finally(() => setLoading(false));
   }, [selections.courseId, token]);
 
-  useEffect(() => {
-    console.log(cloBalanceData);
-  }, [cloBalanceData]);
+  const metricBalanceConfig = {
+    CLO: {
+      title: "CLO Balance",
+      trendData: cloPersentageData?.cloStatsPercentage || [],
+      xAxis: "cloCode",
+      maxPos: "highestPossible",
+      avg: "mean",
+      max: "max",
+      min: "min",
+      med: "median",
+    },
+    PLO: {
+      title: "PLO Balance",
+      trendData: ploPersentageData?.ploStatsPercentage || [],
+      xAxis: "ploCode",
+      maxPos: "highestPossible",
+      avg: "mean",
+      max: "max",
+      min: "min",
+      med: "median",
+    },
+    Ass: {
+      title: "Assignment Balance",
+      trendData: assignmentPersentageData?.categoryStatsPercentage || [],
+      xAxis: "category",
+      maxPos: "highestPossible",
+      avg: "mean",
+      max: "max",
+      min: "min",
+      med: "median",
+    },
+  };
 
   const metricConfig = {
     CLO: {
@@ -506,6 +572,9 @@ export default function PLOChart() {
       med: "median",
     },
   };
+
+  const [isPercentage, setIsPercentage] = useState(false);
+  const currentConfig = isPercentage ? metricBalanceConfig : metricConfig;
 
   const getGradeColor = (g: string) =>
     ({
@@ -673,39 +742,79 @@ export default function PLOChart() {
               id="analytics-graph-container"
               className="bg-white border border-slate-200 rounded-[2.5rem] shadow-xl overflow-hidden flex flex-col"
             >
-              <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-white">
+              <div className="px-10 py-6 border-b border-slate-50 flex flex-col lg:flex-row items-center justify-between gap-6 bg-white">
+                {/* ส่วนหัวข้อ (Title Section) */}
                 <div className="flex items-center gap-4">
-                  <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600">
+                  <div className="bg-indigo-600 p-3.5 rounded-[1.25rem] text-white shadow-lg shadow-indigo-100">
                     <FaThLarge className="text-xl" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-800">
+                    <h3 className="text-xl font-black text-slate-900 leading-tight">
                       {metricConfig[activeMetric].title}
                     </h3>
-                    <p className="text-xs text-slate-400">
-                      Class Performance Overview
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] mt-1">
+                      Performance Analysis Mode
                     </p>
                   </div>
                 </div>
-                <div className="flex bg-slate-100 p-1 rounded-xl">
-                  <button
-                    onClick={() => setActiveTab("line")}
-                    className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === "line" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400"}`}
-                  >
-                    Trend
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("radar")}
-                    className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === "radar" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400"}`}
-                  >
-                    Balance
-                  </button>
+
+                {/* ส่วนควบคุม (Control Toolbar) */}
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                  {/* 1. Toggle Data Source (Real vs Percent) */}
+                  <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner">
+                    <button
+                      onClick={() => setIsPercentage(false)}
+                      className={`px-5 py-2 rounded-xl text-[10px] font-black transition-all duration-300 ${
+                        !isPercentage
+                          ? "bg-white text-blue-600 shadow-md scale-105"
+                          : "text-slate-400 hover:text-slate-600"
+                      }`}
+                    >
+                      REAL SCORE
+                    </button>
+                    <button
+                      onClick={() => setIsPercentage(true)}
+                      className={`px-5 py-2 rounded-xl text-[10px] font-black transition-all duration-300 ${
+                        isPercentage
+                          ? "bg-white text-blue-600 shadow-md scale-105"
+                          : "text-slate-400 hover:text-slate-600"
+                      }`}
+                    >
+                      PERCENT (%)
+                    </button>
+                  </div>
+
+                  <div className="h-8 w-px bg-slate-200 hidden md:block" />
+
+                  {/* 2. Toggle Chart Type (Trend vs Balance) */}
+                  <div className="bg-slate-900 p-1 rounded-2xl flex items-center shadow-lg">
+                    <button
+                      onClick={() => setActiveTab("line")}
+                      className={`px-5 py-2 rounded-xl text-[10px] font-black transition-all duration-300 ${
+                        activeTab === "line"
+                          ? "bg-blue-600 text-white shadow-lg"
+                          : "text-slate-500 hover:text-slate-300"
+                      }`}
+                    >
+                      TREND VIEW
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("radar")}
+                      className={`px-5 py-2 rounded-xl text-[10px] font-black transition-all duration-300 ${
+                        activeTab === "radar"
+                          ? "bg-blue-600 text-white shadow-lg"
+                          : "text-slate-500 hover:text-slate-300"
+                      }`}
+                    >
+                      BALANCE VIEW
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <div className="px-8 py-5 flex flex-wrap gap-4 items-center bg-slate-50/30">
                 <ToggleButton
-                  label="Max Possible"
+                  label="Max"
                   active={visibleLines.maxScore}
                   onClick={() =>
                     setVisibleLines((p) => ({ ...p, maxScore: !p.maxScore }))
@@ -761,30 +870,31 @@ export default function PLOChart() {
                 </div>
               </div>
 
-              <div className="p-10 h-[550px] bg-white">
+              <div className="p-10 h-[550px] bg-white border border-slate-100 rounded-[3rem] shadow-xl shadow-slate-200/50">
                 {activeTab === "line" ? (
                   <PerformanceTrendChart
-                    chartData={metricConfig[activeMetric].trendData}
+                    // 🟢 ดึงข้อมูลจาก Config ที่เลือกอยู่ (Config หรือ BalanceConfig)
+                    chartData={currentConfig[activeMetric].trendData}
                     balanceData={gradeGroupStats}
                     getGradeColor={getGradeColor}
-                    xAxisKey={metricConfig[activeMetric].xAxis}
-                    maxScorePosKey={metricConfig[activeMetric].maxPos}
-                    maxScoreKey={metricConfig[activeMetric].max}
-                    minScoreKey={metricConfig[activeMetric].min}
-                    allAvgKey={metricConfig[activeMetric].avg}
-                    midScoreKey={metricConfig[activeMetric].med}
+                    xAxisKey={currentConfig[activeMetric].xAxis}
+                    maxScorePosKey={currentConfig[activeMetric].maxPos}
+                    maxScoreKey={currentConfig[activeMetric].max}
+                    minScoreKey={currentConfig[activeMetric].min}
+                    allAvgKey={currentConfig[activeMetric].avg}
+                    midScoreKey={currentConfig[activeMetric].med}
                     visibleLines={visibleLines}
                   />
                 ) : (
                   <PerformanceBalanceChart
-                    chartData={metricConfig[activeMetric].trendData}
+                    chartData={currentConfig[activeMetric].trendData}
                     balanceData={gradeGroupStats}
-                    xAxisKey={metricConfig[activeMetric].xAxis}
-                    maxScorePosKey={metricConfig[activeMetric].maxPos}
-                    maxScoreKey={metricConfig[activeMetric].max}
-                    minScoreKey={metricConfig[activeMetric].min}
-                    allAvgKey={metricConfig[activeMetric].avg}
-                    midScoreKey={metricConfig[activeMetric].med}
+                    xAxisKey={currentConfig[activeMetric].xAxis}
+                    maxScorePosKey={currentConfig[activeMetric].maxPos}
+                    maxScoreKey={currentConfig[activeMetric].max}
+                    minScoreKey={currentConfig[activeMetric].min}
+                    allAvgKey={currentConfig[activeMetric].avg}
+                    midScoreKey={currentConfig[activeMetric].med}
                     visibleLines={visibleLines}
                     getGradeColor={getGradeColor}
                   />
@@ -814,8 +924,8 @@ export default function PLOChart() {
                       : [
                           { header: "Code", accessor: "Code" },
                           { header: "Name", accessor: "Name" },
-                          { header: "Total", accessor: "Total" },
-                          { header: "Grade", accessor: "Grade" },
+                          // { header: "Total", accessor: "Total" },
+                          // { header: "Grade", accessor: "Grade" },
                           ...Object.keys(flattenedAssTableData[0] || {})
                             .filter(
                               (k) =>

@@ -93,7 +93,7 @@ export default function AboutData() {
       name_th: "ธนวัฒน์ สุภสมบัติโอฬาร",
       name_eng: "(THANAWAT SUPASOMBATIO-LARN)",
       role: "Research",
-      image: "/images/kittaya.png",
+      image: "/images/profile/thanawat.jpg",
     },
   ];
 
