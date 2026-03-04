@@ -291,6 +291,75 @@ export async function getCloScoreAllStudentPerCourse(
 }
 
 /////////////////////////////////////////////////////////////////////////
+// คำนวณ clo ของนักเรียนแต่ละคนออกมาเป็น percentage เทียบกับ highestPossible
+/////////////////////////////////////////////////////////////////////////
+export async function getCloPercentageAllStudentPerCourse(
+  tx: any,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1) ดึง cloScore ของนักเรียนแต่ละคน
+    const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
+    const cloScoresPerStudent = perStudent.cloScoresPerStudent;
+
+    // 2) ดึง highestPossible ของแต่ละ CLO
+    const assignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) },
+      select: {
+        weight: true,
+        assignment_clo_mappings: {
+          select: {
+            clo: { select: { code: true } },
+            weight: true,
+          },
+        },
+      },
+    });
+
+    const highestCloMap: Record<string, number> = {};
+    assignments.forEach((assignment) => {
+      assignment.assignment_clo_mappings.forEach((mapping) => {
+        const cloCode = mapping.clo.code;
+        const contribution =
+          Number(assignment.weight) * (Number(mapping.weight) / 100);
+        if (!highestCloMap[cloCode]) highestCloMap[cloCode] = 0;
+        highestCloMap[cloCode] += contribution;
+      });
+    });
+
+    // 3) คำนวณ cloScore เป็น percentage ต่อ student ต่อ clo
+    const results: {
+      student_id: number;
+      cloPercentages: { cloCode: string; percentage: number }[];
+    }[] = [];
+
+    cloScoresPerStudent.forEach((student) => {
+      const cloPercentages: { cloCode: string; percentage: number }[] = [];
+
+      student.cloScores.forEach((clo) => {
+        const highest = highestCloMap[clo.cloCode] ?? 0;
+        const percentage =
+          highest > 0 ? (clo.cloScore / highest) * 100 : 0;
+
+        cloPercentages.push({
+          cloCode: clo.cloCode,
+          percentage,
+        });
+      });
+
+      results.push({
+        student_id: student.student_id,
+        cloPercentages,
+      });
+    });
+
+    return { cloPercentagePerStudent: results };
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
 // คำนวณ min, max, mean, median, highestPossible ของ clo แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////////////////
 
@@ -627,6 +696,67 @@ export async function getRealScoreAllStudentPerCourse(
     });
 
     return { realScoresPerStudent: results };
+  });
+
+  return result;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ realScore ของนักเรียนแต่ละคนออกมาเป็น percentage เทียบกับ highestPossible ต่อ category
+/////////////////////////////////////////////////////////////////////////
+export async function getRealScorePercentageAllStudentPerCourse(
+  tx: any,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1) ดึง realScore ของนักเรียนแต่ละคน
+    const perStudent = await getRealScoreAllStudentPerCourse(tx, courseId);
+    const realScoresPerStudent = perStudent.realScoresPerStudent;
+
+    // 2) ดึง highestPossible ต่อ category
+    const assignments = await tx.assignment.findMany({
+      where: { course_id: Number(courseId) },
+      select: {
+        weight: true,
+        category: true,
+      },
+    });
+
+    const highestCategoryMap: Record<string, number> = {};
+    assignments.forEach((assignment) => {
+      const category = assignment.category;
+      const contribution = Number(assignment.weight);
+      if (!highestCategoryMap[category]) highestCategoryMap[category] = 0;
+      highestCategoryMap[category] += contribution;
+    });
+
+    // 3) คำนวณ realScore เป็น percentage ต่อ student ต่อ category
+    const results: {
+      student_id: number;
+      categoryPercentages: { category: string; percentage: number }[];
+    }[] = [];
+
+    realScoresPerStudent.forEach((student) => {
+      const categoryPercentages: { category: string; percentage: number }[] = [];
+
+      student.categoryScores.forEach((cat) => {
+        const highest = highestCategoryMap[cat.category] ?? 0;
+        const percentage =
+          highest > 0 ? (cat.realScore / highest) * 100 : 0;
+
+        categoryPercentages.push({
+          category: cat.category,
+          percentage,
+        });
+      });
+
+      results.push({
+        student_id: student.student_id,
+        categoryPercentages,
+      });
+    });
+
+    return { realScorePercentagePerStudent: results };
   });
 
   return result;
@@ -1012,6 +1142,56 @@ export async function getPloScoreAllStudentPerCourse(
   }
 
   return results;
+}
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ PLO ของนักเรียนแต่ละคนออกมาเป็น percentage เทียบกับ highestPossible
+/////////////////////////////////////////////////////////////////////////
+export async function getPloPercentageAllStudentPerCourse(
+  tx: any,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1) ดึงคะแนน PLO ของนักเรียนแต่ละคน
+    const perStudent = await getPloScoreAllStudentPerCourse(tx, courseId);
+
+    // 2) ดึงค่า highestPossible ของแต่ละ PLO
+    const { ploStats } = await getPloStatsPerCourse(tx, courseId);
+    const highestPloMap: Record<string, number> = {};
+    ploStats.forEach((stat) => {
+      highestPloMap[stat.ploCode] = stat.highestPossible;
+    });
+
+    // 3) คำนวณเปอร์เซ็นต์ต่อ student ต่อ PLO
+    const results: {
+      studentId: number;
+      ploPercentages: { ploCode: string; percentage: number }[];
+    }[] = [];
+
+    perStudent.forEach((student) => {
+      const ploPercentages: { ploCode: string; percentage: number }[] = [];
+
+      student.ploScores.forEach((plo) => {
+        const highest = highestPloMap[plo.ploCode] ?? 0;
+        const percentage =
+          highest > 0 ? (plo.ploScore / highest) * 100 : 0;
+
+        ploPercentages.push({
+          ploCode: plo.ploCode,
+          percentage,
+        });
+      });
+
+      results.push({
+        studentId: student.studentId,
+        ploPercentages,
+      });
+    });
+
+    return { ploPercentagePerStudent: results };
+  });
+
+  return result;
 }
 
 /////////////////////////////////////////////////////////////////////////
