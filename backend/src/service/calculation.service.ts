@@ -1258,7 +1258,7 @@ export async function getPloPercentageAllStudentPerCourse(
       });
 
       results.push({
-        studentId: student.studentId,
+        studentId: student.student_id,
         ploPercentages,
       });
     });

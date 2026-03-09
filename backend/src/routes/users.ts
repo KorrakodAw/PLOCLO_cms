@@ -231,63 +231,11 @@ router.get("/:id", authenticateToken, async (req: AuthRequest, res) => {
   res.json(result.rows[0]);
 });
 
-// Update user by ID
-// ยุบรวม PATCH /:id และเพิ่มการรองรับ Google User (password เป็น null)
-router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
-  const { id } = req.params;
-  const { username, email, role, password } = req.body;
-  const requester = req.user;
-
-  try {
-    // 🔒 1. สิทธิ์การเปลี่ยน Role (เฉพาะ Admin)
-    if (
-      role &&
-      requester?.role !== "system_admin " &&
-      requester?.role !== "Super_admin"
-    ) {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: only admin can change roles" });
-    }
-
-    // 🔍 2. ค้นหา User เดิม
-    const userQuery = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
-    if (userQuery.rows.length === 0)
-      return res.status(404).json({ error: "User not found" });
-    const current = userQuery.rows[0];
-
-    // 🔐 3. จัดการรหัสผ่าน (ข้ามถ้าเป็น Google User หรือไม่ได้ส่ง pass มา)
-    let hashedPassword = current.password_hash;
-    if (password) {
-      hashedPassword = await bcrypt.hash(password, 10);
-    }
-
-    // ✅ 4. อัปเดตข้อมูลแบบ Dynamic
-    const result = await pool.query(
-      `UPDATE users 
-       SET username=$1, email=$2, password_hash=$3, role=$4 
-       WHERE id=$5 
-       RETURNING id, username, email, role, created_at`,
-      [
-        username || current.username,
-        email || current.email,
-        hashedPassword, // จะเป็นค่าเดิม, ค่าใหม่ หรือ null (กรณี Google User)
-        role || current.role,
-        id,
-      ],
-    );
-
-    res.json({ message: "User updated successfully", user: result.rows[0] });
-  } catch (err: any) {
-    res.status(500).json({ error: "Database error" });
-  }
-});
-
 // instructor และ admin ใช้ได้
 router.get(
   "/users",
   authenticateToken,
-  authorizeRoles("admin", "instructor"),
+  authorizeRoles("Super_admin", "system_admin", "instructor"),
   (req, res) => {
     res.json({ message: "Welcome instructor/admin" });
   },
@@ -305,43 +253,43 @@ router.delete("/:id", authenticateToken, async (req: AuthRequest, res) => {
   res.json({ message: `User deleted: ${result.rows[0].username}` });
 });
 
-// ===== EDIT USER INFO (email, username, role) =====
+// Update user by ID
 router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const { username, email, role } = req.body;
+  const { username, email, role, password } = req.body;
   const requester = req.user;
+  const allowedRoles = ["Super_admin", "system_admin"];
 
   try {
-    // 🔒 Only admins can change roles
-    if (role && requester?.role !== "admin") {
-      return res
-        .status(403)
-        .json({ error: "Forbidden: only admin can change roles" });
+    // 1. 🔒 Permission Check: เฉพาะ Admin เท่านั้นที่เข้าถึงได้
+    if (!allowedRoles.includes(requester?.role)) {
+      return res.status(403).json({ message: "Forbidden: Admins only" });
     }
 
-    // ✅ Check if user exists
-    const existingUser = await pool.query("SELECT * FROM users WHERE id=$1", [
-      id,
-    ]);
-    if (existingUser.rows.length === 0)
+    // 2. 🔍 ค้นหาข้อมูลเดิมจาก Database
+    const userQuery = await pool.query("SELECT * FROM users WHERE id=$1", [id]);
+    if (userQuery.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
+    }
+    const current = userQuery.rows[0];
 
-    const current = existingUser.rows[0];
+    // 3. 🔐 จัดการรหัสผ่าน (ถ้ามีการส่ง password มาให้ทำการ Hash ใหม่)
+    let hashedPassword = current.password_hash;
+    if (password && password.trim() !== "") {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
 
-    // ✅ Update the provided fields only
+    // 4. ✅ อัปเดตข้อมูลแบบ Dynamic
+    // ใช้ค่าใหม่ถ้าส่งมา (||) ถ้าไม่ส่งมาให้ใช้ค่าเดิมจาก 'current'
     const result = await pool.query(
-      `
-      UPDATE users
-      SET
-        username = $1,
-        email = $2,
-        role = $3
-      WHERE id = $4
-      RETURNING id, username, email, role, created_at
-      `,
+      `UPDATE users 
+       SET username=$1, email=$2, password_hash=$3, role=$4 
+       WHERE id=$5 
+       RETURNING id, username, email, role, created_at`,
       [
         username || current.username,
         email || current.email,
+        hashedPassword,
         role || current.role,
         id,
       ],
@@ -352,8 +300,8 @@ router.patch("/:id", authenticateToken, async (req: AuthRequest, res) => {
       user: result.rows[0],
     });
   } catch (err: any) {
-    console.error("Error updating user:", err);
-    res.status(500).json({ error: "Database error" });
+    console.error("Error at PATCH /users/:id:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

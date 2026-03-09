@@ -21,6 +21,7 @@ interface PerformanceBalanceChartProps {
   maxScorePosKey: string; // e.g., "maxCloScore"
   balanceData?: any[];
   midScoreKey?: string; // e.g., "median"
+  individualStudentData?: any[]; // ข้อมูลของนักเรียนแต่ละคนสำหรับแสดงเส้นเฉพาะ
 }
 
 export const PerformanceBalanceChart = ({
@@ -34,6 +35,7 @@ export const PerformanceBalanceChart = ({
   minScoreKey,
   midScoreKey,
   allAvgKey,
+  individualStudentData,
 }: PerformanceBalanceChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
   // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
@@ -155,7 +157,33 @@ export const PerformanceBalanceChart = ({
               />
             ),
         )}
-
+        {individualStudentData && (
+          <Radar
+            name={`${individualStudentData.Name}`}
+            dataKey={(dataPoint) => {
+              const key = dataPoint[xAxisKey];
+              const value = individualStudentData[key];
+              return value ? Number(value) : 0;
+            }}
+            // 🎨 ใช้สี Slate-800 เพื่อให้ดู Minimal และไม่ซ้ำกับเฉดสีอื่นที่มีอยู่
+            stroke="#1e293b" // Slate 800 (เกือบดำแต่ซอฟต์กว่า)
+            strokeWidth={2.5} // ความหนาพอดีๆ ไม่ให้ดูเทอะทะ
+            fill="#334155" // Slate 700
+            fillOpacity={0.15} // จางมากเพื่อให้ยังเห็น Grid และเส้นค่าเฉลี่ยด้านหลัง
+            // ✨ ปรับ Dot ให้เล็กลงและสะอาดตา
+            dot={{
+              r: 3,
+              fill: "#1e293b",
+              stroke: "#fff",
+              strokeWidth: 1.5,
+            }}
+            activeDot={{
+              r: 5,
+              fill: "#0f172a", // Slate 900 เมื่อชี้
+            }}
+            animationDuration={1000}
+          />
+        )}
         <Legend verticalAlign="bottom" height={36} iconType="circle" />
       </RadarChart>
     </ResponsiveContainer>

@@ -22,6 +22,7 @@ interface PerformanceTrendChartProps {
   allAvgKey?: string;
   maxScorePosKey: string;
   midScoreKey?: string;
+  individualStudentData?: any[];
 }
 
 export const PerformanceTrendChart = ({
@@ -35,6 +36,7 @@ export const PerformanceTrendChart = ({
   minScoreKey,
   midScoreKey,
   allAvgKey,
+  individualStudentData,
 }: PerformanceTrendChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
   // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
@@ -165,6 +167,40 @@ export const PerformanceTrendChart = ({
                 strokeWidth={2}
               />
             ),
+        )}
+        {individualStudentData && (
+          <Line
+            type="monotone"
+            dataKey={(dataPoint) => {
+              const key = dataPoint[xAxisKey];
+              const value = individualStudentData[key];
+              return value ? Number(value) : 0;
+            }}
+            name={`${individualStudentData.Name}`}
+            // 🎨 ปรับสไตล์ให้ Minimal และดู Premium (Slate Dark)
+            stroke="#0f172a" // Slate 900 (สีน้ำเงินเกือบดำ)
+            strokeWidth={4} // ปรับความหนาให้พอดี (หนากว่าเส้นเฉลี่ยเล็กน้อย)
+            strokeLinecap="round"
+            // ✨ ปรับ Dot ให้ดูสะอาดตาด้วยขอบขาวหนา
+            dot={{
+              r: 6,
+              fill: "#0f172a",
+              stroke: "#fff",
+              strokeWidth: 2.5,
+            }}
+            // 🔥 ขยายเมื่อ Hover
+            activeDot={{
+              r: 8,
+              strokeWidth: 0,
+              fill: "#1e293b",
+            }}
+            // 🪄 Drop Shadow แบบเบาๆ (Subtle) เพื่อให้เส้นดูมีมิติ
+            style={{
+              filter: "drop-shadow(0px 3px 4px rgba(15, 23, 42, 0.2))",
+            }}
+            animationDuration={1000}
+            animationEasing="ease-in-out"
+          />
         )}
       </ComposedChart>
     </ResponsiveContainer>

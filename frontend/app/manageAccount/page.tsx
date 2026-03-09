@@ -291,6 +291,7 @@ export default function ManageAccount() {
           </div>
 
           {/* EDIT POPUP */}
+          {/* EDIT POPUP */}
           {showEditPopup && selectedUser && (
             <FormEditPopup
               title="Edit User"
@@ -302,13 +303,23 @@ export default function ManageAccount() {
                   label: "Role",
                   key: "role",
                   type: "select",
+                  // 🟢 กรอง Option ตามสิทธิ์ของผู้ใช้ที่กำลังแก้
                   options: [
                     "system_admin",
                     "course_admin",
                     "instructor",
                     "student",
                     "guest",
-                  ],
+                  ].filter((role) => {
+                    // ถ้าไม่ใช่ Super_admin จะมองไม่เห็นตัวเลือก system_admin
+                    if (
+                      user?.role !== "Super_admin" &&
+                      role === "system_admin"
+                    ) {
+                      return false;
+                    }
+                    return true;
+                  }),
                 },
               ]}
               onChange={(updated) => setSelectedUser(updated)}
