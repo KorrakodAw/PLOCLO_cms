@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import React, { ReactNode } from "react";
 import NavLink from "../components/NavLink";
@@ -229,7 +229,9 @@ export default function Navbar({
               )}
 
               <button
-                onClick={logout}
+                onClick={() => {
+                  logout();
+                }}
                 title={!isOpen ? t("logout") : ""}
                 className={`flex items-center transition-colors duration-200 text-slate-400 hover:text-red-500
                   ${!isOpen ? "justify-center w-full" : "justify-start gap-4"}`}

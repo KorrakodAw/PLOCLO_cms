@@ -21,19 +21,43 @@ export default function LoginForm() {
 
   const handleSuccess = async (response: any) => {
     try {
-      // Corrected path: removed leading slash if using relative baseURL or kept full path
+      // 1. ส่ง Google Credential ไปที่ Backend
       const res = await apiClient.post("users/auth/google/verify", {
         token: response.credential,
       });
 
+      // 2. จัดการเมื่อ Login สำเร็จ
       if (res.data.token) {
         await login(res.data.token);
         showToast("Google Login Success!", "success");
+
+        // ใช้ replace เพื่อป้องกันการกดย้อนกลับมาหน้า Login
         router.replace("/");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Google Auth Error:", err);
-      showToast("Failed to authenticate with Google.", "error");
+
+      // 3. 🛡️ จัดการ Error ตามรหัสสถานะ (Status Code) จาก Backend
+      const statusCode = err.response?.status;
+
+      const backendMessage = err.response?.data?.message;
+
+      if (statusCode === 409) {
+        // กรณี Username ซ้ำ (Duplicate Username)
+        showToast(
+          backendMessage || "Username already exists. Please contact admin.",
+          "error",
+        );
+      } else if (statusCode === 400) {
+        // กรณี Token มีปัญหา
+        showToast("Invalid Google account session.", "error");
+      } else if (statusCode === 500) {
+        // กรณี Backend Crash
+        showToast("Server error. Please try again later.", "error");
+      } else {
+        // กรณีอื่นๆ (เช่น Network พัง)
+        showToast("Failed to authenticate with Google.", "error");
+      }
     }
   };
 

@@ -82,6 +82,7 @@ model Course {
   clos        Clo[]   
   sections    CourseSection[]
   assignments Assignment[] 
+  categoryWeights   AssignmentCategoryWeight[] 
   gradeSettings GradeSetting[] 
   instructors   CourseInstructor[]
 
@@ -196,6 +197,7 @@ model Assignment {
   @@map("assignment")
 }
 
+
 model AssignmentCloMapping {
   assId     Int      @map("assignment_id")
   cloId     Int      @map("clo_id")
@@ -208,6 +210,20 @@ model AssignmentCloMapping {
 
   @@unique([assId, cloId])
   @@map("assignment_clo_mapping")
+}
+
+model AssignmentCategoryWeight {
+  id        Int         @id @default(autoincrement())
+  course_id Int         @map("course_id")
+  category  AssCategory
+  maxWeight Decimal     @default(0) @db.Decimal(7, 4) @map("max_weight")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  course    Course      @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@unique([course_id, category]) 
+  @@map("assignment_category_weight")
 }
 
 // --- Scores ---

@@ -74,6 +74,7 @@ export default function EditCourse() {
   const handleClear = () => {
     localStorage.removeItem("edit_fix_filters");
     if (isInstructor) {
+      setSelections((prev) => ({ ...prev })); 
       setSearchTerm("");
     } else {
       setSelections({ university: "", faculty: "", program: "" });

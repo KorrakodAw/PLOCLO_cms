@@ -194,6 +194,7 @@ export default function AddPlo({ programId }: AddPloProps) {
     } catch {
       showToast("Failed to delete PLO", "error");
     } finally {
+      fetchPlos();
       setShowDeletePopup(false);
       setPloToDelete(null);
     }
@@ -264,7 +265,6 @@ export default function AddPlo({ programId }: AddPloProps) {
       ],
     },
   ];
-
 
   useEffect(() => {
     fetchPlos();

@@ -31,6 +31,7 @@ import GradeSetting from "../gradeSetting";
 import ScoreCalculated from "../scoreCalculatedforGrade";
 import AlertPopup from "@/components/AlertPopup";
 import { useRouter } from "next/navigation";
+import AssignmentCateWeight from "../assignmentCateWeight";
 
 // --- Interfaces ---
 interface PaginatedResponse {
@@ -99,6 +100,8 @@ export default function EditCourseClient({
   const [showGradeSettingTable, setShowGradeSettingTable] = useState(false);
   const [showScoreCalculatedTable, setShowScoreCalculatedTable] =
     useState(false);
+  const [showAssignmentCateWeightTable, setShowAssignmentCateWeightTable] =
+    useState(false);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [, setCourseToDelete] = useState<Course | null>(null);
   const [showDuplicatePopup, setShowDuplicatePopup] = useState(false);
@@ -163,15 +166,22 @@ export default function EditCourseClient({
       state: showCloPloMappingTable,
     },
     {
+      id: "assignment-weight",
+      label: t("assessment-category-weights"),
+      color: "text-cyan-600",
+      dot: "bg-cyan-500",
+      state: showAssignmentCateWeightTable,
+    },
+    {
       id: "assignment",
-      label: t("assignment"),
+      label: t("assessment"),
       color: "text-amber-600",
       dot: "bg-amber-500",
       state: showAssignmentTable,
     },
     {
       id: "assignment-clo-mapping",
-      label: t("Assignment–CLO Mapping"),
+      label: t("Assessment–CLO Mapping"),
       color: "text-rose-600",
       dot: "bg-rose-500",
       state: showAssignmentCloMappingTable,
@@ -222,6 +232,7 @@ export default function EditCourseClient({
     setShowScoreMappingTable(false);
     setShowGradeSettingTable(false);
     setShowScoreCalculatedTable(false);
+    setShowAssignmentCateWeightTable(false);
 
     if (tabId === "clo") setShowCloTable(true);
     if (tabId === "student") setShowStudentTable(true);
@@ -232,6 +243,7 @@ export default function EditCourseClient({
     if (tabId === "score-mapping") setShowScoreMappingTable(true);
     if (tabId === "grade-setting") setShowGradeSettingTable(true);
     if (tabId === "score-calculated") setShowScoreCalculatedTable(true);
+    if (tabId === "assignment-weight") setShowAssignmentCateWeightTable(true);
   };
 
   const handleModeChange = (mode: "setup" | "grading") => {
@@ -647,6 +659,9 @@ export default function EditCourseClient({
                   masterCourseId={String(formData.course_id)}
                   sectionId={String(formData.id)}
                 />
+              )}
+              {showAssignmentCateWeightTable && formData && (
+                <AssignmentCateWeight courseId={String(formData.course_id)} />
               )}
             </div>
           </div>

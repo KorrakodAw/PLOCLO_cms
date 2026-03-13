@@ -2,14 +2,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../../components/Toast";
 import { apiClient } from "../../utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { CLO } from "@/utils/cloApi";
-import { Info, Calculator, FilterX } from "lucide-react";
+import {
+  Info,
+  Calculator,
+  FilterX,
+  Upload,
+  FileSpreadsheet,
+  Save,
+} from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface Assignment {
   id: number;
@@ -36,6 +44,8 @@ export default function AssignmentCloMapping({
   const [mappingGrid, setMappingGrid] = useState<Record<string, number>>({});
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
   const [selectedClo, setSelectedClo] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Fetch Initial Data
   useEffect(() => {
@@ -86,6 +96,72 @@ export default function AssignmentCloMapping({
 
     fetchData();
   }, [courseId, token]);
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        setLoading(true);
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+
+        // ใช้ defval: 0 เพื่อจัดการช่องว่างตามรูปภาพ
+        const data = XLSX.utils.sheet_to_json(ws, { defval: 0 }) as any[];
+
+        const newGrid = { ...mappingGrid };
+        const newChangedKeys = new Set(changedKeys);
+        let matchCount = 0;
+
+        data.forEach((row: any) => {
+          // 🟢 1. ยืดหยุ่นในการหาชื่อ Assignment (รองรับ "Description" ตามรูปใหม่)
+          const assignName =
+            row.Description || row.description || row.assesment || row.name;
+          if (!assignName) return;
+
+          const targetAssign = assignments.find(
+            (a) =>
+              a.name.trim().toLowerCase() ===
+              String(assignName).trim().toLowerCase(),
+          );
+
+          if (targetAssign) {
+            clos.forEach((clo) => {
+              // 🟢 2. ยืดหยุ่นในการหา CLO Code (เช่น clo1, CLO1, clo 1)
+              const excelKey = Object.keys(row).find(
+                (k) =>
+                  k.toLowerCase().replace(/\s/g, "") ===
+                  clo.code.toLowerCase().replace(/\s/g, ""),
+              );
+
+              if (excelKey) {
+                const weight = Number(row[excelKey]);
+                if (!isNaN(weight)) {
+                  const key = `${targetAssign.id}_${clo.id}`;
+                  newGrid[key] = weight;
+                  newChangedKeys.add(key);
+                  matchCount++;
+                }
+              }
+            });
+          }
+        });
+
+        setMappingGrid(newGrid);
+        setChangedKeys(newChangedKeys);
+        showToast(`Import Success: Matched ${matchCount} cells.`, "success");
+      } catch  {
+        showToast("Excel structure mismatch", "error");
+      } finally {
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   // 2. Sort Assignments Logic
   const sortedAssignments = useMemo(() => {
@@ -295,17 +371,55 @@ export default function AssignmentCloMapping({
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden relative min-h-[400px]">
         {loading && <LoadingOverlay />}
 
-        <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
-          <h3 className="font-bold text-gray-800 uppercase text-xs tracking-widest">
-            Assignment - CLO Mapping
-          </h3>
-          <button
-            onClick={handleSave}
-            disabled={loading || changedKeys.size === 0}
-            className={`px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${changedKeys.size === 0 ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-200"}`}
-          >
-            {loading ? "Saving..." : `Save Changes`}
-          </button>
+        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center bg-white gap-4">
+          {/* Left Side: Title with Indicator */}
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
+            <h3 className="font-black text-slate-800 uppercase text-[11px] tracking-[0.15em]">
+              Assignment - CLO <span className="text-indigo-500">Mapping</span>
+            </h3>
+          </div>
+
+          {/* Right Side: Action Group */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImportExcel}
+              accept=".xlsx, .xls"
+              className="hidden"
+            />
+
+            {/* Import Button: ปรับให้ดูเด่นขึ้นด้วยโทนสีที่สะอาดตา */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all active:scale-95 group"
+            >
+              <Upload
+                size={14}
+                className="group-hover:-translate-y-0.5 transition-transform"
+              />
+              IMPORT EXCEL
+            </button>
+
+            {/* Save Button: ปรับให้ดูเป็นปุ่มหลัก (Primary Action) */}
+            <button
+              onClick={handleSave}
+              disabled={loading || changedKeys.size === 0}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all shadow-lg active:scale-95 ${
+                changedKeys.size === 0
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200"
+                  : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200"
+              }`}
+            >
+              {loading ? (
+                <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <Save size={14} /> // แนะนำให้ import Save จาก lucide-react
+              )}
+              {loading ? "SAVING..." : "SAVE CHANGES"}
+            </button>
+          </div>
         </div>
 
         {/* 🟢 Interactive Filter Info Bar */}

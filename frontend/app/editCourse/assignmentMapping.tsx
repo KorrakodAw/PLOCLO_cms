@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState} from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../../components/Toast";
@@ -9,17 +9,27 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import FormEditPopup from "@/components/EditPopup";
 import AlertPopup from "@/components/AlertPopup";
 import DropdownSelect from "@/components/DropdownSelect";
+import {
+  Calculator,
+  RefreshCcw,
+  Trash2,
+  Edit3,
+  Plus,
+  Info,
+} from "lucide-react";
 
 interface Assignment {
   id: number;
-  section_id: number;
   name: string;
   category: string;
-  description: string;
   maxScore: number;
   weight: number;
   createdAt: string;
-  updated_at: string;
+}
+
+interface CategoryWeight {
+  category: string;
+  maxWeight: number;
 }
 
 export default function AssignmentMapping({
@@ -30,64 +40,114 @@ export default function AssignmentMapping({
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
   const { t } = useTranslation("common");
-  const [loading, setLoading] = useState(false);
 
+  const [loading, setLoading] = useState(false);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [categoryConfigs, setCategoryConfigs] = useState<CategoryWeight[]>([]);
+
+  // Input States
   const [newAssignName, setNewAssignName] = useState("");
   const [newAssignCategory, setNewAssignCategory] = useState<string | number>(
     "",
   );
-  const [newAssignWeight, setNewAssignWeight] = useState<string>("");
   const [newAssignMaxScore, setNewAssignMaxScore] = useState<string>("");
   const [activeFilter, setActiveFilter] = useState("all");
 
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [editFormData, setEditFormData] = useState<Assignment | null>(null);
-
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<number | null>(
     null,
   );
-  const [showDeleteAllPopup, setShowDeleteAllPopup] = useState(false);
 
-  const fetchAssignments = async () => {
+  // 1. Fetch ทั้งรายการงาน และ การตั้งค่าเพดานคะแนน (Category Weights)
+  const fetchData = async () => {
     if (!courseId || !token) return;
     setLoading(true);
     try {
-      const res = await apiClient.get(`/assignment?courseId=${courseId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAssignments(res.data);
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to fetch assignments", "error");
+      const [assignRes, configRes] = await Promise.all([
+        apiClient.get(`/assignment?courseId=${courseId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        apiClient.get("/assignment/categoriesWeights", {
+          params: { courseId },
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      setAssignments(assignRes.data);
+      setCategoryConfigs(configRes.data);
+    } catch {
+      showToast("Failed to fetch data", "error");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAssignments();
+    fetchData();
   }, [courseId, token]);
 
+  // 2. 🧮 ฟังก์ชันหลักในการคำนวณ Weight ใหม่ทั้งหมด (Auto-split logic)
+  const handleRecalculateWeights = async () => {
+    if (assignments.length === 0 || categoryConfigs.length === 0) return;
+    setLoading(true);
+    try {
+      // คำนวณน้ำหนักใหม่สำหรับทุกงานในเครื่องก่อนส่งไป Server
+      const updatedList = assignments.map((assign) => {
+        const config = categoryConfigs.find(
+          (c) => c.category === assign.category,
+        );
+        if (!config) return { id: assign.id, weight: 0 };
+
+        // คะแนนเต็มรวมของหมวดหมู่นี้
+        const totalMaxInCat = assignments
+          .filter((a) => a.category === assign.category)
+          .reduce((sum, a) => sum + Number(a.maxScore), 0);
+
+        // สูตร: (คะแนนงานนี้ / คะแนนรวมหมวด) * น้ำหนักเพดานหมวด
+        const newWeight =
+          totalMaxInCat > 0
+            ? (Number(assign.maxScore) / totalMaxInCat) *
+              Number(config.maxWeight)
+            : 0;
+
+        return { id: assign.id, weight: Number(newWeight.toFixed(2)) };
+      });
+
+      // สั่ง Update ทีละรายการ (หรือใช้ Bulk Patch ถ้า API รองรับ)
+      await Promise.all(
+        updatedList.map((item) =>
+          apiClient.patch(
+            `/assignment/${item.id}`,
+            { weight: item.weight },
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          ),
+        ),
+      );
+
+      showToast("Weights auto-distributed by score proportion!", "success");
+      fetchData(); // รีโหลดข้อมูลล่าสุด
+    } catch {
+      showToast("Failed to recalculate weights", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddAssignment = async () => {
-    if (!newAssignName.trim() || Number(newAssignWeight) <= 0) {
-      showToast("Please provide a name and a valid weight", "error");
+    if (!newAssignName.trim() || !newAssignCategory || !newAssignMaxScore) {
+      showToast("Please complete all fields", "error");
       return;
     }
 
-    if (
-      assignments.some(
-        (a) =>
-          a.name.trim().toLowerCase() === newAssignName.trim().toLowerCase(),
-      )
-    ) {
-      showToast("An assignment with this name already exists.", "error");
-      return;
-    }
-
-    if (!newAssignCategory) {
-      showToast("Please select a category", "error");
+    // ตรวจสอบว่าหมวดนี้มีการตั้งค่า Max Weight ไว้หรือยัง
+    const hasConfig = categoryConfigs.some(
+      (c) => c.category === newAssignCategory,
+    );
+    if (!hasConfig) {
+      showToast("Please set weight limit for this category first!", "error");
       return;
     }
 
@@ -100,16 +160,14 @@ export default function AssignmentMapping({
           name: newAssignName.trim(),
           maxScore: Number(newAssignMaxScore),
           category: newAssignCategory,
-          weight: Number(newAssignWeight),
+          weight: 0, // ส่ง 0 ไปก่อน แล้วค่อยสั่ง Recalculate
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      showToast("Assignment added!", "success");
       // setNewAssignName("");
-      // setNewAssignWeight("");
       // setNewAssignMaxScore("");
-      fetchAssignments();
+      await handleRecalculateWeights(); // 🟢 คำนวณกระจายน้ำหนักใหม่ทันที
     } catch {
       showToast("Failed to add assignment", "error");
     } finally {
@@ -118,7 +176,7 @@ export default function AssignmentMapping({
   };
 
   const handleSaveEdit = async () => {
-    if (!editFormData || !token) return;
+    if (!editFormData) return;
     try {
       setLoading(true);
       await apiClient.patch(
@@ -126,433 +184,271 @@ export default function AssignmentMapping({
         {
           name: editFormData.name,
           maxScore: Number(editFormData.maxScore),
-          weight: Number(editFormData.weight),
-          description: editFormData.description,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      showToast("Assignment updated successfully", "success");
       setShowEditPopup(false);
-      fetchAssignments();
+      await handleRecalculateWeights(); // 🟢 คำนวณใหม่หากมีการแก้ Max Score
     } catch {
-      showToast("Failed to update assignment", "error");
+      showToast("Update failed", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteAssignment = async (targetId: number | null) => {
-    if (!targetId) return;
+  const handleDelete = async (id: number | null) => {
+    if (!id) return;
     try {
       setLoading(true);
-      await apiClient.delete(`/assignment/${targetId}`, {
+      await apiClient.delete(`/assignment/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      showToast("Assignment deleted!", "success");
-      fetchAssignments();
       setShowDeletePopup(false);
+      await handleRecalculateWeights(); 
+      fetchData();
     } catch {
-      showToast("Failed to delete assignment", "error");
+      showToast("Delete failed", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteAllAssignments = async () => {
-    try {
-      setLoading(true);
-      await Promise.all(
-        assignments.map((a) =>
-          apiClient.delete(`/assignment/${a.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ),
-      );
-      showToast("All assignments deleted!", "success");
-      fetchAssignments();
-      setShowDeleteAllPopup(false);
-    } catch {
-      showToast("Failed to delete all assignments", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 4. Corrected Summary Logic
-  const summary = useMemo(() => {
-    const getW = (k: string) =>
-      assignments
-        .filter((a) => a.category === k)
-        .reduce((s, a) => s + Number(a.weight || 0), 0);
-    const total = assignments.reduce((s, a) => s + Number(a.weight || 0), 0);
-    return {
-      pres: getW("presentation"),
-      ass: getW("assignment"),
-      qz: getW("quiz"),
-      prjt: getW("project"),
-      mid: getW("midtermExam"),
-      fin: getW("finalExam"),
-      total,
-    };
-  }, [assignments]);
-
-  // 5. Corrected Filtering Logic (Filtering by category string)
-  const filteredData = useMemo(() => {
-    // 1. Initial Filtering by Category
-    const data =
-      activeFilter === "all"
-        ? assignments
-        : assignments.filter((a) => a.category === activeFilter);
-
-    // 2. Configuration for Sorting
-    const categoryOrder: Record<string, number> = {
-      presentation: 1,
-      assignment: 2,
-      midtermExam: 3,
-      finalExam: 4,
-      project: 5,
-      quiz: 6,
-    };
-
-    const romanMap: Record<string, number> = {
-      i: 1,
-      ii: 2,
-      iii: 3,
-      iv: 4,
-      v: 5,
-      vi: 6,
-      vii: 7,
-      viii: 8,
-      ix: 9,
-      x: 10,
-      xi: 11,
-      xii: 12,
-    };
-
-    // 3. Helper to normalize Roman Numerals to Numbers for localCompare
-    const normalizeName = (name: string) => {
-      return name
-        .toLowerCase()
-        .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
-          return romanMap[match].toString().padStart(2, "0"); // pad ensures "10" comes after "02"
-        });
-    };
-
-    // 4. Final Multi-Level Sort
-    return [...data].sort((a, b) => {
-      // Level 1: Sort by Category Order
-      const catA = categoryOrder[a.category] || 99;
-      const catB = categoryOrder[b.category] || 99;
-
-      if (catA !== catB) {
-        return catA - catB;
-      }
-
-      // Level 2: Natural Sort by Name (handling Roman Numerals and Numbers)
-      const normA = normalizeName(a.name);
-      const normB = normalizeName(b.name);
-
-      return normA.localeCompare(normB, undefined, { numeric: true });
-    });
-  }, [assignments, activeFilter]);
-
-  const assignmentOptions = [
-    { value: "quiz", label: t("Quiz") },
-    { value: "presentation", label: t("Presentation") },
-    { value: "midtermExam", label: t("Midterm") },
-    { value: "finalExam", label: t("Final") },
-    { value: "assignment", label: t("Assignments") },
-    { value: "project", label: t("Project") },
-  ];
+  const filteredData = assignments.filter(
+    (a) => activeFilter === "all" || a.category === activeFilter,
+  );
 
   return (
-    <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-8">
-      {loading && <LoadingOverlay />}
+    <div className="max-w-7xl mx-auto p-6 space-y-6 font-kanit">
       <ToastElement />
+      {loading && <LoadingOverlay />}
 
-      {/* DYNAMIC DASHBOARD SUMMARY */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
-        {Object.entries(summary)
-          .filter(([key, value]) => key !== "total" && Number(value) > 0)
-          .map(([key, value]) => {
-            const labels: Record<string, string> = {
-              pres: t("Presentation"),
-              ass: t("Assignments"),
-              qz: t("Quiz"),
-              prjt: t("Project"),
-              mid: t("Midterm"),
-              fin: t("Final"),
-            };
-            return (
-              <div
-                key={key}
-                className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm flex flex-col justify-center h-20 hover:border-indigo-300 transition-all"
-              >
-                <p className="text-[9px] font-bold uppercase tracking-tight text-slate-400 mb-1 truncate">
-                  {labels[key] || key}
-                </p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-lg font-bold text-slate-800">
-                    {Number(value).toFixed(1)}
-                  </span>
-                  <span className="text-[10px] font-medium text-slate-400">
-                    %
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-
-        <div
-          className={`p-3 rounded-xl shadow-sm flex flex-col justify-center h-20 border transition-all ${summary.total > 100.001 ? "bg-red-50 border-red-200" : "bg-slate-900 border-slate-900"}`}
-        >
-          <p
-            className={`text-[9px] font-bold uppercase tracking-tight mb-1 ${summary.total > 100.001 ? "text-red-500" : "text-slate-400"}`}
-          >
-            {t("Total Weight")}
-          </p>
-          <div className="flex items-baseline gap-1">
-            <span
-              className={`text-lg font-bold ${summary.total > 100.001 ? "text-red-700" : "text-emerald-400"}`}
-            >
-              {summary.total.toFixed(1)}
-            </span>
-            <span
-              className={`text-[10px] font-medium ${summary.total > 100.001 ? "text-red-400" : "text-slate-500"}`}
-            >
-              %
-            </span>
+      {/* 1. Dashboard Header */}
+      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl shadow-slate-200">
+        <div className="flex items-center gap-5">
+          <div className="bg-blue-500 p-4 rounded-3xl shadow-lg shadow-blue-500/20">
+            <Calculator className="text-white w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight uppercase leading-none">
+              Auto-Weight <span className="text-blue-400">Mapping</span>
+            </h1>
+            <p className="text-slate-400 text-xs mt-2 font-medium">
+              Weights are calculated proportionally based on Max Scores within
+              each category.
+            </p>
           </div>
         </div>
+        <button
+          onClick={handleRecalculateWeights}
+          className="group flex items-center gap-3 bg-white/10 hover:bg-blue-600 px-8 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95 border border-white/10"
+        >
+          <RefreshCcw
+            size={16}
+            className="group-hover:rotate-180 transition-transform duration-500"
+          />{" "}
+          RE-DISTRIBUTE WEIGHTS
+        </button>
       </div>
 
-      {/* CREATE FORM */}
-      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-        <h2 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
-          <span className="w-2 h-6 bg-blue-600 rounded-full"></span>Create
-          Assignment
-        </h2>
+      {/* 2. Create Form Section */}
+      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleAddAssignment();
           }}
-          className="flex flex-col md:flex-row gap-4 items-end w-full"
+          className="flex flex-col md:flex-row gap-4 items-end"
         >
-          <div className="md:w-1/4 ">
-            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
+          <div className="md:w-1/4">
+            <label className="text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">
               Category
             </label>
             <DropdownSelect
-              options={assignmentOptions}
+              options={categoryConfigs.map((c) => ({
+                value: c.category,
+                label: t(
+                  c.category.charAt(0).toUpperCase() + c.category.slice(1),
+                ),
+              }))}
               value={newAssignCategory}
-              onChange={(v) => setNewAssignCategory(v)}
+              onChange={setNewAssignCategory}
             />
           </div>
-          <div className="w-full md:flex-1">
-            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
-              Name
+          <div className="flex-1 w-full">
+            <label className="text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">
+              Assignment Name
             </label>
             <input
               type="text"
-              placeholder="e.g., Quiz 1, Final Exam, Project Proposal"
-              className="w-full border border-gray-200 p-3 rounded-2xl outline-none"
+              className="w-full h-[42px] border border-slate-200 px-4 rounded-xl outline-none focus:border-blue-400 transition-all font-medium"
               value={newAssignName}
               onChange={(e) => setNewAssignName(e.target.value)}
+              placeholder="e.g. Lab 1, Project Phase 1"
             />
           </div>
-          <div className="w-full md:w-24 shrink-0">
-            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
-              Weight (%)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., 20"
-              className="w-full border border-gray-200 p-3 rounded-2xl text-center"
-              value={newAssignWeight}
-              onChange={(e) =>
-                /^\d*\.?\d*$/.test(e.target.value) &&
-                setNewAssignWeight(e.target.value)
-              }
-            />
-          </div>
-          <div className="w-full md:w-24 shrink-0">
-            <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">
+          <div className="w-full md:w-32">
+            <label className="text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 text-center tracking-widest">
               Max Score
             </label>
             <input
-              type="text"
-              placeholder="e.g., 100"
-              className="w-full border border-gray-200 p-3 rounded-2xl text-center"
+              type="number"
+              className="w-full h-[42px] border border-slate-200 rounded-xl text-center font-bold text-slate-700"
               value={newAssignMaxScore}
-              onChange={(e) =>
-                /^\d*\.?\d*$/.test(e.target.value) &&
-                setNewAssignMaxScore(e.target.value)
-              }
+              onChange={(e) => setNewAssignMaxScore(e.target.value)}
+              placeholder="100"
             />
           </div>
           <button
             type="submit"
-            className="w-full md:w-auto px-6 bg-blue-600 text-white font-black py-3 rounded-2xl hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-100 shrink-0 h-[50px]"
+            className="w-full md:w-auto px-10 bg-blue-600 text-white font-black h-[42px] rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
           >
-            + Add
+            + {t("add")}
           </button>
         </form>
       </div>
 
-      {/* TABLE SECTION WITH DYNAMIC CATEGORY FILTER */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-        <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/30">
-          <div className="flex items-center gap-3">
-            <h3 className="font-bold text-gray-800 uppercase text-xs tracking-widest">
-              Assignment List
+      {/* 3. Table & List Section */}
+      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden">
+        <div className="p-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">
+              Assignment Repository
             </h3>
-            {assignments.length > 0 && (
+            <div className="flex bg-slate-200/50 p-1 rounded-xl">
               <button
-                onClick={() => setShowDeleteAllPopup(true)}
-                className="text-red-500 hover:text-red-700 text-[10px] font-bold uppercase tracking-wide border border-red-200 px-3 py-1 rounded-full"
+                onClick={() => setActiveFilter("all")}
+                className={`px-4 py-1 rounded-lg text-[10px] font-black transition-all ${activeFilter === "all" ? "bg-white shadow-sm text-blue-600" : "text-slate-400"}`}
               >
-                Delete All
+                ALL
               </button>
-            )}
+              {categoryConfigs.map((c) => (
+                <button
+                  key={c.category}
+                  onClick={() => setActiveFilter(c.category)}
+                  className={`px-4 py-1 rounded-lg text-[10px] font-black transition-all ${activeFilter === c.category ? "bg-white shadow-sm text-blue-600" : "text-slate-400"}`}
+                >
+                  {c.category.toUpperCase()}
+                </button>
+              ))}
+            </div>
           </div>
-
-          {/* DYNAMIC FILTERS: Only show buttons for categories that exist */}
-          <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-2xl">
-            <button
-              onClick={() => setActiveFilter("all")}
-              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeFilter === "all" ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"}`}
-            >
-              {t("all")}
-            </button>
-            {Object.entries(summary)
-              .filter(([key, val]) => key !== "total" && Number(val) > 0)
-              .map(([key]) => {
-                const map: Record<string, string> = {
-                  pres: "presentation",
-                  ass: "assignment",
-                  qz: "quiz",
-                  prjt: "project",
-                  mid: "midtermExam",
-                  fin: "finalExam",
-                };
-                const filterValue = map[key];
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setActiveFilter(filterValue)}
-                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all ${activeFilter === filterValue ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"}`}
-                  >
-                    {key}
-                  </button>
-                );
-              })}
+          <div className="flex items-center gap-2 text-blue-500 bg-blue-50 px-3 py-1.5 rounded-full">
+            <Info size={14} strokeWidth={3} />
+            <span className="text-[9px] font-black uppercase">
+              Weights sum to category limit
+            </span>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50/50 text-gray-400 text-[10px] uppercase font-black tracking-widest">
-              <tr>
-                <th className="p-5 text-center w-16">#</th>
-                <th className="p-5">Name</th>
-                <th className="p-5 text-center">Score</th>
-                <th className="p-5 text-center">Weight</th>
-                <th className="p-5 text-center">Date</th>
-                <th className="p-5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredData.length > 0 ? (
-                filteredData.map((a, index) => (
-                  <tr
-                    key={a.id}
-                    className="group hover:bg-blue-50/30 transition-all"
-                  >
-                    <td className="p-5 text-center text-gray-400 font-bold text-xs">
-                      {index + 1}
-                    </td>
-                    <td className="p-5 font-bold text-gray-700">{a.name}</td>
-                    <td className="p-5 text-center text-gray-500">
-                      {Number(a.maxScore).toFixed(0)}
-                    </td>
-                    <td className="p-5 text-center">
-                      <span className="bg-blue-100 text-blue-700 px-4 py-1.5 rounded-2xl text-[10px] font-black">
-                        {Number(a.weight).toFixed(1)}%
+        <table className="w-full text-left">
+          <thead className="text-[10px] font-black uppercase text-slate-400 tracking-tighter bg-slate-50/30">
+            <tr>
+              <th className="p-5 text-center w-16">#</th>
+              <th className="p-5">Task Details</th>
+              <th className="p-5 text-center">Base Score</th>
+              <th className="p-5 text-center">Calculated Weight</th>
+              <th className="p-5 text-right px-10">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {filteredData.length > 0 ? (
+              filteredData.map((a, idx) => (
+                <tr
+                  key={a.id}
+                  className="group hover:bg-blue-50/20 transition-all"
+                >
+                  <td className="p-5 text-center text-slate-300 font-bold text-xs">
+                    {idx + 1}
+                  </td>
+                  <td className="p-5">
+                    <div className="font-bold text-slate-700">{a.name}</div>
+                    <div className="text-[9px] font-black text-blue-400 uppercase tracking-widest mt-0.5">
+                      {a.category}
+                    </div>
+                  </td>
+                  <td className="p-5 text-center">
+                    <span className="font-mono font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg">
+                      {a.maxScore}
+                    </span>
+                  </td>
+                  <td className="p-5 text-center">
+                    <div className="inline-flex flex-col items-center">
+                      <span className="text-sm font-black text-slate-800">
+                        {a.weight}%
                       </span>
-                    </td>
-                    <td className="p-5 text-center text-gray-400 text-[10px]">
-                      {new Date(a.createdAt).toLocaleDateString("en-GB")}
-                    </td>
-                    <td className="p-5 text-right flex justify-end gap-2">
+                      <div className="w-16 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${(a.weight / 20) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-5 text-right px-10">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => {
                           setEditFormData(a);
                           setShowEditPopup(true);
                         }}
-                        className="text-blue-400 hover:text-blue-600"
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
                       >
-                        Edit
+                        <Edit3 size={18} />
                       </button>
                       <button
                         onClick={() => {
                           setAssignmentToDelete(a.id);
                           setShowDeletePopup(true);
                         }}
-                        className="text-red-400 hover:text-red-600"
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                       >
-                        Delete
+                        <Trash2 size={18} />
                       </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="p-20 text-center text-gray-300 italic font-bold"
-                  >
-                    {t("No results found")}
+                    </div>
                   </td>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="p-20 text-center text-slate-300 font-medium italic"
+                >
+                  No assignments found for this criteria.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* POPUPS */}
-      {editFormData && showEditPopup && (
+      {/* Popups */}
+      {showEditPopup && editFormData && (
         <FormEditPopup
-          title="Edit Assignment"
+          title="Adjust Assignment"
           data={editFormData}
           fields={[
-            { label: "Name", key: "name", type: "text" },
-            { label: "Max Score", key: "maxScore", type: "number" },
-            { label: "Weight", key: "weight", type: "number" },
+            { label: "Task Name", key: "name", type: "text" },
+            {
+              label: "Max Score (Affects Weight)",
+              key: "maxScore",
+              type: "number",
+            },
           ]}
           onSave={handleSaveEdit}
-          onChange={(update) => setEditFormData(update)}
+          onChange={setEditFormData}
           onClose={() => setShowEditPopup(false)}
         />
       )}
+
       <AlertPopup
-        title={t("Delete")}
-        type="confirm"
-        message={t("Are you sure you want to delete this assignment?")}
         isOpen={showDeletePopup}
-        onCancel={() => setShowDeletePopup(false)}
-        onConfirm={() => handleDeleteAssignment(assignmentToDelete)}
-      />
-      <AlertPopup
-        title={t("Delete All")}
         type="confirm"
-        message={t("Delete ALL assignments? Action cannot be undone.")}
-        isOpen={showDeleteAllPopup}
-        onCancel={() => setShowDeleteAllPopup(false)}
-        onConfirm={handleDeleteAllAssignments}
-        confirmText="Delete All"
+        title="Remove Task"
+        message="This will delete the assignment and redistribute weights in this category."
+        onConfirm={() => handleDelete(assignmentToDelete)}
+        onCancel={() => setShowDeletePopup(false)}
       />
     </div>
   );

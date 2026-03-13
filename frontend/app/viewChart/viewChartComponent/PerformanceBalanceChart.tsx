@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { useTranslation } from "react-i18next";
 
 interface PerformanceBalanceChartProps {
   chartData: any[];
@@ -38,6 +39,7 @@ export const PerformanceBalanceChart = ({
   individualStudentData,
 }: PerformanceBalanceChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
+  const { t } =useTranslation("common");
   // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
   const uniqueGrades = useMemo(() => {
     if (!balanceData) return [];
@@ -93,7 +95,7 @@ export const PerformanceBalanceChart = ({
 
         {/* Background Radar: Total Possible Score */}
         <Radar
-          name="Total Possible"
+          name={t("fullScore")}
           dataKey={maxScorePosKey}
           stroke="#94a3b8"
           fill="#cbd5e1"
@@ -104,7 +106,7 @@ export const PerformanceBalanceChart = ({
         {/* Dynamic Radars based on Visibility */}
         {visibleLines?.maxScore && maxScoreKey && (
           <Radar
-            name="Highest Achieved"
+            name={t("maxScore")}
             dataKey={maxScoreKey} // Maps to "max"
             stroke="#22c55e"
             fill="#22c55e"
@@ -114,7 +116,7 @@ export const PerformanceBalanceChart = ({
 
         {visibleLines?.minScore && minScoreKey && (
           <Radar
-            name="Lowest Achieved"
+            name={t("minScore")}
             dataKey={minScoreKey} // Maps to "min"
             stroke="#ef4444"
             fill="#ef4444"
@@ -124,7 +126,7 @@ export const PerformanceBalanceChart = ({
 
         {visibleLines?.allAvg && allAvgKey && (
           <Radar
-            name="Class Average"
+            name={t("averageScore")}
             dataKey={allAvgKey} // Maps to "mean"
             stroke="#6366f1"
             fill="#6366f1"
@@ -134,7 +136,7 @@ export const PerformanceBalanceChart = ({
         )}
         {visibleLines?.midScore && midScoreKey && (
           <Radar
-            name="Median Score"
+            name={t("medianScore")}
             dataKey={midScoreKey} // Maps to "median"
             stroke="#f59e0b"
             fill="#f59e0b"

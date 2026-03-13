@@ -34,6 +34,17 @@ router.post("/auth/google/verify", async (req, res) => {
 
     // 3. ถ้ายังไม่มี User ให้สร้างใหม่ (พร้อมเช็ค Role)
     if (!user) {
+      const nameCheck = await pool.query(
+        "SELECT id FROM users WHERE username = $1",
+        [googleName],
+      );
+      if (nameCheck.rows.length > 0) {
+        // หากซ้ำ ให้ส่ง 409 Conflict กลับไปเพื่อให้ Frontend แจ้งเตือน
+        return res.status(409).json({
+          error: "Username already exists",
+          message: `The name "${googleName}" is already taken in our system. Please contact admin.`,
+        });
+      }
       let role = "guest"; // Default role
 
       // --- NEW LOGIC: Check if Google Name matches a Student ---

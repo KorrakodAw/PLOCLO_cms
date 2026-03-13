@@ -108,4 +108,112 @@ router.patch("/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// GET: ดึงเกณฑ์น้ำหนักของแต่ละหมวดในวิชานั้นๆ
+router.get("/categoriesWeights", authenticateToken, async (req, res) => {
+  try {
+    const courseId = req.query.courseId
+      ? Number(req.query.courseId)
+      : undefined;
+
+    if (!courseId || isNaN(courseId)) {
+      return res
+        .status(400)
+        .json({ error: "Valid courseId query parameter is required" });
+    }
+
+    const categoryWeights = await prisma.assignmentCategoryWeight.findMany({
+      where: { course_id: courseId },
+      orderBy: { category: "asc" }, // เรียงลำดับให้แสดงผลในหน้าบ้านง่ายขึ้น
+    });
+
+    res.json(categoryWeights);
+  } catch (err: any) {
+    console.error("GET Error:", err);
+    res.status(500).json({ error: "Failed to fetch category weights" });
+  }
+});
+
+// POST: บันทึกหรือแก้ไขเกณฑ์น้ำหนัก
+router.post("/categoriesWeights", authenticateToken, async (req, res) => {
+  try {
+    const { courseId, category, maxWeight } = req.body;
+
+    // ตรวจสอบค่าที่ส่งมา (maxWeight อาจเป็น 0 ได้ จึงเช็ค undefined)
+    if (!courseId || !category || maxWeight === undefined) {
+      return res.status(400).json({
+        error: "courseId, category, and maxWeight are required",
+      });
+    }
+
+    // Upsert: ถ้ามีคู่ (course_id, category) เดิมอยู่แล้วจะ Update ถ้าไม่มีจะ Create
+    const updatedRecord = await prisma.assignmentCategoryWeight.upsert({
+      where: {
+        course_id_category: {
+          course_id: Number(courseId),
+          category: category,
+        },
+      },
+      update: {
+        maxWeight: parseFloat(maxWeight),
+      },
+      create: {
+        course_id: Number(courseId),
+        category: category,
+        maxWeight: parseFloat(maxWeight),
+      },
+    });
+
+    res.json(updatedRecord);
+  } catch (err: any) {
+    console.error("POST Error:", err);
+    // กรณีที่ส่ง Enum category ผิด หรือ Prisma error อื่นๆ
+    res.status(500).json({ error: "Failed to update category weight" });
+  }
+});
+
+router.post("/categoriesWeights/bulk", authenticateToken, async (req, res) => {
+  const { course_id, weights } = req.body; // weights: [{category: 'quiz', maxWeight: 20}, ...]
+
+  try {
+    const results = await prisma.$transaction(
+      weights.map((w: any) =>
+        prisma.assignmentCategoryWeight.upsert({
+          where: {
+            course_id_category: {
+              course_id: Number(course_id),
+              category: w.category,
+            },
+          },
+          update: { maxWeight: parseFloat(w.maxWeight) },
+          create: {
+            course_id: Number(course_id),
+            category: w.category,
+            maxWeight: parseFloat(w.maxWeight),
+          },
+        }),
+      ),
+    );
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: "Bulk update failed" });
+  }
+});
+
+// ลบโดยใช้ ID ของ Record นั้นๆ โดยตรง
+router.delete("/categoriesWeights/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await prisma.assignmentCategoryWeight.delete({
+      where: {
+        id: Number(id), // ลบด้วย Unique ID
+      },
+    });
+    res.json({ message: "Category weight deleted successfully" });
+  } catch (err) {
+    console.error("Delete Error:", err);
+    res.status(500).json({ error: "Failed to delete category weight" });
+  }
+});
+
 export default router;

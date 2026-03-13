@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import {
   ComposedChart,
@@ -10,6 +11,7 @@ import {
   Line,
   ResponsiveContainer,
 } from "recharts";
+import { useTranslation } from "react-i18next";
 
 interface PerformanceTrendChartProps {
   chartData: any[];
@@ -39,6 +41,7 @@ export const PerformanceTrendChart = ({
   individualStudentData,
 }: PerformanceTrendChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
+  const { t } = useTranslation("common");
   // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
   const uniqueGrades = useMemo(() => {
     if (!balanceData) return [];
@@ -77,9 +80,10 @@ export const PerformanceTrendChart = ({
         margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
       >
         <CartesianGrid
-          strokeDasharray="3 3"
+          strokeDasharray="5 5"
           vertical={false}
-          stroke="#f1f5f9"
+          stroke="#e2e8f0"
+          // strokeOpacity={0.9}
         />
         <XAxis
           dataKey={xAxisKey}
@@ -99,7 +103,12 @@ export const PerformanceTrendChart = ({
             border: "none",
             boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
           }}
-          cursor={{ fill: "#f8fafc" }}
+          cursor={{
+            stroke: "#e2e8f0",
+            strokeWidth: 2,
+            strokeDasharray: "5 5",
+            fill: "transparent", // เปลี่ยนจาก fill เป็นเส้น stroke แทนจะดูสะอาดกว่า
+          }}
           formatter={(value: number) => value.toFixed(2)}
         />
         <Legend
@@ -110,7 +119,7 @@ export const PerformanceTrendChart = ({
         />
         <Bar
           dataKey={maxScorePosKey}
-          name="Max Possible"
+          name={t("fullScore")}
           fill="#93e3f5"
           radius={[6, 6, 0, 0]}
           barSize={300}
@@ -119,6 +128,7 @@ export const PerformanceTrendChart = ({
           <Line
             type="monotone"
             dataKey={maxScoreKey}
+            name={t("maxScore")}
             stroke="#22c55e"
             strokeDasharray="5 5"
             dot={false}
@@ -129,6 +139,7 @@ export const PerformanceTrendChart = ({
           <Line
             type="monotone"
             dataKey={minScoreKey}
+            name={t("minScore")}
             stroke="#ef4444"
             strokeDasharray="5 5"
             dot={false}
@@ -139,6 +150,7 @@ export const PerformanceTrendChart = ({
           <Line
             type="monotone"
             dataKey={allAvgKey}
+            name={t("averageScore")}
             stroke="#6366f1"
             strokeWidth={4}
             dot={{ r: 6, fill: "#6366f1" }}
@@ -147,6 +159,7 @@ export const PerformanceTrendChart = ({
         {visibleLines?.midScore && (
           <Line
             type="monotone"
+            name={t("medianScore")}
             dataKey={midScoreKey}
             stroke="#f59e0b"
             strokeDasharray="3 4 5 2"

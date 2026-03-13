@@ -23,6 +23,8 @@ import { useAuth } from "../context/AuthContext";
 import { getUniversities, University } from "@/utils/universityApi";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useTranslation } from "react-i18next";
+import { Faculty, getFaculties } from "@/utils/facultyApi";
+import { GradeDistributionChart } from "./viewChartComponent/gradeDistributionChart";
 
 export default function PLOChart() {
   const { token, user } = useAuth();
@@ -38,12 +40,17 @@ export default function PLOChart() {
     courses: false,
   });
 
+  interface Option {
+    label: string;
+    value: string;
+  }
+
   const [options, setOptions] = useState({
-    universities: [] as any[],
-    faculties: [] as any[],
-    programs: [] as any[],
-    years: [] as any[],
-    courses: [] as any[],
+    universities: [] as Option[],
+    faculties: [] as Option[],
+    programs: [] as Option[],
+    years: [] as Option[],
+    courses: [] as Option[],
   });
 
   const [selections, setSelections] = useState({
@@ -312,37 +319,98 @@ export default function PLOChart() {
   }, [studentCourseAssScoreData, ploStudentData, cloStudentData]);
 
   // --- API & Effects (ส่วนที่เหลือคงเดิมตามความต้องการของคุณ) ---
-  useEffect(() => {
-    if (!token) return;
-    getUniversities(token).then((uniData) => {
-      setOptions((prev) => ({
-        ...prev,
-        universities: uniData.map((u: University) => ({
-          label: lang === "th" ? u.name_th : u.name,
-          value: String(u.id),
-        })),
-      }));
-    });
-    setIsHydrated(true);
-  }, [token, lang]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    if (!isHydrated || !selections.university) return;
-    apiClient
-      .get("/faculty", {
-        params: { university_id: selections.university },
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) =>
-        setOptions((p) => ({
-          ...p,
-          faculties: res.data.map((f: any) => ({
+    if (!token) return;
+
+    const initialize = async () => {
+      try {
+        setLoading(true);
+
+        // 1. Fetch Universities for all roles first
+        const uniData = await getUniversities(token);
+        const formattedUni = uniData.map((u: University) => ({
+          label: lang === "th" ? u.name_th : u.name,
+          value: String(u.id),
+        }));
+
+        if (isInstructor && user?.email) {
+          // 2. Instructor Path: Map Email -> Faculty -> University
+          const instructorRes = await apiClient.get(
+            `/instructor/email/${user.email}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+          const facultyId = instructorRes.data?.faculty_id;
+
+          const facultyRes = await apiClient.get(`/faculty/${facultyId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const facultyData = facultyRes.data;
+
+          // Load faculty list immediately so the dropdown has the name
+          const facultiesData = await getFaculties(
+            token,
+            String(facultyData.university_id),
+          );
+          const formattedFacs = facultiesData.map((f: Faculty) => ({
             label: lang === "th" ? f.name_th : f.name,
             value: String(f.id),
-          })),
-        })),
-      );
-  }, [selections.university, token, lang, isHydrated]);
+          }));
+
+          setOptions({
+            universities: [{ label: t("all"), value: "" }, ...formattedUni],
+            faculties: formattedFacs,
+            programs: [],
+            years: [],
+            courses: [],
+          });
+
+          // Set selections before releasing the initialization flag
+          setSelections({
+            university: String(facultyData.university_id),
+            faculty: String(facultyData.id),
+            program: "",
+            year: "",
+            courseId: "",
+          });
+        } else {
+          // 3. Admin/Super Admin Path
+          setOptions((prev) => ({
+            ...prev,
+            universities: [{ label: t("all"), value: "" }, ...formattedUni],
+          }));
+        }
+      } catch (err) {
+        console.error("Initialization failed:", err);
+      } finally {
+        setIsInitialized(true); // Now we allow cascading effects and CourseManagement to mount
+        setLoading(false);
+      }
+    };
+
+    initialize();
+  }, [token, user?.email, user?.role, lang]);
+
+  useEffect(() => {
+    if (!token || !selections.university || isInstructor || !isInitialized)
+      return;
+
+    getFaculties(token, selections.university)
+      .then((data) => {
+        const formatted = data.map((f: Faculty) => ({
+          label: lang === "th" ? f.name_th : f.name,
+          value: String(f.id),
+        }));
+        setOptions((prev) => ({
+          ...prev,
+          faculties: [{ label: t("all"), value: "" }, ...formatted],
+        }));
+      })
+      .catch(() => setOptions((prev) => ({ ...prev, faculties: [] })));
+  }, [selections.university, isInitialized, lang]);
 
   useEffect(() => {
     if (!isHydrated || !token || !selections.faculty) return;
@@ -427,7 +495,7 @@ export default function PLOChart() {
         setOptions((prev) => ({
           ...prev,
           courses: res.data.map((c: any) => ({
-            label: `${c.code} ${lang === "th" ? c.name_th : c.name_en}`,
+            label: `${c.code} ${lang === "th" ? c.name_th : c.name}`,
             value: String(c.id),
           })),
         }));
@@ -722,17 +790,25 @@ export default function PLOChart() {
   const [isPercentage, setIsPercentage] = useState(false);
   const currentConfig = isPercentage ? metricBalanceConfig : metricConfig;
 
-  const getGradeColor = (g: string) =>
-    ({
-      A: "#22c55e",
-      "B+": "#3b82f6",
-      B: "#60a5fa",
-      "C+": "#eab308",
-      C: "#fde047",
-      "D+": "#f97316",
-      D: "#fb923c",
-      F: "#ef4444",
-    })[g] || "#94a3b8";
+  const getGradeColor = (g: string) => {
+    const colors: Record<string, string> = {
+      // 🌟 กลุ่มดีเยี่ยม: ใช้โทน Emerald & Indigo
+      A: "#059669", // Emerald 600 (เขียวเข้มหรูหรา)
+      "B+": "#4f46e5", // Indigo 600 (น้ำเงินม่วง คมชัด)
+      B: "#0ea5e9", // Sky 500 (ฟ้าสว่าง)
+
+      // ⚡ กลุ่มกลาง: ใช้โทน Violet & Amber
+      "C+": "#8b5cf6", // Violet 500 (ม่วงพาสเทล ตัดกับทุกสีได้ดี)
+      C: "#f59e0b", // Amber 500 (เหลืองทองเข้ม)
+
+      // ⚠️ กลุ่มเสี่ยง: ใช้โทน Rose & Crimson
+      "D+": "#f43f5e", // Rose 500 (ชมพูเข้ม/แดงกุหลาบ)
+      D: "#fb923c", // Orange 400 (ส้มอิฐ)
+      F: "#be123c", // Rose 700 (แดงก่ำมืด สำหรับจุดที่แย่ที่สุด)
+    };
+
+    return colors[g] || "#cbd5e1"; // Default เป็นเทาอ่อน Slate 200
+  };
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
     null,
@@ -825,6 +901,65 @@ export default function PLOChart() {
     students,
   ]);
 
+  const clearFilters = () => {
+    // 🟢 ลบข้อมูลออกจาก localStorage ทันทีที่กดปุ่ม Clear
+    localStorage.removeItem("edit_fix_filters");
+
+    if (isInstructor) {
+      setSelections((prev) => ({
+        ...prev, // 🟢 เก็บค่า University และ Faculty เดิมไว้
+        program: "", // 🔴 ล้างค่าที่ต้องการ
+        year: "",
+        courseId: "",
+      }));
+    } else {
+      setSelections({
+        university: "",
+        faculty: "",
+        program: "",
+        year: "",
+        courseId: "",
+      });
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const res = apiClient.get("/calculation/ass-clo/gradeSummary", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { courseId: selections.courseId },
+      });
+      res.then((response) => {
+        setGradeSummaryData(response.data);
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }, [token, selections.courseId]);
+
+  const [gradeSummaryData, setGradeSummaryData] = useState<any>(null);
+
+  const formattedGradeData = useMemo(() => {
+    const grades = gradeSummaryData || {};
+    return Object.entries(grades)
+      .map(([grade, details]: [string, any]) => ({
+        grade,
+        count: details.count,
+      }))
+      .sort((a, b) => {
+        const order = ["A", "B+", "B", "C+", "C", "D+", "D", "F"];
+        return order.indexOf(a.grade) - order.indexOf(b.grade);
+      });
+  }, [gradeSummaryData]);
+
+  const isInstructor = user?.role === "instructor";
+  const isStudent = user?.role === "student";
+
+  const updateSelections = (updates: Partial<typeof selections>) => {
+    if (isInstructor && (updates.university || updates.faculty)) return;
+    setSelections((prev) => ({ ...prev, ...updates }));
+  };
+
   return (
     <div className="bg-[#f8fafc] min-h-screen text-slate-900 pb-20 font-kanit">
       {loading && <LoadingOverlay />}
@@ -869,14 +1004,18 @@ export default function PLOChart() {
           </div>
 
           {/* Dynamic Filters Grid */}
-          <div className="bg-slate-50/80 p-3 rounded-[2rem] border border-slate-100 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div
+            className="bg-white/50 
+              min-[768px]:grid-cols-3 
+              min-[1400px]:grid-cols-6 
+              items-endbg-white/50 backdrop-blur-sm p-4 rounded-[2.5rem] border border-slate-200/60 shadow-sm grid grid-cols-2  gap-4 items-end"
+          >
             <DropdownSelect
               label="University"
               options={options.universities}
               value={selections.university}
               onChange={(v) =>
-                setSelections({
-                  ...selections,
+                updateSelections({
                   university: v as string,
                   faculty: "",
                   program: "",
@@ -884,15 +1023,15 @@ export default function PLOChart() {
                   courseId: "",
                 })
               }
+              disabled={isInstructor}
             />
             <DropdownSelect
               label="Faculty"
               options={options.faculties}
               value={selections.faculty}
-              disabled={!selections.university}
+              disabled={!selections.university || isInstructor}
               onChange={(v) =>
-                setSelections({
-                  ...selections,
+                updateSelections({
                   faculty: v as string,
                   program: "",
                   year: "",
@@ -906,8 +1045,7 @@ export default function PLOChart() {
               value={selections.program}
               disabled={!selections.faculty}
               onChange={(v) =>
-                setSelections({
-                  ...selections,
+                updateSelections({
                   program: v as string,
                   year: "",
                   courseId: "",
@@ -920,8 +1058,7 @@ export default function PLOChart() {
               value={isOptionsLoaded.years ? selections.year : ""}
               disabled={!selections.program}
               onChange={(v) =>
-                setSelections({
-                  ...selections,
+                updateSelections({
                   year: v as string,
                   courseId: "",
                 })
@@ -932,23 +1069,14 @@ export default function PLOChart() {
               options={options.courses}
               disabled={!selections.year}
               value={isOptionsLoaded.courses ? selections.courseId : ""}
-              onChange={(v) =>
-                setSelections({ ...selections, courseId: v as string })
-              }
+              onChange={(v) => updateSelections({ courseId: v as string })}
             />
             <button
-              onClick={() =>
-                setSelections({
-                  university: "",
-                  faculty: "",
-                  program: "",
-                  year: "",
-                  courseId: "",
-                })
-              }
-              className="h-[46px] mt-auto text-slate-400 font-black hover:text-red-500 hover:bg-red-50 transition-colors border border-slate-200 rounded-xl text-[10px] uppercase tracking-widest"
+              onClick={clearFilters}
+              className="h-[42px] flex items-center justify-center gap-2 px-6 text-sm font-bold text-slate-400 hover:text-orange-600 bg-white border border-slate-200 rounded-xl transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:shadow-md active:scale-95"
             >
-              Clear Filters
+              <span className="text-lg">↺</span>
+              {t("clear")}
             </button>
           </div>
         </div>
@@ -996,7 +1124,6 @@ export default function PLOChart() {
             {/* Main Analytics Container */}
             {/* --- ส่วนกราฟที่ปรับให้กระชับขึ้น (Tidier Version) --- */}
             <div
-              ref={graphRef}
               id="analytics-graph-container"
               className="bg-white border border-slate-200 rounded-[2.5rem] shadow-xl overflow-hidden flex flex-col"
             >
@@ -1058,58 +1185,64 @@ export default function PLOChart() {
               </div>
 
               {/* 2. Secondary Bar: Student Focus & Statistical Toggles (ลดความสูงลง) */}
-              <div className="px-8 py-3 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                {/* Student Selector แบบ Minimal */}
+              <div className="px-6 py-4 bg-white border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_4px_12px_-5px_rgba(0,0,0,0.03)]">
+                {/* Left Side: Student Focus Selector */}
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <div className="relative group min-w-[280px] lg:min-w-[340px]">
+                    <div className="absolute -top-2 left-3 px-2 bg-white text-[9px] font-black text-indigo-500 uppercase tracking-widest z-10">
+                      {t("student_focus")}
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50/50 p-1 rounded-2xl border border-slate-100 transition-all focus-within:border-indigo-300 focus-within:bg-white focus-within:shadow-sm">
+                      <DropdownSelect
+                        label="" // ลบ Label ออกเพราะใช้แผ่นแปะด้านบนแทนแล้ว เพื่อความคลีน
+                        value={selectedStudentId || ""}
+                        disabled={!selections.courseId}
+                        options={studentCourseAssScoreData.map(
+                          (scoreItem: any) => {
+                            const studentInfo = students.find(
+                              (std: any) =>
+                                String(std.id) === String(scoreItem.student_id),
+                            );
+                            return {
+                              label: studentInfo
+                                ? `${studentInfo.student_code} - ${studentInfo.first_name} ${studentInfo.last_name}`
+                                : `ID: ${scoreItem.student_id}`,
+                              value: String(scoreItem.student_id),
+                            };
+                          },
+                        )}
+                        onChange={(v) => setSelectedStudentId(v as string)}
+                      />
 
-                {/* ส่วน Dropdown: ใช้ความกว้างที่พอเหมาะ ไม่ให้ยาวเกินไปจนดันส่วนอื่น */}
-                <div className="min-w-[240px] lg:min-w-[300px] flex items-center gap-2">
-                  <DropdownSelect
-                    label="Individual Focus"
-                    value={selectedStudentId || ""}
-                    disabled={!selections.courseId}
-                    options={studentCourseAssScoreData.map((scoreItem: any) => {
-                      const studentInfo = students.find(
-                        (std: any) =>
-                          String(std.id) === String(scoreItem.student_id),
-                      );
-                      return {
-                        label: studentInfo
-                          ? `${studentInfo.student_code} - ${studentInfo.first_name} ${studentInfo.last_name}`
-                          : `ID: ${scoreItem.student_id}`,
-                        value: String(scoreItem.student_id),
-                      };
-                    })}
-                    onChange={(v) => setSelectedStudentId(v as string)}
-                  />
-
-                  {selectedStudentId && (
-                    <button
-                      onClick={() => setSelectedStudentId(null)}
-                      className="flex items-center justify-center w-8 h-8 rounded-xl bg-white border border-red-100 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm group mt-4" // mt-4 เพื่อให้กึ่งกลางพอกับระดับ Dropdown
-                      title="Clear Focus"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="3"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  )}
+                      {selectedStudentId && (
+                        <button
+                          onClick={() => setSelectedStudentId(null)}
+                          className="mr-2 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all group/clear"
+                          title="Clear Focus"
+                        >
+                          <svg
+                            className="w-4 h-4 group-hover/clear:rotate-90 transition-transform"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2.5"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* ปุ่ม Clear: ปรับให้ดูเป็นส่วนหนึ่งของคอมโพเนนต์มากขึ้น */}
-
-                {/* 4. Grade Group Footer (เลื่อนลงมาเป็นส่วนท้ายของกราฟ) */}
-                <div className="px-8 py-4 bg-slate-50/30 border-t border-slate-100">
-                  <div className="flex flex-wrap justify-center gap-2">
+                {/* Right Side: Grade Filters & Stats Toggle */}
+                <div className="flex flex-wrap items-center justify-end gap-4 w-full md:w-auto">
+                  {/* 1. Grade Filters Group */}
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-100/50 rounded-[1.25rem] border border-slate-100">
                     {(isPercentage
                       ? gradeGroupStatsPercentage
                       : gradeGroupStats
@@ -1123,58 +1256,80 @@ export default function PLOChart() {
                               !p[`avg_grade_${item.grade}`],
                           }))
                         }
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black border transition-all flex items-center gap-2 
-                      ${visibleLines[`avg_grade_${item.grade}`] ? "bg-white shadow-sm border-slate-200 text-slate-800" : "bg-transparent border-transparent text-slate-300"}`}
+                        className={`
+                        relative w-[68px] px-3 py-1.5 rounded-xl text-[18px] font-black transition-all duration-300 flex items-center gap-2
+                        ${
+                          visibleLines[`avg_grade_${item.grade}`]
+                            ? "bg-white shadow-sm text-slate-800 scale-105 border-slate-200"
+                            : "text-slate-400 hover:text-slate-600 border-transparent"
+                        }
+                        border
+                      `}
                       >
                         <span
-                          className="w-1.5 h-1.5 rounded-full"
+                          className="w-2 h-2 rounded-full shadow-inner"
                           style={{ backgroundColor: getGradeColor(item.grade) }}
                         />
                         {item.grade}
+                        {/* {item.count !== undefined && (
+                          <span className="text-[8px] opacity-50 font-medium">
+                            ({item.count})
+                          </span>
+                        )} */}
                       </button>
                     ))}
                   </div>
-                </div>
-
-                {/* Statistical Toggles แบบไอคอนหรือปุ่มจิ๋ว */}
-                <div className="flex items-center gap-2">
-                  <ToggleButton
-                    label="MAX"
-                    active={visibleLines.maxScore}
-                    onClick={() =>
-                      setVisibleLines((p) => ({ ...p, maxScore: !p.maxScore }))
-                    }
-                    color="#22c55e"
-                  />
-                  <ToggleButton
-                    label="MIN"
-                    active={visibleLines.minScore}
-                    onClick={() =>
-                      setVisibleLines((p) => ({ ...p, minScore: !p.minScore }))
-                    }
-                    color="#ef4444"
-                  />
-                  <ToggleButton
-                    label="AVG"
-                    active={visibleLines.allAvg}
-                    onClick={() =>
-                      setVisibleLines((p) => ({ ...p, allAvg: !p.allAvg }))
-                    }
-                    color="#6366f1"
-                  />
-                  <ToggleButton
-                    label="MED"
-                    active={visibleLines.midScore}
-                    onClick={() =>
-                      setVisibleLines((p) => ({ ...p, midScore: !p.midScore }))
-                    }
-                    color="#f59e0b"
-                  />
+                  <div className="h-8 w-px hidden xl:block" />
+                  {/* Separator */}
+                  {/* 2. Statistical Toggles Group */}
+                  <div className="flex items-center gap-1.5 p-1 rounded-[1.25rem]">
+                    <ToggleButton
+                      label="MAX"
+                      active={visibleLines.maxScore}
+                      onClick={() =>
+                        setVisibleLines((p) => ({
+                          ...p,
+                          maxScore: !p.maxScore,
+                        }))
+                      }
+                      color="#22c55e"
+                    />
+                    <ToggleButton
+                      label="MIN"
+                      active={visibleLines.minScore}
+                      onClick={() =>
+                        setVisibleLines((p) => ({
+                          ...p,
+                          minScore: !p.minScore,
+                        }))
+                      }
+                      color="#ef4444"
+                    />
+                    <ToggleButton
+                      label="AVG"
+                      active={visibleLines.allAvg}
+                      onClick={() =>
+                        setVisibleLines((p) => ({ ...p, allAvg: !p.allAvg }))
+                      }
+                      color="#6366f1"
+                    />
+                    <ToggleButton
+                      label="MED"
+                      active={visibleLines.midScore}
+                      onClick={() =>
+                        setVisibleLines((p) => ({
+                          ...p,
+                          midScore: !p.midScore,
+                        }))
+                      }
+                      color="#f59e0b"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* 3. Graph Area (เพิ่มพื้นที่แสดงผล) */}
-              <div className="p-6">
+              <div ref={graphRef} className="p-6">
                 <div className="h-[480px] w-full">
                   {activeTab === "line" ? (
                     <PerformanceTrendChart
@@ -1215,6 +1370,10 @@ export default function PLOChart() {
                   )}
                 </div>
               </div>
+            </div>
+
+            <div className="h-[400px]">
+              <GradeDistributionChart data={formattedGradeData} />
             </div>
 
             {/* Table Data Section */}

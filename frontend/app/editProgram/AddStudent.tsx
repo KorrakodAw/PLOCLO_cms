@@ -88,7 +88,7 @@ export default function AddStudent({ programId }: AddStudentProps) {
     {
       header: "full name",
       accessor: "first_name",
-      // render: (value, row) => `${row.first_name} ${row.last_name}`,
+      render: (row) => `${row.first_name} ${row.last_name}`,
     },
     // {
     //   header: t("program"),
@@ -98,7 +98,6 @@ export default function AddStudent({ programId }: AddStudentProps) {
     {
       header: t("email"),
       accessor: "email",
-     
     },
     {
       header: t("actions"),
@@ -207,8 +206,6 @@ export default function AddStudent({ programId }: AddStudentProps) {
       email: String(data.nameTh), // Using nameTh as Email
       program_id: programId,
     };
-
- 
 
     try {
       await addStudent(payload, token);

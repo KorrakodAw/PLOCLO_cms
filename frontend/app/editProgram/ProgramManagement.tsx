@@ -293,7 +293,7 @@ export default function ProgramManagement({
     { header: t("code"), accessor: "program_code" },
     lang === "en"
       ? { header: "Name", accessor: "program_name_en" }
-      : { header: "ชื่อแผนการเรียน", accessor: "program_name_th" },
+      : { header: "ชื่อหลักสูตร", accessor: "program_name_th" },
     lang === "en"
       ? { header: "Abbrev.", accessor: "program_shortname_en" }
       : { header: "ชื่อย่อ", accessor: "program_shortname_th" },

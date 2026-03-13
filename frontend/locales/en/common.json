@@ -18,7 +18,7 @@
   "assignment": "Assignment",
   "assignment mapping": "Assignment Mapping",
   "Assignments": "Assignments",
-  "Assignment–CLO Mapping": "Assignment–CLO Mapping",
+  "Assessment–CLO Mapping": "Assessment–CLO Mapping",
   "Assignment–PLO Mapping": "Assignment–PLO Mapping",
   "cancel": "Cancel",
   "clear": "CLEAR",
@@ -223,5 +223,12 @@
   "Academic Year / Term": "Academic Year / Term",
   "Duplicate Section": "Duplicate Section",
   "Confirm Removal": "Confirm Removal",
-  "Score Calculated": "Score Calculated"
+  "Score Calculated": "Score Calculated",
+  "fullScore": "Full Score",
+  "maxScore": "Max",
+  "minScore": "Min",
+  "averageScore": "Average",
+  "medianScore": "Median",
+  "assessment": "Assessment",
+  "assessment-category-weights": "Assessment Category Weights"
 }

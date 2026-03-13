@@ -12,7 +12,7 @@ export function Toast({
   type = "success",
   visible,
   onClose,
-  duration = 5000,
+  duration = 10000,
   toastKey,
 }: {
   message: string;
@@ -110,7 +110,7 @@ export function useToast() {
     type: "success",
     visible: false,
     key: 0,
-    duration: 5000,
+    duration: 10000,
   });
 
   // refs to avoid adding toast.duration/toast.visible to deps
@@ -127,7 +127,7 @@ export function useToast() {
     (
       message: string,
       type: "success" | "error" = "success",
-      duration = 5000
+      duration = 10000
     ) => {
       setToast({
         message,

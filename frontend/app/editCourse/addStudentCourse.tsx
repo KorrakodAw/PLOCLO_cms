@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { apiClient } from "@/utils/apiClient";
 import { useToast } from "@/components/Toast";
 import { Column, Table } from "@/components/Table";
@@ -7,6 +7,8 @@ import { useTranslation } from "react-i18next";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import AlertPopup from "@/components/AlertPopup";
 import { useAuth } from "../context/AuthContext";
+import * as XLSX from "xlsx";
+import { Upload, Plus, Users, Trash2 } from "lucide-react";
 
 interface Student {
   id: number;
@@ -80,12 +82,19 @@ export default function AddStudentCourse({
   }, [programId, sectionId, masterCourseId, loadData]);
 
   // Filter Logic
-  const availableStudents = allProgramStudents.filter((student) => {
-    const isAlreadyInCourse = studentsInAnySection.some(
-      (enrolled) => enrolled.id === student.id,
+  const availableStudents = allProgramStudents
+    .filter((student) => {
+      const isAlreadyInCourse = studentsInAnySection.some(
+        (enrolled) => enrolled.id === student.id,
+      );
+      return !isAlreadyInCourse;
+    })
+    // 🟢 เพิ่มการ Sort ตามรหัสนิสิต (student_code)
+    .sort((a, b) =>
+      a.student_code.localeCompare(b.student_code, undefined, {
+        numeric: true,
+      }),
     );
-    return !isAlreadyInCourse;
-  });
 
   // --- BULK ADD ---
   const handleAddSelected = async () => {
@@ -109,6 +118,94 @@ export default function AddStudentCourse({
     } finally {
       setLoading(false);
     }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [invalidCodes, setInvalidCodes] = useState<string[]>([]);
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+
+  // 🟢 ฟังก์ชันสำหรับ Import จาก Excel พร้อมระบบ Skip และ Alert
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        setLoading(true);
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const validStudentIds: number[] = [];
+        const missingFromProgram: string[] = [];
+        let skipCount = 0;
+
+        data.forEach((row) => {
+          const code = String(
+            row.student_id || row["รหัสนิสิต"] || "",
+          ).trim();
+          if (!code) return;
+
+          // 1. ตรวจสอบว่ารหัสนิสิตนี้มีตัวตนอยู่ใน Program นี้หรือไม่
+          const studentInfo = allProgramStudents.find(
+            (s) => s.student_code === code,
+          );
+
+          if (!studentInfo) {
+            // กรณีไม่มีรหัสนี้ในระบบเลย (แจ้งเตือน)
+            missingFromProgram.push(code);
+          } else {
+            // 2. ถ้ามีตัวตน ตรวจสอบต่อว่า "ลงทะเบียนวิชานี้ไปหรือยัง" (ไม่ว่าจะ Section ไหน)
+            const isAlreadyInCourse = studentsInAnySection.some(
+              (enrolled) => enrolled.id === studentInfo.id,
+            );
+
+            if (isAlreadyInCourse) {
+              // กรณีมีอยู่แล้วในคอร์ส (ข้ามไปเงียบๆ)
+              skipCount++;
+            } else {
+              // กรณีเป็นนิสิตใหม่ที่ยังไม่เคยลงวิชานี้ (เพิ่มเข้า List)
+              validStudentIds.push(studentInfo.id);
+            }
+          }
+        });
+
+        // 3. จัดการแสดงผล Alert สำหรับรหัสที่ไม่มีในระบบ (แต่ยังยอมให้เพิ่มคนอื่นๆ ต่อได้)
+        if (missingFromProgram.length > 0) {
+          setInvalidCodes(missingFromProgram);
+          setShowErrorPopup(true);
+          // เราจะไม่ return ตรงนี้เพื่อให้ validStudentIds ที่เหลือทำงานต่อได้
+        }
+
+        // 4. ส่งข้อมูลเฉพาะนิสิตที่ผ่านเงื่อนไข (มีในระบบ และ ยังไม่เคยลงวิชานี้)
+        if (validStudentIds.length > 0) {
+          await apiClient.post("/studentOnCourse/bulk", {
+            sectionId: parseInt(sectionId),
+            studentIds: validStudentIds,
+          });
+
+          showToast(
+            `Added ${validStudentIds.length} new students. (Skipped ${skipCount} already enrolled)`,
+            "success",
+          );
+          await loadData();
+        } else if (missingFromProgram.length === 0) {
+          showToast(
+            `No new students to add. (${skipCount} were already in the course)`,
+            "error",
+          );
+        }
+      } catch (err) {
+        console.error("Excel processing error", err);
+        showToast("Failed to process Excel file", "error");
+      } finally {
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   // --- BULK DELETE ---
@@ -185,29 +282,70 @@ export default function AddStudentCourse({
       <ToastElement />
 
       {/* Header Actions */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          {t("Students in this Course")}
-          <span className="text-sm font-normal text-gray-500">
-            ({enrolledStudents.length})
-          </span>
-        </h2>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm gap-4 transition-all hover:shadow-md">
+        {/* Left Side: Title & Counter */}
+        <div className="flex items-center gap-4">
+          <div className="bg-orange-500/10 p-3 rounded-2xl">
+            <Users className="text-orange-600 w-6 h-6" />{" "}
+            {/* แนะนำให้ import Users จาก lucide-react */}
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight leading-none">
+              {t("Students in this Course")}
+            </h2>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+              Currently Enrolled:{" "}
+              <span className="text-orange-600">{enrolledStudents.length}</span>{" "}
+              Members
+            </p>
+          </div>
+        </div>
 
-        <div className="flex gap-2">
+        {/* Right Side: Action Buttons Group */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* 1. Delete Action (Show only when selected) */}
           {selectedEnrolledIds.length > 0 && (
             <button
               onClick={() => setShowAlertPopup(true)}
-              className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-4 py-2 rounded-lg font-bold transition-colors animate-in fade-in"
+              className="group flex items-center gap-2 bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-sm active:scale-95"
             >
+              <Trash2 size={16} className="group-hover:animate-pulse" />
               {t("delete")} ({selectedEnrolledIds.length})
             </button>
           )}
 
+          <div className="h-8 w-px bg-slate-100 hidden sm:block mx-1" />
+
+          {/* 2. Import Excel Action */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportExcel}
+            accept=".xlsx, .xls"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white px-5 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-sm active:scale-95 group"
+          >
+            <Upload
+              size={16}
+              className="group-hover:-translate-y-1 transition-transform"
+            />
+            Import Excel
+          </button>
+
+          {/* 3. Primary Enroll Action */}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition-colors"
+            className="flex items-center gap-2 bg-slate-900 text-white hover:bg-orange-600 px-6 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-lg shadow-slate-200 active:scale-95 group"
           >
-            + {t("Enroll Students")}
+            <Plus
+              size={18}
+              strokeWidth={3}
+              className="group-hover:rotate-90 transition-transform duration-300"
+            />
+            {t("Enroll Students")}
           </button>
         </div>
       </div>
@@ -324,6 +462,16 @@ export default function AddStudentCourse({
             handleBulkDelete();
           }}
           onCancel={() => setShowAlertPopup(false)}
+        />
+      )}
+
+      {showErrorPopup && (
+        <AlertPopup
+          isOpen={showErrorPopup}
+          type="error"
+          title="Students Not Found"
+          message={`The following student codes do not exist in the current program: ${invalidCodes.join(", ")}. Please add them to the program system first.`}
+          onConfirm={() => setShowErrorPopup(false)}
         />
       )}
     </div>
