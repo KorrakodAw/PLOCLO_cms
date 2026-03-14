@@ -61,6 +61,7 @@ model Program {
   courses  Course[]
   plos     Plo[]
   students Student[]
+  programOnCourses ProgramOnCourse[]
 
   @@unique([program_code, program_year])
   @@map("program")
@@ -73,6 +74,7 @@ model Course {
   code       String @db.VarChar(50)
   name       String @db.VarChar(255)
   name_th    String @db.VarChar(255)
+  credits    Decimal @db.Decimal(10, 3)
   program_id Int
 
   program Program @relation(fields: [program_id], references: [id], onDelete: Cascade)
@@ -81,6 +83,7 @@ model Course {
   clos        Clo[]
   sections    CourseSection[]
   instructors CourseInstructor[]
+  programs    ProgramOnCourse[]
 
   @@map("course")
 }
@@ -289,6 +292,20 @@ model StudentOnSection {
 
   @@unique([student_id, section_id])
   @@map("student_on_section")
+}
+
+model ProgramOnCourse {
+  program_id Int  @map("program_id")
+  course_id  Int  @map("course_id")
+  type       String @db.VarChar(50) // เช่น "core", "elective", "general"
+
+  program Program @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([program_id, course_id]) // ใช้ composite primary key
+  @@map("program_on_course")
 }
 
 enum AssCategory {
