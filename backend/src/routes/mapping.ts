@@ -28,7 +28,7 @@ router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
        FROM clo_plo_mapping m
        JOIN clo c ON m.clo_id = c.id
        WHERE c.course_id = $1`,
-      [courseId]
+      [courseId],
     );
 
     res.json(result.rows);
@@ -53,13 +53,13 @@ router.post("/clo-plo", authenticateToken, async (req, res) => {
            VALUES ($1, $2, $3)
            ON CONFLICT (clo_id, plo_id) 
            DO UPDATE SET weight = EXCLUDED.weight, updated_at = NOW()`,
-          [item.clo_id, item.plo_id, item.weight]
+          [item.clo_id, item.plo_id, item.weight],
         );
       } else {
         await client.query(
           `DELETE FROM clo_plo_mapping 
            WHERE clo_id = $1 AND plo_id = $2`,
-          [item.clo_id, item.plo_id]
+          [item.clo_id, item.plo_id],
         );
       }
     }
@@ -87,7 +87,7 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
         // 1. Fetch Assignment (Now directly linked to Course)
         const assignment = await tx.assignment.findUnique({
           where: { id: Number(item.assignment_id) },
-          select: { course_id: true }, // Direct relation
+          select: { section_id: true }, // Direct relation
         });
 
         // 2. Fetch CLO (Linked to Course)
@@ -101,7 +101,7 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
         }
 
         // 3. Validation: Must belong to the same Master Course
-        if (assignment.course_id !== clo.course_id) {
+        if (assignment.section_id !== clo.course_id) {
           throw new Error("COURSE_MISMATCH");
         }
 
@@ -117,7 +117,7 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
 
         const currentTotal = existingMappings.reduce(
           (acc, curr) => acc + Number(curr.weight ?? 0),
-          0
+          0,
         );
 
         // Note: Strict validation logic depends on your business rules.
@@ -181,29 +181,33 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
 });
 
 // GET /api/mapping/assignment-clo/:courseId
-router.get("/assignment-clo/:courseId", authenticateToken, async (req, res) => {
-  try {
-    const courseId = parseInt(req.params.courseId as string);
+router.get(
+  "/assignment-clo/:sectionId",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const sectionId = parseInt(req.params.sectionId as string);
 
-    if (isNaN(courseId)) {
-      return res.status(400).json({ error: "Invalid Course ID" });
-    }
+      if (isNaN(sectionId)) {
+        return res.status(400).json({ error: "Invalid Course ID" });
+      }
 
-    // Updated Query: Both Assignment and CLO are now directly under Course
-    const result = await pool.query(
-      `SELECT m.assignment_id, m.clo_id, m.weight 
+      // Updated Query: Both Assignment and CLO are now directly under Course
+      const result = await pool.query(
+        `SELECT m.assignment_id, m.clo_id, m.weight 
        FROM assignment_clo_mapping m
        JOIN assignment a ON m.assignment_id = a.id
        JOIN clo c ON m.clo_id = c.id
-       WHERE a.course_id = $1 AND c.course_id = $1`,
-      [courseId]
-    );
+       WHERE a.section_id = $1 AND c.course_id = $1`,
+        [sectionId],
+      );
 
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch mappings" });
-  }
-});
+      res.json(result.rows);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to fetch mappings" });
+    }
+  },
+);
 
 export default router;

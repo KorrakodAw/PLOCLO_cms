@@ -16,7 +16,7 @@ export async function getCloScorePerStudentPerCourse(
       where: {
         student_id: Number(studentId),
         assignment: {
-          course_id: Number(courseId),
+          section_id: Number(courseId),
         },
       },
       select: {
@@ -101,7 +101,7 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
     const studentClo = await tx.studentScore.findMany({
       where: {
         assignment: {
-          course_id: Number(courseId),
+          section_id: Number(courseId),
         },
       },
       select: {
@@ -231,7 +231,7 @@ export async function getCloScoreAllStudentPerCourse(
     const studentClo = await tx.studentScore.findMany({
       where: {
         assignment: {
-          course_id: Number(courseId),
+          section_id: Number(courseId),
         },
       },
       select: {
@@ -361,7 +361,7 @@ export async function getCloPercentageAllStudentPerCourse(
 
     // 2) ดึง highestPossible ของแต่ละ CLO
     const assignments = await tx.assignment.findMany({
-      where: { course_id: Number(courseId) },
+      where: { section_id: Number(courseId) },
       select: {
         weight: true,
         assignment_clo_mappings: {
@@ -461,7 +461,7 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     // 2) เพิ่มการหา highest clo possible จาก assignment weight
     // -----------------------------
     const assignments = await tx.assignment.findMany({
-      where: { course_id: Number(courseId) },
+      where: { section_id: Number(courseId) },
       select: {
         weight: true,
         assignment_clo_mappings: {
@@ -571,7 +571,7 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
 
     // 2) ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { course_id: Number(courseId) },
+      where: { section_id : Number(courseId) },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -652,7 +652,7 @@ export async function getRealScorePerStudentPerCourse(
       where: {
         student_id: Number(studentId),
         assignment: {
-          course_id: Number(courseId),
+          section_id: Number(courseId),
         },
       },
       select: {
@@ -708,7 +708,7 @@ export async function getRealScoreAllStudentPerCourse(
     const studentScores = await tx.studentScore.findMany({
       where: {
         assignment: {
-          course_id: Number(courseId),
+          section_id: Number(courseId),
         },
       },
       select: {
@@ -782,7 +782,7 @@ export async function getRealScorePercentageAllStudentPerCourse(
 
     // 2) ดึง highestPossible ต่อ category
     const assignments = await tx.assignment.findMany({
-      where: { course_id: Number(courseId) },
+      where: { section_id: Number(courseId) },
       select: {
         weight: true,
         category: true,
@@ -850,7 +850,7 @@ export async function getTotalScoreAndGradePerStudentPerCourse(
 
     // 3. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { course_id: Number(courseId) },
+      where: { section_id: Number(courseId) },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -885,7 +885,7 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 
     // 2. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { course_id: Number(courseId) },
+      where: { section_id: Number(courseId) },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -968,7 +968,7 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
     // 2) หา highestPossible ต่อ category จาก assignment weight
     // -----------------------------
     const assignments = await tx.assignment.findMany({
-      where: { course_id: Number(courseId) },
+      where: { section_id: Number(courseId) },
       select: {
         weight: true,
         category: true,

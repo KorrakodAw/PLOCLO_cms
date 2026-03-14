@@ -30,7 +30,9 @@ interface Assignment {
 
 export default function AssignmentCloMapping({
   courseId,
+  sectionId,
 }: {
+  sectionId: string | number;
   courseId: string | number;
 }) {
   const { token } = useAuth();
@@ -49,19 +51,19 @@ export default function AssignmentCloMapping({
 
   // 1. Fetch Initial Data
   useEffect(() => {
-    if (!courseId || !token) return;
+    if (!sectionId || !token) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
         const [assignRes, cloRes, mapRes] = await Promise.all([
-          apiClient.get(`/assignment?courseId=${courseId}`, {
+          apiClient.get(`/assignment?sectionId=${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           apiClient.get(`/clo?courseId=${courseId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          apiClient.get(`/mapping/assignment-clo/${courseId}`, {
+          apiClient.get(`/mapping/assignment-clo/${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -95,7 +97,7 @@ export default function AssignmentCloMapping({
     };
 
     fetchData();
-  }, [courseId, token]);
+  }, [sectionId, token]);
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -153,7 +155,7 @@ export default function AssignmentCloMapping({
         setMappingGrid(newGrid);
         setChangedKeys(newChangedKeys);
         showToast(`Import Success: Matched ${matchCount} cells.`, "success");
-      } catch  {
+      } catch {
         showToast("Excel structure mismatch", "error");
       } finally {
         setLoading(false);

@@ -1,374 +1,305 @@
-import AddButton from "../../components/AddButton";
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
-import { useState, useEffect } from "react";
-import { addStudent } from "../../utils/studentApi";
-
-import { Column, Table } from "../../components/Table";
-
 import { useToast } from "../../components/Toast";
-
-import FormEditPopup from "../../components/EditPopup";
-import AlertPopup from "../../components/AlertPopup";
 import { apiClient } from "../../utils/apiClient";
 
+import { Column, Table } from "../../components/Table";
+import AddButton from "../../components/AddButton";
+import FormEditPopup from "../../components/EditPopup";
+import AlertPopup from "../../components/AlertPopup";
 import LoadingOverlay from "../../components/LoadingOverlay";
-
-interface AddStudentProps {
-  programId?: string | number;
-}
+import { Trash2, Users } from "lucide-react";
 
 interface Student {
-  student_id: number | string;
   id: number;
-  student_code: string | number;
-  name: string;
+  student_code: string;
   first_name: string;
   last_name: string;
   email: string;
-  program_shortname_en: string;
-  program_shortname_th: string;
-  year_of_admission?: number;
-  year?: number;
 }
 
-export default function AddStudent({ programId }: AddStudentProps) {
-  const { t, i18n } = useTranslation("common");
-  const lang = i18n.language;
+export default function AddStudent({
+  programId,
+}: {
+  programId?: string | number;
+}) {
+  const { t } = useTranslation("common");
   const { token, isLoggedIn, initialized } = useAuth();
+  const { showToast, ToastElement } = useToast();
 
   const [loadingStudent, setLoadingStudent] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
-  const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]); // สำหรับ Bulk Delete
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
 
-  const { showToast, ToastElement } = useToast();
-
+  // 1. Fetch Data
   const fetchStudents = async () => {
-    // 1. Guard Clause: Don't fetch if crucial data is missing
-    if (!initialized || !isLoggedIn || !token || !programId) {
-      // Optional: console.log("Waiting for programId or auth...");
-      return;
-    }
-
+    if (!initialized || !isLoggedIn || !token || !programId) return;
     try {
       setLoadingStudent(true);
-
-      // 2. Use 'params' object for cleaner query strings
       const res = await apiClient.get("/student", {
         headers: { Authorization: `Bearer ${token}` },
-        params: { programId: programId },
+        params: { programId },
       });
-
-      // 3. Robust Data Extraction (Fixes the "No Data" issue)
-      // Checks if the response IS the array, or if the array is nested inside .data
-      let studentData: Student[] = [];
-
-      if (Array.isArray(res.data)) {
-        studentData = res.data;
-      } else if (res.data && Array.isArray(res.data.data)) {
-        studentData = res.data.data;
-      }
-
-      setStudents(studentData);
-    } catch (error) {
-      console.error("Error fetching students:", error);
+      setStudents(Array.isArray(res.data) ? res.data : res.data.data || []);
+    } catch {
       showToast(t("Failed to load student data."), "error");
     } finally {
       setLoadingStudent(false);
     }
   };
 
+  useEffect(() => {
+    fetchStudents();
+  }, [isLoggedIn, token, programId]);
+
+  // 2. Multi-select Logic
+  const toggleSelectAll = () => {
+    if (selectedIds.length === students.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(students.map((s) => s.id));
+    }
+  };
+
+  const handleCheckboxChange = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  // 3. Actions
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0 || !token) return;
+    try {
+      setLoadingStudent(true);
+      await apiClient.delete("/student/bulk-delete", {
+        data: { studentIds: selectedIds },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast(
+        `Deleted ${selectedIds.length} students successfully!`,
+        "success",
+      );
+      setSelectedIds([]);
+      fetchStudents();
+    } catch {
+      showToast("Failed to delete students", "error");
+    } finally {
+      setLoadingStudent(false);
+      setShowDeletePopup(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!selectedStudent || !token) return;
+    try {
+      setLoadingStudent(true);
+      await apiClient.patch(`/student/${selectedStudent.id}`, selectedStudent, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast("Student updated successfully!", "success");
+      setShowEditPopup(false);
+      fetchStudents();
+    } catch {
+      showToast("Update failed", "error");
+    } finally {
+      setLoadingStudent(false);
+    }
+  };
+
+  // 4. Excel & Manual Add (Bulk)
+  const handleAddStudentBulk = async (rows: any[]) => {
+    if (!token || !programId) return;
+    setLoadingStudent(true);
+
+    const studentsToUpload = rows
+      .map((row) => {
+        let firstName = row.first_name || "";
+        let lastName = row.last_name || "";
+
+        if (row.student_name) {
+          const parts = String(row.student_name).trim().split(/\s+/);
+          firstName = parts[0];
+          lastName = parts.slice(1).join(" ");
+        }
+
+        return {
+          student_code: String(row.student_id || row.student_code || "").trim(),
+          first_name: firstName,
+          last_name: lastName,
+          email: String(row.email || "").trim(),
+          program_id: Number(programId),
+        };
+      })
+      .filter((s) => s.student_code && s.first_name);
+
+    try {
+      await apiClient.post(
+        "/student/bulk",
+        { students: studentsToUpload },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      showToast(
+        `Successfully added ${studentsToUpload.length} students`,
+        "success",
+      );
+      fetchStudents();
+    } catch {
+      showToast("Bulk add failed", "error");
+    } finally {
+      setLoadingStudent(false);
+    }
+  };
+
+  const sortedStudents = useMemo(() => {
+    return [...students].sort((a, b) => {
+      // แปลงเป็น String ก่อนเปรียบเทียบเพื่อความปลอดภัย
+      const codeA = String(a.student_code || "");
+      const codeB = String(b.student_code || "");
+
+      return codeA.localeCompare(codeB, undefined, { numeric: true });
+    });
+  }, [students]);
+
+  // 5. Columns Definition
   const studentColumns: Column<Student>[] = [
-    { header: "student code", accessor: "student_code" },
     {
-      header: "full name",
+      header: (
+        <input
+          type="checkbox"
+          checked={
+            students.length > 0 && selectedIds.length === students.length
+          }
+          onChange={toggleSelectAll}
+          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+        />
+      ) as any,
+      accessor: "id",
+      render: (row) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(row.id)}
+          onChange={() => handleCheckboxChange(row.id)}
+          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+        />
+      ),
+    },
+    { header: t("Student Code"), accessor: "student_code" },
+    {
+      header: t("Full Name"),
       accessor: "first_name",
       render: (row) => `${row.first_name} ${row.last_name}`,
     },
-    // {
-    //   header: t("program"),
-    //   accessor: lang === "en" ? "program_shortname_en" : "program_shortname_th",
-    //   render: (v) => v || "-",
-    // },
+    { header: t("Email"), accessor: "email" },
     {
-      header: t("email"),
-      accessor: "email",
-    },
-    {
-      header: t("actions"),
+      header: t("Actions"),
       accessor: "id",
       actions: [
         {
-          label: t("edit"),
+          label: t("Edit"),
           color: "blue",
-          hoverColor: "blue",
-          onClick: (row: Student) => {
+          onClick: (row) => {
             setSelectedStudent(row);
             setShowEditPopup(true);
-          },
-        },
-        {
-          label: t("delete"),
-          color: "red",
-          hoverColor: "red",
-          onClick: (row: Student) => {
-            setStudentToDelete(row);
-            setShowDeletePopup(true);
           },
         },
       ],
     },
   ];
 
-  const saveEdit = async () => {
-    if (!selectedStudent || !token) return;
-
-    try {
-      await apiClient.patch(
-        `/student/${selectedStudent.id}`,
-        {
-          student_code: selectedStudent.student_code,
-          first_name: selectedStudent.first_name,
-          last_name: selectedStudent.last_name,
-          email: selectedStudent.email,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      showToast("Student updated successfully!", "success");
-      setShowEditPopup(false);
-      fetchStudents();
-    } catch (err) {
-      if (err instanceof Error) {
-        showToast("Failed to update student: " + err.message, "error");
-      } else if (typeof err === "string") {
-        showToast("Failed to update student: " + err, "error");
-      } else {
-        showToast(
-          "Failed to update student: An unknown error occurred",
-          "error",
-        );
-      }
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!studentToDelete || !token) return;
-
-    try {
-      await apiClient.delete(`/student/${studentToDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      showToast("Student deleted successfully!", "success");
-      setShowDeletePopup(false);
-      setStudentToDelete(null);
-      fetchStudents();
-    } catch (err) {
-      if (err instanceof Error) {
-        showToast("Failed to delete student: " + err.message, "error");
-      } else if (typeof err === "string") {
-        showToast("Failed to delete student: " + err, "error");
-      } else {
-        showToast(
-          "Failed to delete student: An unknown error occurred",
-          "error",
-        );
-      }
-    }
-  };
-
-  // 🧩 Add single student manually
-  const handleAddStudent = async (data: Record<string, unknown>) => {
-    if (!initialized || !programId) return;
-    if (!isLoggedIn || !token)
-      return showToast("Please log in again.", "error");
-    if (!programId) return showToast("Please select a program.", "error");
-
-    // Map form fields to backend payload
-    // 1. Logic to split "FirstName LastName"
-    const fullName = String(data.nameEn || "").trim();
-    const nameParts = fullName.split(" "); // Split by space
-
-    const firstName = nameParts[0] || ""; // Take the first chunk
-    const lastName = nameParts.slice(1).join(" ") || ""; // Join the rest as Last Name
-
-    // 2. Construct the Payload
-    const payload = {
-      student_code: String(data.code),
-      first_name: firstName, // Derived from nameEn
-      last_name: lastName, // Derived from nameEn
-      email: String(data.nameTh), // Using nameTh as Email
-      program_id: programId,
-    };
-
-    try {
-      await addStudent(payload, token);
-
-      fetchStudents();
-      showToast("Student added successfully!", "success");
-      setPage(1); // Reset to first page to see new entries
-    } catch (err) {
-      if (err instanceof Error) {
-        showToast("Failed to add student: " + err.message, "error");
-      } else if (typeof err === "string") {
-        showToast("Failed to add student: " + err, "error");
-      } else {
-        showToast("Failed to add student: An unknown error occurred", "error");
-      }
-    }
-  };
-
-  // 🧩 Add from Excel
-  // 🧩 Add from Excel
-  const handleAddStudentExcel = async (rows: Student[]) => {
-    if (!initialized) return alert("Auth not initialized.");
-    if (!isLoggedIn || !token) return alert("Please log in again.");
-    if (!programId) return alert("Please select a program first.");
-
-    // 1. Start Loading UI (Prevents interaction while processing)
-    setLoadingStudent(true);
-
-    let successCount = 0;
-    let failCount = 0;
-    const errorDetails: string[] = [];
-
-    const rowsWithProgram = rows.map((row) => ({
-      ...row,
-      program_id: programId,
-      year_of_admission: Number(row.year_of_admission ?? row.year),
-    }));
-
-    // 2. Process all rows
-    for (const [i, row] of rowsWithProgram.entries()) {
-      const student_code = row.student_id || row.student_code;
-      const first_name = row.first_name;
-      const last_name = row.last_name;
-      const email = row.email || "";
-      const program_id = row.program_id || programId;
-
-      if (!student_code || !first_name || !last_name || !program_id) {
-        failCount++;
-        errorDetails.push(`Row ${i + 1}: missing required fields`);
-        continue;
-      }
-
-      const payload = {
-        student_code: String(student_code),
-        first_name: String(first_name),
-        last_name: String(last_name),
-        email: String(email) || "",
-        program_id: programId,
-      };
-
-      try {
-        await addStudent(payload, token);
-        successCount++;
-        // ❌ REMOVED fetchStudents() from here to stop blinking
-      } catch (err) {
-        failCount++;
-        if (err instanceof Error) {
-          errorDetails.push(`Row ${i + 1}: ${err.message}`);
-        } else {
-          errorDetails.push(`Row ${i + 1}: An unknown error occurred`);
-        }
-      }
-    }
-
-    // 3. Update UI ONCE after loop finishes
-    await fetchStudents();
-    setPage(1);
-    setLoadingStudent(false); // Stop loading
-
-    showToast(
-      `Excel upload completed: ${successCount} succeeded, ${failCount} failed.`,
-      failCount > 0 ? "error" : "success",
-    );
-
-    if (failCount > 0) {
-      showToast(
-        `Some rows failed to add:\n${errorDetails.join("\n")}`,
-        "error",
-      );
-    }
-  };
-
-  useEffect(() => {
-    fetchStudents();
-  }, [isLoggedIn, token, page, programId]);
-
   return (
-    <div className="p-5 md:p-8 min-h-screen">
+    <div className="p-6 md:p-10 min-h-screen bg-slate-50/50 font-kanit">
       {loadingStudent && <LoadingOverlay />}
       <ToastElement />
-      <div className="mb-6 flex justify-between items-center border-b pb-4">
-        <h1 className="text-3xl font-extrabold text-gray-800">
-          {t("student management")}
-        </h1>
 
-        <AddButton
-          buttonText={t("create new student")}
-          placeholderText={{
-            code: t("student id"),
-            nameEn: "full name",
-            nameTh: t("email"),
-          }}
-          submitButtonText={{
-            insert: t("insert student"),
-            upload: t("upload student (excel)"),
-          }}
-          showAbbreviationInputs={false}
-          onSubmit={handleAddStudent}
-          onSubmitExcel={handleAddStudentExcel}
-        />
-      </div>
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm mb-8 gap-4">
+        <div className="flex items-center gap-4">
+          <div className="bg-indigo-500/10 p-3 rounded-2xl text-indigo-600">
+            <Users size={28} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight leading-none">
+              {t("Student Management")}
+            </h1>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+              Total Enrolled:{" "}
+              <span className="text-indigo-600">{students.length}</span>
+            </p>
+          </div>
+        </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-xl">
-        <Table<Student> columns={studentColumns} data={students} />
-        <div className="pt-4 flex justify-end">
-          {/* <PaginationControlButton
-            page={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          /> */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={() => setShowDeletePopup(true)}
+              className="flex items-center gap-2 bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shadow-sm"
+            >
+              <Trash2 size={14} /> {t("Delete Selected")} ({selectedIds.length})
+            </button>
+          )}
+
+          <AddButton
+            buttonText={t("Create New Student")}
+            placeholderText={{
+              code: t("ID"),
+              nameEn: "Full Name",
+              nameTh: "Email",
+            }}
+            submitButtonText={{
+              insert: t("Insert"),
+              upload: t("Upload Excel"),
+            }}
+            showAbbreviationInputs={false}
+            onSubmit={(data: any) => handleAddStudentBulk([data])} // Reuse bulk for single
+            onSubmitExcel={handleAddStudentBulk}
+          />
         </div>
       </div>
 
-      {selectedStudent && showEditPopup && (
+      {/* Table Section */}
+      <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+        <Table<Student> columns={studentColumns} data={sortedStudents} />
+      </div>
+
+      {/* Popups */}
+      {showEditPopup && selectedStudent && (
         <FormEditPopup
-          title={t("edit student")}
+          title={t("Edit Student")}
           data={selectedStudent}
           fields={[
-            { label: "student id", key: "student_code", type: "number" },
-            { label: "first name", key: "first_name", type: "text" },
-            { label: "last name", key: "last_name", type: "text" },
-            { label: "email", key: "email", type: "text" },
+            { label: "Student ID", key: "student_code", type: "text" },
+            { label: "First Name", key: "first_name", type: "text" },
+            { label: "Last Name", key: "last_name", type: "text" },
+            { label: "Email", key: "email", type: "text" },
           ]}
-          onChange={(update) => {
-            setSelectedStudent(update);
-          }}
+          onChange={setSelectedStudent}
           onClose={() => setShowEditPopup(false)}
           onSave={saveEdit}
         />
       )}
 
       <AlertPopup
-        title={t("delete student")}
-        type="confirm"
-        message={t("are you sure you want to delete this student?")}
         isOpen={showDeletePopup}
-        onCancel={() => {
-          setShowDeletePopup(false);
-          setStudentToDelete(null);
-        }}
-        onConfirm={confirmDelete}
+        type="confirm"
+        title={t("Confirm Deletion")}
+        message={
+          selectedIds.length > 0
+            ? `Are you sure you want to delete ${selectedIds.length} students?`
+            : t("Are you sure you want to delete this student?")
+        }
+        onConfirm={selectedIds.length > 0 ? handleBulkDelete : () => {}}
+        onCancel={() => setShowDeletePopup(false)}
       />
-      {/* Simple Pagination */}
     </div>
   );
 }

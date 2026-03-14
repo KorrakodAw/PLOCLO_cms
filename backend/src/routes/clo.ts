@@ -165,6 +165,68 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+router.post("/bulk", authenticateToken, async (req, res) => {
+  const { clos } = req.body; // Expecting an array of CLOs
+
+  if (!Array.isArray(clos) || clos.length === 0) {
+    return res.status(400).json({ error: "No CLOs provided for bulk upload" });
+  }
+
+  try {
+    // We can use a transaction to ensure all-or-nothing
+    await pool.query("BEGIN");
+
+    for (const clo of clos) {
+      const { code, name, name_th, course_id } = clo;
+
+      try {
+        await pool.query(
+          `INSERT INTO clo (code, name, name_th, course_id) 
+           VALUES ($1, $2, $3, $4)`,
+          [code, name, name_th, course_id]
+        );
+      } catch (err: any) {
+        if (err.code === "23505") {
+          // If there's a duplicate code for the same course, we skip it
+          continue;
+        } else {
+          throw err; // For any other error, we want to rollback
+        }
+      }
+    }
+
+    await pool.query("COMMIT");
+    res.status(201).json({ message: "Bulk CLO upload completed" });
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    console.error("Bulk Upload Error:", err);
+    res.status(500).json({ error: "Bulk upload failed" });
+  }
+});
+
+router.delete("/bulk-delete", authenticateToken, async (req, res) => {
+  const { cloIds } = req.body; // Expecting [1, 2, 3]
+
+  if (!Array.isArray(cloIds) || cloIds.length === 0) {
+    return res.status(400).json({ error: "No CLO IDs provided" });
+  }
+
+  try {
+    await pool.query("BEGIN");
+    
+    await pool.query(
+      "DELETE FROM clo WHERE id = ANY($1::int[])",
+      [cloIds]
+    );
+
+    await pool.query("COMMIT");
+    res.status(200).json({ message: "Bulk delete successful" });
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    res.status(500).json({ error: "Failed to delete CLOs" });
+  }
+});
+
 router.delete("/:id", authenticateToken, async (req, res) => {
   const cloId = parseInt(req.params.id as string);
 

@@ -9,18 +9,18 @@ const prisma = new PrismaClient();
 router.get("/", authenticateToken, async (req, res) => {
   try {
     // Assignments are now defined at the Course level, so we filter by courseId
-    const courseId = req.query.courseId
-      ? Number(req.query.courseId)
+    const sectionId = req.query.sectionId
+      ? Number(req.query.sectionId)
       : undefined;
 
-    if (!courseId) {
+    if (!sectionId) {
       return res
         .status(400)
-        .json({ error: "courseId query parameter is required" });
+        .json({ error: "sectionId query parameter is required" });
     }
 
     const assignments = await prisma.assignment.findMany({
-      where: { course_id: courseId },
+      where: { section_id: sectionId },
       orderBy: { createdAt: "asc" },
     });
 
@@ -35,17 +35,17 @@ router.get("/", authenticateToken, async (req, res) => {
 router.post("/", authenticateToken, async (req, res) => {
   try {
     // Note: 'course_id' replaces 'section_id'
-    const { course_id, name, description, category, maxScore, weight } =
+    const { section_id, name, description, category, maxScore, weight } =
       req.body;
 
     // Validation
-    if (!course_id || !name) {
+    if (!section_id || !name) {
       return res.status(400).json({ error: "course_id and name are required" });
     }
 
     const newAssignment = await prisma.assignment.create({
       data: {
-        course_id: Number(course_id),
+        section_id: Number(section_id),
         name,
         description: description || "",
         category: category || "assignment",
@@ -59,6 +59,35 @@ router.post("/", authenticateToken, async (req, res) => {
   } catch (err: any) {
     console.error(err);
     res.status(500).json({ error: "Failed to create assignment" });
+  }
+});
+
+router.post("/bulk", authenticateToken, async (req, res) => {
+  try {
+    const { assignments } = req.body; // Expecting an array of assignments
+
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return res.status(400).json({ error: "assignments array is required" });
+    }
+
+    const createdAssignments = await prisma.assignment.createMany({
+      data: assignments.map((a: any) => ({
+        section_id: Number(a.section_id),
+        name: a.name,
+        description: a.description || "",
+        category: a.category,
+        maxScore: Number(a.maxScore ?? 100),
+        weight: Number(a.weight ?? 0),
+        createdAt: new Date(),
+      })),
+    });
+
+    res.status(201).json({
+      message: `${createdAssignments.count} assignments created successfully`,
+    });
+  } catch (err: any) {
+    console.error("Bulk Create Error:", err);
+    res.status(500).json({ error: "Failed to create assignments in bulk" });
   }
 });
 
@@ -111,18 +140,18 @@ router.patch("/:id", authenticateToken, async (req, res) => {
 // GET: ดึงเกณฑ์น้ำหนักของแต่ละหมวดในวิชานั้นๆ
 router.get("/categoriesWeights", authenticateToken, async (req, res) => {
   try {
-    const courseId = req.query.courseId
-      ? Number(req.query.courseId)
+    const sectionId = req.query.sectionId
+      ? Number(req.query.sectionId)
       : undefined;
 
-    if (!courseId || isNaN(courseId)) {
+    if (!sectionId || isNaN(sectionId)) {
       return res
         .status(400)
-        .json({ error: "Valid courseId query parameter is required" });
+        .json({ error: "Valid sectionId query parameter is required" });
     }
 
     const categoryWeights = await prisma.assignmentCategoryWeight.findMany({
-      where: { course_id: courseId },
+      where: { section_id: sectionId },
       orderBy: { category: "asc" }, // เรียงลำดับให้แสดงผลในหน้าบ้านง่ายขึ้น
     });
 
@@ -136,20 +165,20 @@ router.get("/categoriesWeights", authenticateToken, async (req, res) => {
 // POST: บันทึกหรือแก้ไขเกณฑ์น้ำหนัก
 router.post("/categoriesWeights", authenticateToken, async (req, res) => {
   try {
-    const { courseId, category, maxWeight } = req.body;
+    const { sectionId, category, maxWeight } = req.body;
 
     // ตรวจสอบค่าที่ส่งมา (maxWeight อาจเป็น 0 ได้ จึงเช็ค undefined)
-    if (!courseId || !category || maxWeight === undefined) {
+    if (!sectionId || !category || maxWeight === undefined) {
       return res.status(400).json({
-        error: "courseId, category, and maxWeight are required",
+        error: "sectionId, category, and maxWeight are required",
       });
     }
 
-    // Upsert: ถ้ามีคู่ (course_id, category) เดิมอยู่แล้วจะ Update ถ้าไม่มีจะ Create
+    // Upsert: ถ้ามีคู่ (section_id, category) เดิมอยู่แล้วจะ Update ถ้าไม่มีจะ Create
     const updatedRecord = await prisma.assignmentCategoryWeight.upsert({
       where: {
-        course_id_category: {
-          course_id: Number(courseId),
+        section_id_category: {
+          section_id: Number(sectionId),
           category: category,
         },
       },
@@ -157,7 +186,7 @@ router.post("/categoriesWeights", authenticateToken, async (req, res) => {
         maxWeight: parseFloat(maxWeight),
       },
       create: {
-        course_id: Number(courseId),
+        section_id: Number(sectionId),
         category: category,
         maxWeight: parseFloat(maxWeight),
       },
@@ -172,21 +201,21 @@ router.post("/categoriesWeights", authenticateToken, async (req, res) => {
 });
 
 router.post("/categoriesWeights/bulk", authenticateToken, async (req, res) => {
-  const { course_id, weights } = req.body; // weights: [{category: 'quiz', maxWeight: 20}, ...]
+  const { section_id, weights } = req.body; // weights: [{category: 'quiz', maxWeight: 20}, ...]
 
   try {
     const results = await prisma.$transaction(
       weights.map((w: any) =>
         prisma.assignmentCategoryWeight.upsert({
           where: {
-            course_id_category: {
-              course_id: Number(course_id),
+            section_id_category: {
+              section_id: Number(section_id),
               category: w.category,
             },
           },
           update: { maxWeight: parseFloat(w.maxWeight) },
           create: {
-            course_id: Number(course_id),
+            section_id: Number(section_id),
             category: w.category,
             maxWeight: parseFloat(w.maxWeight),
           },

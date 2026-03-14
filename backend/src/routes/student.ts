@@ -76,6 +76,102 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+router.post("/bulk", authenticateToken, async (req, res) => {
+  const students = req.body.students;
+
+  if (!Array.isArray(students) || students.length === 0) {
+    return res.status(400).json({ error: "Students array is required" });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const insertQuery = `
+      INSERT INTO student (student_code, first_name, last_name, program_id, email)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+
+    const insertedStudents = [];
+
+    for (const student of students) {
+      const { student_code, first_name, last_name, program_id, email } =
+        student;
+
+      if (!student_code || !first_name || !last_name || !program_id) {
+        await client.query("ROLLBACK");
+        return res
+          .status(400)
+          .json({ error: "Missing required fields in one of the students" });
+      }
+
+      try {
+        const result = await client.query(insertQuery, [
+          student_code,
+          first_name,
+          last_name,
+          program_id,
+          email,
+        ]);
+        insertedStudents.push(result.rows[0]);
+      } catch (err: any) {
+        console.error("Error inserting student:", err);
+        await client.query("ROLLBACK");
+
+        if (err.code === "23505") {
+          return res
+            .status(400)
+            .json({
+              error: `Duplicate student code or email: ${student_code}`,
+            });
+        } else if (err.code === "23503") {
+          return res
+            .status(400)
+            .json({
+              error: `Invalid program_id for student code: ${student_code}`,
+            });
+        } else {
+          return res.status(500).json({ error: "Failed to insert students" });
+        }
+      }
+    }
+
+    await client.query("COMMIT");
+    res.status(201).json({ insertedStudents });
+  } catch (err) {
+    console.error("Transaction error:", err);
+    await client.query("ROLLBACK");
+    res.status(500).json({ error: "Failed to insert students" });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete("/bulk-delete", authenticateToken, async (req, res) => {
+  const studentIds = req.body.studentIds;
+
+  if (!Array.isArray(studentIds) || studentIds.length === 0) {
+    return res.status(400).json({ error: "studentIds array is required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `DELETE FROM student WHERE id = ANY($1::int[]) RETURNING *`,
+      [studentIds],
+    );
+
+    res.json({
+      message: `${result.rowCount} students deleted successfully`,
+      deletedStudents: result.rows,
+    });
+  } catch (err) {
+    console.error("Error deleting students:", err);
+    res.status(500).json({ error: "Failed to delete students" });
+  }
+});
+
 /**
  * ✅ GET paginated students
  */
@@ -255,6 +351,5 @@ router.get("/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch student" });
   }
 });
-
 
 export default router;

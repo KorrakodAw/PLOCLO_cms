@@ -640,10 +640,13 @@ export default function EditCourseClient({
                 />
               )}
               {showAssignmentTable && (
-                <AssignmentMapping courseId={String(formData.course_id)} />
+                <AssignmentMapping sectionId={String(formData.id)} />
               )}
               {showAssignmentCloMappingTable && (
-                <AssignmentCloMapping courseId={String(formData.course_id)} />
+                <AssignmentCloMapping
+                  sectionId={String(formData.id)}
+                  courseId={String(formData.course_id)}
+                />
               )}
               {showScoreMappingTable && (
                 <ScoreMapping
@@ -652,7 +655,7 @@ export default function EditCourseClient({
                 />
               )}
               {showGradeSettingTable && formData && (
-                <GradeSetting masterCourseId={String(formData.course_id)} />
+                <GradeSetting sectionId={String(formData.id)} />
               )}
               {showScoreCalculatedTable && formData && (
                 <ScoreCalculated
@@ -661,7 +664,7 @@ export default function EditCourseClient({
                 />
               )}
               {showAssignmentCateWeightTable && formData && (
-                <AssignmentCateWeight courseId={String(formData.course_id)} />
+                <AssignmentCateWeight sectionId={String(formData.id)} />
               )}
             </div>
           </div>

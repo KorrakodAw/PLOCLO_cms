@@ -198,7 +198,7 @@ router.delete("/bulk-delete", authenticateToken, async (req, res) => {
         where: {
           student_id: { in: studentIds.map((id) => Number(id)) },
           assignment: {
-            course_id: Number(sectionId), // หรือใช้เงื่อนไขที่เชื่อมโยงกับ Section ของคุณ
+            section_id: Number(sectionId), // หรือใช้เงื่อนไขที่เชื่อมโยงกับ Section ของคุณ
           },
         },
       });

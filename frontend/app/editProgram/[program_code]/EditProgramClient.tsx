@@ -29,7 +29,7 @@ interface PaginatedResponse {
 
 interface Option {
   label: string;
-  value: string ;
+  value: string;
 }
 
 async function fetchMatchingPrograms(
@@ -73,7 +73,7 @@ export default function EditProgramClient({
   const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false); // New Popup State
 
   const [activeTab, setActiveTab] = useState<"plo" | "student">("plo");
-  const [shouldCopyPlo, setShouldCopyPlo] = useState(true);
+  const [shouldCopyPlo, setShouldCopyPlo] = useState(false);
 
   // --- Dropdown Options ---
   const programOptions: Option[] = useMemo(() => {
@@ -119,16 +119,22 @@ export default function EditProgramClient({
 
   // --- Handlers ---
 
+  const [targetDuplicateYear, setTargetDuplicateYear] = useState<number | null>(
+    null,
+  );
+
+  const targetYear = useMemo(() => {
+    let nextYear = Number(formData?.program_year || 0) + 1;
+    while (duplicatePrograms.some((p) => Number(p.program_year) === nextYear)) {
+      nextYear++;
+    }
+    return nextYear;
+  }, [formData?.program_year, duplicatePrograms]);
+
   const triggerDuplicateConfirm = () => {
     if (!formData) return;
-    const nextYear = Number(formData.program_year) + 1;
-    if (duplicatePrograms.some((p) => p.program_year === nextYear)) {
-      showToast(
-        `${t("Program for year")} ${nextYear} ${t("already exists.")}`,
-        "error",
-      );
-      return;
-    }
+
+    setTargetDuplicateYear(targetYear);
     setShowDuplicateConfirm(true);
   };
 
@@ -136,14 +142,13 @@ export default function EditProgramClient({
     setShowDuplicateConfirm(false);
     if (!formData || !token) return;
 
-    const nextYear = Number(formData.program_year) + 1;
     const payload = {
       program_code: formData.program_code,
       program_name_en: formData.program_name_en,
       program_name_th: formData.program_name_th,
       program_shortname_en: formData.program_shortname_en,
       program_shortname_th: formData.program_shortname_th,
-      program_year: nextYear,
+      program_year: targetYear,
       faculty_id: formData.faculty_id,
       copy_from_id: shouldCopyPlo ? formData.id : null,
     };
@@ -159,7 +164,9 @@ export default function EditProgramClient({
       const updated = res.data || [];
       setDuplicatePrograms(updated);
 
-      const newVar = updated.find((p: Program) => p.program_year === nextYear);
+      const newVar = updated.find(
+        (p: Program) => p.program_year === targetYear,
+      );
       if (newVar) setSelectedProgramId(String(newVar.id));
     } catch {
       showToast(t("Failed to duplicate program."), "error");
@@ -260,10 +267,10 @@ export default function EditProgramClient({
               <div className="flex flex-col gap-2 p-4 bg-blue-50/50 border border-blue-100 rounded-3xl">
                 <button
                   onClick={triggerDuplicateConfirm}
-                  className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                  className="flex items-center gap-2 px-6 py-2.5 text-[11px] font-black uppercase tracking-wider text-white bg-indigo-600 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 group"
                 >
-                  <FaCopy /> {t("Duplicate to")}{" "}
-                  {Number(formData.program_year) + 1}
+                  <FaCopy className="group-hover:rotate-12 transition-transform" />
+                  {t("Duplicate to")} {targetYear}
                 </button>
                 <label className="flex items-center gap-2 px-1 cursor-pointer group">
                   <input
@@ -273,7 +280,7 @@ export default function EditProgramClient({
                     className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <span className="text-[10px] font-black uppercase tracking-tight text-slate-400 group-hover:text-slate-600">
-                    Copy PLOs & Course Mappings
+                    Copy PLOs
                   </span>
                 </label>
               </div>
@@ -368,7 +375,10 @@ export default function EditProgramClient({
         isOpen={showDuplicateConfirm}
         type="confirm"
         title={t("Confirm Duplication")}
-        message={`${t("Confirm duplicate to year")} ${Number(formData.program_year) + 1}? ${shouldCopyPlo ? t("PLO data will be copied.") : ""}`}
+        // 🟢 เปลี่ยนจาก +1 เป็น targetDuplicateYear ที่ดึงจาก State
+        message={`${t("Confirm duplicate to year")} ${targetDuplicateYear}? ${
+          shouldCopyPlo ? t("PLO data will be copied.") : ""
+        }`}
         onConfirm={handleDuplicateProgram}
         onCancel={() => setShowDuplicateConfirm(false)}
       />

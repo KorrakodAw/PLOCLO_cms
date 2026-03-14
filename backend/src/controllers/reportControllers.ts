@@ -11,9 +11,9 @@ export const getGradeSummary = async (req: any, res: any) => {
   try {
     const result = await prisma.$transaction(async (tx) => {
       const [assignments, gradeSettings, courseSections] = await Promise.all([
-        tx.assignment.findMany({ where: { course_id: Number(courseId) } }),
+        tx.assignment.findMany({ where: { section_id: Number(courseId) } }),
         tx.gradeSetting.findMany({
-          where: { course_id: Number(courseId) },
+          where: { section_id: Number(courseId) },
           orderBy: { score: "desc" },
         }),
         tx.courseSection.findMany({
@@ -24,7 +24,7 @@ export const getGradeSummary = async (req: any, res: any) => {
                 student: {
                   include: {
                     scores: {
-                      where: { assignment: { course_id: Number(courseId) } },
+                      where: { assignment: { section_id: Number(courseId) } },
                     },
                   },
                 },
@@ -127,7 +127,7 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
                   include: {
                     scores: {
                       where: {
-                        assignment: { course_id: Number(masterCourseId) },
+                        assignment: { section_id: Number(masterCourseId) },
                       },
                     },
                   },
@@ -137,10 +137,10 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
           },
         }),
         tx.assignment.findMany({
-          where: { course_id: Number(masterCourseId) },
+          where: { section_id: Number(masterCourseId) },
         }),
         tx.gradeSetting.findMany({
-          where: { course_id: Number(masterCourseId) },
+          where: { section_id: Number(masterCourseId) },
           orderBy: { score: "desc" },
         }),
       ]);
@@ -209,18 +209,18 @@ export const getIndividualStudentSummary = async (req: any, res: any) => {
         where: { id: Number(studentId) },
         include: {
           scores: {
-            where: { assignment: { course_id: Number(masterCourseId) } },
+            where: { assignment: { section_id: Number(masterCourseId) } },
             include: { assignment: true },
           },
         },
       }),
       // 2. ดึงรายการงานทั้งหมดในวิชานี้ (เพื่อหาตัวหาร)
       prisma.assignment.findMany({
-        where: { course_id: Number(masterCourseId) },
+        where: { section_id: Number(masterCourseId) },
       }),
       // 3. ดึงเกณฑ์การตัดเกรด
       prisma.gradeSetting.findMany({
-        where: { course_id: Number(masterCourseId) },
+        where: { section_id: Number(masterCourseId) },
         orderBy: { score: "desc" },
       }),
     ]);

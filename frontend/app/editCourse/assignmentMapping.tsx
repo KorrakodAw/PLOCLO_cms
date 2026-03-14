@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState} from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../../components/Toast";
@@ -9,14 +9,7 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import FormEditPopup from "@/components/EditPopup";
 import AlertPopup from "@/components/AlertPopup";
 import DropdownSelect from "@/components/DropdownSelect";
-import {
-  Calculator,
-  RefreshCcw,
-  Trash2,
-  Edit3,
-  Plus,
-  Info,
-} from "lucide-react";
+import { Calculator, RefreshCcw, Trash2, Edit3, Info, Upload } from "lucide-react";
 
 interface Assignment {
   id: number;
@@ -33,9 +26,9 @@ interface CategoryWeight {
 }
 
 export default function AssignmentMapping({
-  courseId,
+  sectionId,
 }: {
-  courseId: string | number;
+  sectionId: string | number;
 }) {
   const { token } = useAuth();
   const { showToast, ToastElement } = useToast();
@@ -62,15 +55,15 @@ export default function AssignmentMapping({
 
   // 1. Fetch ทั้งรายการงาน และ การตั้งค่าเพดานคะแนน (Category Weights)
   const fetchData = async () => {
-    if (!courseId || !token) return;
+    if (!sectionId || !token) return;
     setLoading(true);
     try {
       const [assignRes, configRes] = await Promise.all([
-        apiClient.get(`/assignment?courseId=${courseId}`, {
+        apiClient.get(`/assignment?sectionId=${sectionId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         apiClient.get("/assignment/categoriesWeights", {
-          params: { courseId },
+          params: { sectionId },
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -85,7 +78,7 @@ export default function AssignmentMapping({
 
   useEffect(() => {
     fetchData();
-  }, [courseId, token]);
+  }, [sectionId, token]);
 
   // 2. 🧮 ฟังก์ชันหลักในการคำนวณ Weight ใหม่ทั้งหมด (Auto-split logic)
   const handleRecalculateWeights = async () => {
@@ -136,6 +129,63 @@ export default function AssignmentMapping({
     }
   };
 
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !token || !sectionId) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        setLoading(true);
+        const bstr = evt.target?.result;
+        const XLSX = await import("xlsx");
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        // 🟢 ปรับปรุงการ Map ข้อมูลให้ปลอดภัยขึ้น
+        const payload = data
+          .filter((row) => row.Description || row.description) // ข้ามแถวที่ไม่มีชื่อ
+          .map((row) => {
+            // ตรวจสอบ Category ให้ตรงกับ Enum ที่ Backend รับได้
+            const rawCat = String(row.category);
+
+            return {
+              section_id: Number(sectionId),
+              name: String(row.Description || row.description).trim(),
+              // ป้องกันปัญหาเว้นวรรคหรือตัวพิมพ์ใหญ่เล็ก
+              category: rawCat.trim(),
+              maxScore: isNaN(Number(row.maxScore))
+                ? 100
+                : Number(row.maxScore),
+              weight: 0,
+              description: "",
+            };
+          });
+
+        await apiClient.post(
+          "/assignment/bulk",
+          { assignments: payload },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        showToast(`Imported ${payload.length} tasks successfully!`, "success");
+        await handleRecalculateWeights();
+        fetchData();
+      } catch (err: any) {
+        // 🔴 แสดง Error Message จาก Server เพื่อให้รู้สาเหตุที่แท้จริง
+        const serverError =
+          err.response?.data?.error || "Internal Server Error";
+        showToast(`Upload failed: ${serverError}`, "error");
+        console.error("Server Side Error:", err.response?.data);
+      } finally {
+        setLoading(false);
+        if (e.target) e.target.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const handleAddAssignment = async () => {
     if (!newAssignName.trim() || !newAssignCategory || !newAssignMaxScore) {
       showToast("Please complete all fields", "error");
@@ -156,7 +206,7 @@ export default function AssignmentMapping({
       await apiClient.post(
         "/assignment",
         {
-          course_id: Number(courseId),
+          section_id: Number(sectionId),
           name: newAssignName.trim(),
           maxScore: Number(newAssignMaxScore),
           category: newAssignCategory,
@@ -167,7 +217,7 @@ export default function AssignmentMapping({
 
       // setNewAssignName("");
       // setNewAssignMaxScore("");
-      await handleRecalculateWeights(); // 🟢 คำนวณกระจายน้ำหนักใหม่ทันที
+      // await handleRecalculateWeights(); // 🟢 คำนวณกระจายน้ำหนักใหม่ทันที
     } catch {
       showToast("Failed to add assignment", "error");
     } finally {
@@ -189,7 +239,7 @@ export default function AssignmentMapping({
       );
 
       setShowEditPopup(false);
-      await handleRecalculateWeights(); // 🟢 คำนวณใหม่หากมีการแก้ Max Score
+      // await handleRecalculateWeights(); // 🟢 คำนวณใหม่หากมีการแก้ Max Score
     } catch {
       showToast("Update failed", "error");
     } finally {
@@ -205,7 +255,7 @@ export default function AssignmentMapping({
         headers: { Authorization: `Bearer ${token}` },
       });
       setShowDeletePopup(false);
-      await handleRecalculateWeights(); 
+      // await handleRecalculateWeights();
       fetchData();
     } catch {
       showToast("Delete failed", "error");
@@ -214,9 +264,75 @@ export default function AssignmentMapping({
     }
   };
 
-  const filteredData = assignments.filter(
-    (a) => activeFilter === "all" || a.category === activeFilter,
-  );
+  const sortedAssignments = useMemo(() => {
+    const categoryOrder: Record<string, number> = {
+      presentation: 1,
+      assignment: 2,
+      midtermExam: 3,
+      finalExam: 4,
+      project: 5,
+      quiz: 6,
+    };
+
+    const keywordOrder = [
+      "presentation",
+      "assignment",
+      "midterm",
+      "final",
+      "project",
+      "quiz",
+    ];
+
+    const getKeywordScore = (name: string) => {
+      const lowerName = name.toLowerCase();
+      const index = keywordOrder.findIndex((keyword) =>
+        lowerName.includes(keyword),
+      );
+      return index === -1 ? 999 : index;
+    };
+
+    const romanMap: Record<string, number> = {
+      i: 1,
+      ii: 2,
+      iii: 3,
+      iv: 4,
+      v: 5,
+      vi: 6,
+      vii: 7,
+      viii: 8,
+      ix: 9,
+      x: 10,
+      xi: 11,
+      xii: 12,
+    };
+
+    const normalizeName = (name: string) => {
+      return name
+        .toLowerCase()
+        .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
+          return romanMap[match].toString().padStart(2, "0");
+        });
+    };
+
+    // นำ assignments มากรองตาม Filter ก่อนแล้วค่อย Sort
+    const dataToTable = assignments.filter(
+      (a) => activeFilter === "all" || a.category === activeFilter,
+    );
+
+    return [...dataToTable].sort((a, b) => {
+      const catA = categoryOrder[a.category] || 99;
+      const catB = categoryOrder[b.category] || 99;
+      if (catA !== catB) return catA - catB;
+
+      const scoreA = getKeywordScore(a.name);
+      const scoreB = getKeywordScore(b.name);
+      if (scoreA !== scoreB) return scoreA - scoreB;
+
+      const normA = normalizeName(a.name);
+      const normB = normalizeName(b.name);
+      return normA.localeCompare(normB, undefined, { numeric: true });
+    });
+  }, [assignments, activeFilter]); // 🟢 อย่าลืมใส่ activeFilter ใน Dependency
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6 font-kanit">
@@ -224,31 +340,51 @@ export default function AssignmentMapping({
       {loading && <LoadingOverlay />}
 
       {/* 1. Dashboard Header */}
-      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl shadow-slate-200">
+      <div className="bg-slate-900 p-6 md:p-8 rounded-[2.5rem] text-white flex flex-col lg:flex-row justify-between items-center gap-6 shadow-2xl shadow-slate-200">
+        {/* Left Side: Brand & Description */}
         <div className="flex items-center gap-5">
-          <div className="bg-blue-500 p-4 rounded-3xl shadow-lg shadow-blue-500/20">
-            <Calculator className="text-white w-8 h-8" />
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-4 rounded-3xl shadow-xl shadow-blue-500/20">
+            <Calculator className="text-white w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tight uppercase leading-none">
+            <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase leading-none">
               Auto-Weight <span className="text-blue-400">Mapping</span>
             </h1>
-            <p className="text-slate-400 text-xs mt-2 font-medium">
-              Weights are calculated proportionally based on Max Scores within
-              each category.
+            <p className="text-slate-400 text-[10px] md:text-xs mt-2 font-medium max-w-xs leading-relaxed">
+              Proportional weight distribution based on category max scores.
             </p>
           </div>
         </div>
-        <button
-          onClick={handleRecalculateWeights}
-          className="group flex items-center gap-3 bg-white/10 hover:bg-blue-600 px-8 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all active:scale-95 border border-white/10"
-        >
-          <RefreshCcw
-            size={16}
-            className="group-hover:rotate-180 transition-transform duration-500"
-          />{" "}
-          RE-DISTRIBUTE WEIGHTS
-        </button>
+
+        {/* Right Side: Action Buttons Group */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+          {/* 🟢 Import Excel: ปรับให้เป็น Secondary Action */}
+          <label className="flex-1 lg:flex-none flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 px-6 py-3.5 rounded-2xl text-[10px] font-black tracking-[0.15em] transition-all cursor-pointer active:scale-95 group">
+            <Upload
+              size={14}
+              className="group-hover:-translate-y-0.5 transition-transform"
+            />
+            IMPORT EXCEL
+            <input
+              type="file"
+              className="hidden"
+              accept=".xlsx, .xls"
+              onChange={handleImportExcel}
+            />
+          </label>
+
+          {/* 🔵 Re-distribute: ปรับให้เป็น Primary Action */}
+          <button
+            onClick={handleRecalculateWeights}
+            className="flex-1 lg:flex-none group flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 px-8 py-3.5 rounded-2xl text-[10px] font-black tracking-[0.15em] transition-all active:scale-95 shadow-lg shadow-blue-900/20"
+          >
+            <RefreshCcw
+              size={14}
+              className="group-hover:rotate-180 transition-transform duration-700 ease-in-out"
+            />
+            RE-DISTRIBUTE WEIGHTS
+          </button>
+        </div>
       </div>
 
       {/* 2. Create Form Section */}
@@ -352,8 +488,8 @@ export default function AssignmentMapping({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {filteredData.length > 0 ? (
-              filteredData.map((a, idx) => (
+            {sortedAssignments.length > 0 ? (
+              sortedAssignments.map((a, idx) => (
                 <tr
                   key={a.id}
                   className="group hover:bg-blue-50/20 transition-all"

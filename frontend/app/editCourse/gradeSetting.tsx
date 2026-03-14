@@ -13,8 +13,8 @@ interface GradeLevel {
 // Define the standard grades you want to control
 const DEFAULT_GRADES = ["A", "B+", "B", "C+", "C", "D+", "D"];
 
-export default function GradeSetting({ masterCourseId }: { masterCourseId: string | number }) {
-  // courseId represents a specific section
+export default function GradeSetting({ sectionId }: { sectionId: string | number }) {
+  // sectionId represents a specific section
   const { showToast, ToastElement } = useToast();
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +27,7 @@ export default function GradeSetting({ masterCourseId }: { masterCourseId: strin
   const fetchGradeSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`grade/settings/${masterCourseId}`);
+      const res = await apiClient.get(`grade/settings/${sectionId}`);
       const fetchedData: GradeLevel[] = res.data;
 
       // Merge fetched data with our default list
@@ -46,11 +46,11 @@ export default function GradeSetting({ masterCourseId }: { masterCourseId: strin
     } finally {
       setLoading(false);
     }
-  }, [masterCourseId, showToast]);
+  }, [sectionId, showToast]);
 
   useEffect(() => {
-    if (masterCourseId) fetchGradeSettings();
-  }, [masterCourseId, fetchGradeSettings]);
+    if (sectionId) fetchGradeSettings();
+  }, [sectionId, fetchGradeSettings]);
 
   // 2. Handle Input Changes
   const handleScoreChange = (gradeSymbol: string, val: string) => {
@@ -70,7 +70,7 @@ export default function GradeSetting({ masterCourseId }: { masterCourseId: strin
   const handleSave = async () => {
     setLoading(true);
     try {
-      const parsedCourseId = parseInt(masterCourseId.toString());
+      const parsedSectionId = parseInt(sectionId.toString());
 
       // Filter: Only include grades that actually have a number value
       const validSettings = gradeSettings
@@ -87,7 +87,7 @@ export default function GradeSetting({ masterCourseId }: { masterCourseId: strin
       }
 
       const payload = {
-        courseId: parsedCourseId,
+        sectionId: parsedSectionId,
         settings: validSettings,
       };
 

@@ -6,16 +6,16 @@ const prisma = new PrismaClient();
 const router = Router();
 
 // GET /api/grade/settings/:course
-router.get("/settings/:courseId", authenticateToken, async (req, res) => {
+router.get("/settings/:sectionId", authenticateToken, async (req, res) => {
   try {
-    const courseId = parseInt(req.params.courseId as string);
+    const sectionId = parseInt(req.params.sectionId as string);
 
-    if (isNaN(courseId)) {
+    if (isNaN(sectionId)) {
       return res.status(400).json({ error: "Invalid Section ID" });
     }
 
     const settings = await prisma.gradeSetting.findMany({
-      where: { course_id: courseId },
+      where: { section_id: sectionId },
       orderBy: { score: "desc" }, // Sort A -> F by default
     });
 
@@ -29,10 +29,10 @@ router.get("/settings/:courseId", authenticateToken, async (req, res) => {
 // POST /api/grade/settings
 router.post("/settings", authenticateToken, async (req, res) => {
   try {
-    const { courseId, settings } = req.body;
+    const { sectionId, settings } = req.body;
 
     // 1. Validation
-    if (!courseId || !Array.isArray(settings)) {
+    if (!sectionId || !Array.isArray(settings)) {
       return res.status(400).json({ error: "Invalid input data" });
     }
 
@@ -40,7 +40,7 @@ router.post("/settings", authenticateToken, async (req, res) => {
     await prisma.$transaction(async (tx) => {
       // A. Delete existing settings for this section
       await tx.gradeSetting.deleteMany({
-        where: { course_id: courseId },
+        where: { section_id: sectionId },
       });
 
       // B. Insert the fresh list
@@ -51,7 +51,7 @@ router.post("/settings", authenticateToken, async (req, res) => {
       if (validSettings.length > 0) {
         await tx.gradeSetting.createMany({
           data: validSettings.map((item: any) => ({
-            course_id: courseId,
+            section_id: sectionId,
             grade: item.grade,
             score: item.score,
           })),
@@ -61,7 +61,7 @@ router.post("/settings", authenticateToken, async (req, res) => {
 
     // 3. Fetch the newly created settings to return to frontend
     const createdSettings = await prisma.gradeSetting.findMany({
-      where: { course_id: courseId },
+      where: { section_id: sectionId },
       orderBy: { score: "desc" },
     });
 

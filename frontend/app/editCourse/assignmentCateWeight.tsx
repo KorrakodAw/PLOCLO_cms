@@ -16,9 +16,9 @@ interface WeightEntry {
 }
 
 export default function AssignmentCateWeight({
-  courseId,
+  sectionId,
 }: {
-  courseId: string;
+  sectionId: string;
 }) {
   const { showToast, ToastElement } = useToast();
   const { t } = useTranslation("common");
@@ -44,11 +44,11 @@ export default function AssignmentCateWeight({
   ];
 
   const fetchData = async () => {
-    if (!courseId) return;
+    if (!sectionId) return;
     try {
       setLoading(true);
       const res = await apiClient.get("/assignment/categoriesWeights", {
-        params: { courseId },
+        params: { sectionId },
       });
 
       // Map ข้อมูลให้ตรงกับ Interface
@@ -71,7 +71,7 @@ export default function AssignmentCateWeight({
   // 3. Fetch ข้อมูลและเก็บ ID ไว้ด้วย
   useEffect(() => {
     fetchData();
-  }, [courseId]);
+  }, [sectionId]);
 
   const hasChanges = useMemo(() => {
     if (weights.length !== initialWeights.length) return true;
@@ -140,7 +140,7 @@ export default function AssignmentCateWeight({
     setSaving(true);
     try {
       const payload = {
-        course_id: Number(courseId),
+        section_id: Number(sectionId),
         weights: weights.map((w) => ({
           category: w.category,
           maxWeight: w.maxWeight,
@@ -154,7 +154,7 @@ export default function AssignmentCateWeight({
 
       // Refresh data เพื่อเอา ID ใหม่จาก DB
       const res = await apiClient.get("/assignment/categoriesWeights", {
-        params: { courseId },
+        params: { sectionId },
       });
       setWeights(
         res.data.map((item: any) => ({
