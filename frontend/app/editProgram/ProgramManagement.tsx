@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { Faculty, getFaculties } from "../../utils/facultyApi";
 import { getUniversities, University } from "../../utils/universityApi";
 import PaginationControlButton from "../../components/PaignateControlButton";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import axios from "axios";
 
@@ -67,7 +67,7 @@ export default function ProgramManagement({
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10; // You can make this configurable if needed
 
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   // Fetch universities
   useEffect(() => {
     if (!isLoggedIn || !token) return;
@@ -423,7 +423,7 @@ export default function ProgramManagement({
   return (
     <div className="p-5 md:p-8">
       {loading && <LoadingOverlay />}
-      <ToastElement /> {/* Place Toast element at the top level */}
+     
       {/* HEADER & ACTIONS */}
       <div className="mb-6 flex justify-between items-center border-b pb-4">
         <h1 className="text-3xl font-light text-gray-800">

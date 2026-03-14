@@ -13,7 +13,7 @@ export const getGradeSummary = async (req: any, res: any) => {
       const [assignments, gradeSettings, courseSections] = await Promise.all([
         tx.assignment.findMany({ where: { section_id: Number(courseId) } }),
         tx.gradeSetting.findMany({
-          where: { section_id: Number(courseId) },
+          where: { course_id: Number(courseId) },
           orderBy: { score: "desc" },
         }),
         tx.courseSection.findMany({
@@ -140,7 +140,7 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
           where: { section_id: Number(masterCourseId) },
         }),
         tx.gradeSetting.findMany({
-          where: { section_id: Number(masterCourseId) },
+          where: { course_id: Number(masterCourseId) },
           orderBy: { score: "desc" },
         }),
       ]);
@@ -220,7 +220,7 @@ export const getIndividualStudentSummary = async (req: any, res: any) => {
       }),
       // 3. ดึงเกณฑ์การตัดเกรด
       prisma.gradeSetting.findMany({
-        where: { section_id: Number(masterCourseId) },
+        where: { course_id: Number(masterCourseId) },
         orderBy: { score: "desc" },
       }),
     ]);

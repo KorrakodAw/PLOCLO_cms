@@ -7,7 +7,7 @@ import {
   University,
   CreateUniversityPayload,
 } from "../../utils/universityApi";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import AddButton from "../../components/AddButton";
 import { Table, Column } from "../../components/Table";
@@ -22,7 +22,7 @@ import { useTranslation } from "next-i18next";
 export default function ManageUniversity() {
   const router = useRouter();
   const { token, isLoggedIn } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const [universities, setUniversities] = useState<University[]>([]);
   const [selectedUniversity, setSelectedUniversity] =
     useState<University | null>(null);
@@ -244,7 +244,7 @@ export default function ManageUniversity() {
           setUniversityToDelete(null);
         }}
       />
-      <ToastElement />
+
     </div>
   );
 }

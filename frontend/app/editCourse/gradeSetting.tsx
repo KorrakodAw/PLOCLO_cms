@@ -1,6 +1,6 @@
 import { apiClient } from "@/utils/apiClient";
 import React, { useState, useEffect, useCallback } from "react";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverLay from "@/components/LoadingOverlay";
 import { Save } from "lucide-react";
 
@@ -13,21 +13,25 @@ interface GradeLevel {
 // Define the standard grades you want to control
 const DEFAULT_GRADES = ["A", "B+", "B", "C+", "C", "D+", "D"];
 
-export default function GradeSetting({ sectionId }: { sectionId: string | number }) {
-  // sectionId represents a specific section
-  const { showToast, ToastElement } = useToast();
+export default function GradeSetting({
+  masterCourseId,
+}: {
+  masterCourseId: string | number;
+}) {
+  // masterCourseId represents a specific course
+  const { showToast } = useGlobalToast();
   const [loading, setLoading] = useState(false);
 
   // Initialize with default grades having empty scores
   const [gradeSettings, setGradeSettings] = useState<GradeLevel[]>(
-    DEFAULT_GRADES.map((g) => ({ grade: g, score: "" }))
+    DEFAULT_GRADES.map((g) => ({ grade: g, score: "" })),
   );
 
   // 1. Fetch Existing Data
   const fetchGradeSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`grade/settings/${sectionId}`);
+      const res = await apiClient.get(`grade/settings/${masterCourseId}`);
       const fetchedData: GradeLevel[] = res.data;
 
       // Merge fetched data with our default list
@@ -46,11 +50,11 @@ export default function GradeSetting({ sectionId }: { sectionId: string | number
     } finally {
       setLoading(false);
     }
-  }, [sectionId, showToast]);
+  }, [masterCourseId, showToast]);
 
   useEffect(() => {
-    if (sectionId) fetchGradeSettings();
-  }, [sectionId, fetchGradeSettings]);
+    if (masterCourseId) fetchGradeSettings();
+  }, [masterCourseId, fetchGradeSettings]);
 
   // 2. Handle Input Changes
   const handleScoreChange = (gradeSymbol: string, val: string) => {
@@ -61,8 +65,8 @@ export default function GradeSetting({ sectionId }: { sectionId: string | number
       prev.map((item) =>
         item.grade === gradeSymbol
           ? { ...item, score: val === "" ? "" : parseFloat(val) }
-          : item
-      )
+          : item,
+      ),
     );
   };
 
@@ -70,7 +74,7 @@ export default function GradeSetting({ sectionId }: { sectionId: string | number
   const handleSave = async () => {
     setLoading(true);
     try {
-      const parsedSectionId = parseInt(sectionId.toString());
+      const parsedCourseId = parseInt(masterCourseId.toString());
 
       // Filter: Only include grades that actually have a number value
       const validSettings = gradeSettings
@@ -87,7 +91,7 @@ export default function GradeSetting({ sectionId }: { sectionId: string | number
       }
 
       const payload = {
-        sectionId: parsedSectionId,
+        courseId: parsedCourseId,
         settings: validSettings,
       };
 
@@ -109,7 +113,6 @@ export default function GradeSetting({ sectionId }: { sectionId: string | number
   return (
     <div className="p-6 bg-white shadow-md rounded-lg max-w-2xl mx-auto mt-8">
       {loading && <LoadingOverLay />}
-      <ToastElement />
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold text-gray-800">

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { apiClient } from "../../utils/apiClient";
 
 import { Column, Table } from "../../components/Table";
@@ -28,7 +28,7 @@ export default function AddStudent({
 }) {
   const { t } = useTranslation("common");
   const { token, isLoggedIn, initialized } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
 
   const [loadingStudent, setLoadingStudent] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -219,7 +219,7 @@ export default function AddStudent({
   return (
     <div className="p-6 md:p-10 min-h-screen bg-slate-50/50 font-kanit">
       {loadingStudent && <LoadingOverlay />}
-      <ToastElement />
+
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm mb-8 gap-4">

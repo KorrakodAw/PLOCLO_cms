@@ -2,7 +2,7 @@ import { Student } from "@/utils/studentApi";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiClient } from "@/utils/apiClient";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { Save } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -37,7 +37,7 @@ export default function ScoreMapping({
   sectionId?: string | number;
 }) {
   const { token } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
 
   const [students, setStudents] = useState<Student[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -59,7 +59,7 @@ export default function ScoreMapping({
           apiClient.get(`/studentOnCourse?sectionId=${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          apiClient.get(`/assignment?courseId=${masterCourseId}`, {
+          apiClient.get(`/assignment?sectionId=${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           apiClient.get(`/score?sectionId=${sectionId}`, {
@@ -306,7 +306,7 @@ export default function ScoreMapping({
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-8 relative min-h-[400px]">
       {loading && <LoadingOverlay />}
-      <ToastElement />
+
 
       <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
         <h3 className="font-bold text-gray-800 uppercase text-xs tracking-widest">

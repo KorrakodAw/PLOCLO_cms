@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiClient } from "@/utils/apiClient";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "../context/ToastContext";
 import { Column, Table } from "@/components/Table";
 import { useTranslation } from "react-i18next";
 import LoadingOverlay from "@/components/LoadingOverlay";
@@ -49,7 +49,7 @@ export default function AddStudentCourse({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t } = useTranslation("common");
   const { token } = useAuth();
 
@@ -143,9 +143,7 @@ export default function AddStudentCourse({
         let skipCount = 0;
 
         data.forEach((row) => {
-          const code = String(
-            row.student_id || row["รหัสนิสิต"] || "",
-          ).trim();
+          const code = String(row.student_id || row["รหัสนิสิต"] || "").trim();
           if (!code) return;
 
           // 1. ตรวจสอบว่ารหัสนิสิตนี้มีตัวตนอยู่ใน Program นี้หรือไม่
@@ -279,7 +277,6 @@ export default function AddStudentCourse({
   return (
     <div className="p-4 space-y-6">
       {loading && <LoadingOverlay />}
-      <ToastElement />
 
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm gap-4 transition-all hover:shadow-md">

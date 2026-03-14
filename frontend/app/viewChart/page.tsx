@@ -16,7 +16,7 @@ import DropdownSelect from "@/components/DropdownSelect";
 import { apiClient } from "@/utils/apiClient";
 import { PerformanceTrendChart } from "./viewChartComponent/PerformanceTrendChart";
 import { PerformanceBalanceChart } from "./viewChartComponent/PerformanceBalanceChart";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { ToggleButton } from "./viewChartComponent/ToggleButton";
 import Table from "@/components/Table";
 import { useAuth } from "../context/AuthContext";
@@ -28,7 +28,7 @@ import { GradeDistributionChart } from "./viewChartComponent/gradeDistributionCh
 
 export default function PLOChart() {
   const { token, user } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
 
@@ -963,7 +963,7 @@ export default function PLOChart() {
   return (
     <div className="bg-[#f8fafc] min-h-screen text-slate-900 pb-20 font-kanit">
       {loading && <LoadingOverlay />}
-      <ToastElement />
+
 
       {/* Header & Sticky Filter Bar */}
       <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm transition-all">

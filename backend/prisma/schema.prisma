@@ -81,6 +81,7 @@ model Course {
   clos        Clo[]
   sections    CourseSection[]
   instructors CourseInstructor[]
+  gradeSettings    GradeSetting[]
 
   @@map("course")
 }
@@ -97,7 +98,7 @@ model CourseSection {
   // ✅ MOVED: Relations now link to Section
   assignments      Assignment[]
   categoryWeights  AssignmentCategoryWeight[]
-  gradeSettings    GradeSetting[]
+  
   
   students         StudentOnSection[]
   scores           StudentScore[]
@@ -252,11 +253,11 @@ model GradeSetting {
   score      Decimal  @db.Decimal(7, 4)
   
   // ✅ CHANGED: Link to Section
-  section_id Int      @map("section_id")
+  course_id Int      @map("course_id")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 
-  section CourseSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
 
   @@map("grade_setting")
 }

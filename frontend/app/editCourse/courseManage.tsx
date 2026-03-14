@@ -7,7 +7,7 @@ import { Table, Column } from "@/components/Table";
 import PaginationControlButton from "@/components/PaignateControlButton";
 import { getFaculties, Faculty } from "@/utils/facultyApi";
 import { getUniversities, University } from "@/utils/universityApi";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 
 import { addCourse, getCoursePaginate, Course } from "@/utils/courseApi";
 import { useAuth } from "../context/AuthContext";
@@ -59,7 +59,7 @@ export default function CourseManagement({
   const lang = i18n.language;
   const { token, isLoggedIn, initialized, user } = useAuth();
   const router = useRouter();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
 
   const isInstructor = user?.role === "instructor";
 
@@ -491,7 +491,7 @@ export default function CourseManagement({
   return (
     <div className="mt-5 p-5">
       {loading && <LoadingOverlay />}
-      <ToastElement />
+
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-extralight">{t("course management")}</h1>
         <AddButton

@@ -5,7 +5,7 @@ import React, { useEffect, useState, use } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { apiClient } from "@/utils/apiClient";
 import { Table, Column } from "@/components/Table";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import AlertPopup from "@/components/AlertPopup";
 import FormEditPopup from "@/components/EditPopup";
 import AddButton from "@/components/AddButton";
@@ -57,7 +57,7 @@ interface PageProps {
 export default function FacultyInstructorPage({ params }: PageProps) {
   const { facultyId } = use(params);
   const { token } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
 
@@ -249,7 +249,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
           },
         ]}
       />
-      <ToastElement />
+
 
       {/* Header Card */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex justify-between items-start">

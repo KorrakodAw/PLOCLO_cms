@@ -34,6 +34,93 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+router.post("/bulk", authenticateToken, async (req, res) => {
+  const { plos } = req.body;
+  if (!Array.isArray(plos) || plos.length === 0) {
+    return res.status(400).json({ error: "plos ต้องเป็นอาเรย์ที่มีข้อมูล" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const insertedPLOs = [];
+    let skipCount = 0;
+
+    for (const plo of plos) {
+      const { code, program_id, name, engname } = plo;
+
+      // 1. Validation เบื้องต้น
+      if (!code || !program_id || !name || !engname) {
+        // หากข้อมูลไม่ครบ เราอาจจะเลือกข้ามหรือหยุด ขึ้นอยู่กับนโยบายข้อมูล
+        continue;
+      }
+
+      // 2. ตรวจสอบข้อมูลซ้ำ
+      const dupCheck = await client.query(
+        `SELECT id FROM plo WHERE code = $1 AND program_id = $2`,
+        [code, program_id],
+      );
+
+      if (dupCheck.rows.length > 0) {
+        // 🟢 พบข้อมูลซ้ำ -> ข้ามรายการนี้ไป (Skip)
+        skipCount++;
+        continue;
+      }
+
+      // 3. เพิ่มข้อมูลรายการใหม่
+      const result = await client.query(
+        `INSERT INTO plo (code, program_id, name, engname) 
+         VALUES ($1, $2, $3, $4) 
+         RETURNING id, code, program_id, name, engname`,
+        [code, program_id, name, engname],
+      );
+      insertedPLOs.push(result.rows[0]);
+    }
+
+    await client.query("COMMIT");
+
+    res.status(201).json({
+      message: "Bulk processing completed",
+      inserted: insertedPLOs.length,
+      skipped: skipCount,
+      plos: insertedPLOs,
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error(err);
+    res.status(500).json({ error: "ไม่สามารถประมวลผลข้อมูล PLO ได้" });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete("/bulk-delete", authenticateToken, async (req, res) => {
+  const { ploIds } = req.body; // รับ [101, 102, 103]
+
+  if (!Array.isArray(ploIds) || ploIds.length === 0) {
+    return res.status(400).json({ error: "No PLO IDs provided" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // ใช้ ANY($1) เพื่อลบรายการทั้งหมดที่มี ID อยู่ใน Array
+    await client.query("DELETE FROM plo WHERE id = ANY($1::int[])", [ploIds]);
+
+    await client.query("COMMIT");
+    res
+      .status(200)
+      .json({ message: `Successfully deleted ${ploIds.length} PLOs` });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Bulk Delete Error:", err);
+    res.status(500).json({ error: "Failed to delete PLOs" });
+  } finally {
+    client.release();
+  }
+});
+
 // ดึงข้อมูล PLO ทั้งหมด
 // GET /api/plo
 router.get("/", authenticateToken, async (req, res) => {
@@ -109,7 +196,7 @@ router.get("/paginate", authenticateToken, async (req, res) => {
       query += ` AND program.program_year = $${params.length}`;
     }
 
-    query += ` ORDER BY plo.id ASC LIMIT $${params.length + 1} OFFSET $${
+    query += ` ORDER BY LENGTH(plo.code) ASC, plo.code ASC LIMIT $${params.length + 1} OFFSET $${
       params.length + 2
     }`;
     params.push(limit, offset);

@@ -5,168 +5,128 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   XMarkIcon,
-} from "@heroicons/react/20/solid"; // Assuming you use Heroicons
+} from "@heroicons/react/20/solid";
 
+type ToastType = "success" | "error";
+
+interface ToastItem {
+  id: number;
+  message: string;
+  type: ToastType;
+  duration: number;
+}
+
+// --- Component: Individual Toast with Pause Logic ---
 export function Toast({
   message,
   type = "success",
-  visible,
   onClose,
-  duration = 10000,
-  toastKey,
+  duration = 5000,
 }: {
   message: string;
-  type?: "success" | "error";
-  visible: boolean;
+  type?: ToastType;
   onClose: () => void;
   duration?: number;
-  toastKey?: number;
 }) {
   const [progress, setProgress] = useState(100);
-
-  const durationRef = useRef(duration);
-
-  useEffect(() => {
-    durationRef.current = duration;
-  }, [duration]);
+  const [isPaused, setIsPaused] = useState(false);
+  const remainingTimeRef = useRef(duration);
+  const startTimeRef = useRef(Date.now());
 
   useEffect(() => {
-    setProgress(100); // 👈 FIX — reset only when new toast is shown
+    if (isPaused) return;
 
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const percent = Math.max(100 - (elapsed / durationRef.current) * 100, 0);
+    const tick = setInterval(() => {
+      remainingTimeRef.current -= 50; // ลดเวลาทีละ 50ms ตามช่วง Interval
+      const percent = Math.max((remainingTimeRef.current / duration) * 100, 0);
       setProgress(percent);
 
-      if (percent <= 0) clearInterval(interval);
+      if (remainingTimeRef.current <= 0) {
+        clearInterval(tick);
+        onClose();
+      }
     }, 50);
 
-    return () => clearInterval(interval);
-  }, [toastKey]); // 👈 ONLY runs for a NEW toast
-
-  if (!visible) return null;
+    return () => clearInterval(tick);
+  }, [isPaused, duration, onClose]);
 
   return (
     <div
-      // Refined positioning, reduced max-width for less screen intrusion
-      className={`fixed bottom-6 right-6 z-50 max-w-sm w-full rounded-xl shadow-2xl border px-4 py-3 flex flex-col transition-transform duration-300 animate-slide-in 
-      ${
-        type === "success"
-          ? "bg-white border-green-200 text-gray-800"
-          : "bg-white border-red-200 text-gray-800"
-      }`}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      className={`relative z-50 max-w-sm w-full rounded-2xl shadow-2xl border px-4 py-4 flex flex-col transition-all duration-300 animate-slide-in overflow-hidden cursor-default
+      ${type === "success" ? "bg-white border-green-100 shadow-green-100/30" : "bg-white border-red-100 shadow-red-100/30"}`}
     >
       <div className="flex items-start gap-3">
-        {/* 1. Icon Slot (Replaces the dot) */}
         <div className="flex-shrink-0 pt-0.5">
           {type === "success" ? (
-            <CheckCircleIcon
-              className="h-6 w-6 text-green-500"
-              aria-hidden="true"
-            />
+            <CheckCircleIcon className="h-6 w-6 text-green-500" />
           ) : (
-            <XCircleIcon className="h-6 w-6 text-red-500" aria-hidden="true" />
+            <XCircleIcon className="h-6 w-6 text-red-500" />
           )}
         </div>
 
-        {/* 2. Message Content */}
-        <div className="flex-1 mt-0.5 text-sm font-light leading-relaxed">
+        <div className="flex-1 mt-0.5 text-sm font-light text-slate-700 leading-relaxed">
           {message}
         </div>
 
-        {/* 3. Close Button */}
         <button
-          onClick={onClose}
-          className="ml-2 flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 rounded-full transition-colors duration-150"
+          onClick={(e) => {
+            e.stopPropagation(); // กันการ Trigger MouseLeave
+            onClose();
+          }}
+          className="ml-2 flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition-colors"
         >
-          {/* Using a clear X icon instead of the character ✕ */}
-          <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+          <XMarkIcon className="h-4 w-4" />
         </button>
       </div>
 
-      {/* 4. Progress Bar (Uncommented and improved styling) */}
-      {/* <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-2">
+      {/* Subtle Progress Bar */}
+      {/* <div className="absolute bottom-0 left-0 w-full h-1.5 bg-slate-50">
         <div
-          className={`h-1 rounded-full ${
+          className={`h-full transition-all duration-75 ease-linear ${
             type === "success" ? "bg-green-500" : "bg-red-500"
-          } transition-all duration-75 ease-linear`}
+          } ${isPaused ? "opacity-40" : "opacity-100"}`}
           style={{ width: `${progress}%` }}
-        ></div>
+        />
       </div> */}
     </div>
   );
 }
 
+// --- Hook: useToast ---
 export function useToast() {
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-    visible: boolean;
-    key: number;
-    duration: number;
-  }>({
-    message: "",
-    type: "success",
-    visible: false,
-    key: 0,
-    duration: 10000,
-  });
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // refs to avoid adding toast.duration/toast.visible to deps
-  const durationRef = useRef(toast.duration);
-  const visibleRef = useRef(toast.visible);
-
-  // keep refs updated
-  useEffect(() => {
-    durationRef.current = toast.duration;
-    visibleRef.current = toast.visible;
-  }, [toast.duration, toast.visible]);
-
-  const showToast = useCallback(
-    (
-      message: string,
-      type: "success" | "error" = "success",
-      duration = 10000
-    ) => {
-      setToast({
-        message,
-        type,
-        visible: true,
-        key: Date.now(),
-        duration,
-      });
-    },
-    []
-  );
-
-  const close = useCallback(() => {
-    setToast((t) => ({ ...t, visible: false }));
+  const close = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Auto-close timer using refs
-  useEffect(() => {
-    if (!visibleRef.current) return;
-
-    const timer = window.setTimeout(() => {
-      setToast((t) => ({ ...t, visible: false }));
-    }, durationRef.current);
-
-    return () => window.clearTimeout(timer);
-  }, [toast.key]);
+  const showToast = useCallback(
+    (message: string, type: ToastType = "success", duration = 5000) => {
+      const id = Date.now();
+      setToasts((prev) => [...prev, { id, message, type, duration }]);
+    },
+    [],
+  );
 
   const ToastElement = () => (
-    <Toast
-      message={toast.message}
-      type={toast.type}
-      visible={toast.visible}
-      onClose={close}
-      toastKey={toast.key}
-      duration={toast.duration}
-    />
+    <div
+      // 🟢 ปรับลด z-index ลงมาเหลือ 9990 หรือ 9998 (ต้องน้อยกว่า Loading)
+      className="fixed bottom-6 right-6 z-[9990] flex flex-col-reverse gap-3 w-full max-w-sm pointer-events-none"
+    >
+      {toasts.map((t) => (
+        <div key={t.id} className="pointer-events-auto">
+          <Toast
+            message={t.message}
+            type={t.type}
+            duration={t.duration}
+            onClose={() => close(t.id)}
+          />
+        </div>
+      ))}
+    </div>
   );
 
   return { showToast, ToastElement } as const;
 }
-
-export default Toast;

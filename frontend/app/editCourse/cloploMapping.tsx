@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiClient } from "../../utils/apiClient";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { useTranslation } from "next-i18next";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
@@ -31,7 +31,7 @@ export default function CloPloMapping({
   programId: string | number;
 }) {
   const { token } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
   const [loading, setLoading] = useState(false);
@@ -397,7 +397,7 @@ export default function CloPloMapping({
         </div>
       </div>
 
-      <ToastElement />
+
     </div>
   );
 }

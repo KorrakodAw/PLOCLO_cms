@@ -12,7 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { useAuth } from "@/app/context/AuthContext";
 import DropdownSelect from "@/components/DropdownSelect";
 import LoadingOverlay from "@/components/LoadingOverlay";
@@ -46,7 +46,7 @@ export default function CourseInstructorsPage({ params }: PageProps) {
 
   const { token } = useAuth();
   const { t, i18n } = useTranslation("common");
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const lang = i18n.language;
 
   const [loading, setLoading] = useState(true);
@@ -165,7 +165,7 @@ export default function CourseInstructorsPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-      <ToastElement />
+
 
       {/* 1. Breadcrumb Bar */}
       <div className="px-8 py-5">

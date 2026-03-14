@@ -6,7 +6,7 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { useAuth } from "../app/context/AuthContext";
 import { apiClient } from "../utils/apiClient";
 import { useTranslation } from "react-i18next";
-import { useToast } from "../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import axios from "axios";
 import { GoogleLogin } from "@react-oauth/google";
 
@@ -17,7 +17,7 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoggedIn } = useAuth();
   const router = useRouter();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
 
   const handleSuccess = async (response: any) => {
     try {
@@ -156,8 +156,6 @@ export default function LoginForm() {
             width="100%"
           />
         </div>
-
-        <ToastElement />
       </form>
     </div>
   );

@@ -10,7 +10,7 @@ import {
   Copy,
 } from "lucide-react"; // Assuming you use lucide-react based on your icons
 import { useAuth } from "@/app/context/AuthContext";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { useTranslation } from "react-i18next";
 import { Course, getCoursePaginate } from "@/utils/courseApi";
 import { apiClient } from "@/utils/apiClient";
@@ -76,7 +76,7 @@ export default function EditCourseClient({
 }) {
   const router = useRouter();
   const { isLoggedIn, token } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
 
@@ -462,7 +462,7 @@ export default function EditCourseClient({
 
       <div className="px-5 md:px-8 space-y-6">
         {loading && <LoadingOverlay />}
-        <ToastElement />
+  
 
         {/* --- MAIN HEADER CARD --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 ">
@@ -655,7 +655,7 @@ export default function EditCourseClient({
                 />
               )}
               {showGradeSettingTable && formData && (
-                <GradeSetting sectionId={String(formData.id)} />
+                <GradeSetting masterCourseId={String(formData.course_id)} />
               )}
               {showScoreCalculatedTable && formData && (
                 <ScoreCalculated

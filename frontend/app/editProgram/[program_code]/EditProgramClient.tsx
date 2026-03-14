@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { useTranslation } from "next-i18next";
 import { getProgramsPaginated, Program } from "@/utils/programApi";
 import { apiClient } from "@/utils/apiClient";
@@ -55,7 +55,7 @@ export default function EditProgramClient({
   programCode: string;
 }) {
   const { token, isLoggedIn } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
 
@@ -238,7 +238,7 @@ export default function EditProgramClient({
           },
         ]}
       />
-      <ToastElement />
+
 
       <div className="mb-8 border-b pb-6">
         <h1 className="text-3xl font-bold text-slate-800">

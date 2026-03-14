@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiClient } from "../../utils/apiClient";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import AlertPopup from "../../components/AlertPopup";
 import Table, { Column } from "../../components/Table";
 import FormEditPopup from "../../components/EditPopup";
@@ -34,7 +34,7 @@ export default function ManageAccount() {
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const [activeTab, setActiveTab] = useState<string>("guest");
 
   const filteredUsers = useMemo(() => {
@@ -238,7 +238,7 @@ export default function ManageAccount() {
   return (
     <ProtectedRoute roles={["Super_admin", "system_admin"]}>
       <div className="max-w-[1400px] flex flex-col mx-auto">
-        <ToastElement />
+
         {loading && <LoadingOverlay />}
         <div className="p-5 md:p-8">
           <div className="flex justify-between items-center mb-8 border-b pb-4">

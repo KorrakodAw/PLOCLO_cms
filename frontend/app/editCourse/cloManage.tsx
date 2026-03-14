@@ -6,7 +6,7 @@ import AddButton from "../../components/AddButton";
 
 import { addClo, getCLOsPaginate, CLO } from "../../utils/cloApi";
 
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 
 import AlertPopup from "../../components/AlertPopup";
@@ -38,7 +38,7 @@ interface CLOManagementProps {
 
 export default function CLOManagement({ courseId }: CLOManagementProps) {
   const { t, i18n } = useTranslation("common");
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const lang = i18n.language;
   const { isLoggedIn, token } = useAuth();
 
@@ -295,7 +295,7 @@ export default function CLOManagement({ courseId }: CLOManagementProps) {
   return (
     <div className="mt-5 p-5">
       {loading && <LoadingOverlay />}
-      <ToastElement />
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl border border-slate-100 shadow-sm gap-4 mb-6">
         {/* Left Side: Title & Counter */}
         <div className="flex items-center gap-4">

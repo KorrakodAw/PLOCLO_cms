@@ -6,6 +6,7 @@ import ClientWrapper from "../components/ClientWrapper";
 import { AuthProvider } from "./context/AuthContext";
 // 1. Import the Provider
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { ToastProvider } from "@/app/context/ToastContext";
 
 const kanit = Kanit({
   weight: ["300", "400", "500", "600", "700"],
@@ -31,7 +32,9 @@ export default function RootLayout({
         <GoogleOAuthProvider clientId={process.env.GOOGLE_CLIENT_ID || ""}>
           <AuthProvider>
             <I18nProvider>
-              <ClientWrapper>{children}</ClientWrapper>
+              <ClientWrapper>
+                <ToastProvider>{children}</ToastProvider>
+              </ClientWrapper>
               {/* Footer Info (Optional) */}
               <footer className="text-center text-slate-400 text-xs pb-4 ml-[200px]">
                 © 2026 PLOCLO Management System • All Rights Reserved

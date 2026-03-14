@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { apiClient } from "../../utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import FormEditPopup from "@/components/EditPopup";
@@ -31,7 +31,7 @@ export default function AssignmentMapping({
   sectionId: string | number;
 }) {
   const { token } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t } = useTranslation("common");
 
   const [loading, setLoading] = useState(false);
@@ -336,7 +336,7 @@ export default function AssignmentMapping({
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6 font-kanit">
-      <ToastElement />
+
       {loading && <LoadingOverlay />}
 
       {/* 1. Dashboard Header */}

@@ -10,7 +10,7 @@ import {
 } from "@/utils/facultyApi";
 import { getUniversityById, University } from "@/utils/universityApi";
 import { Table, Column } from "@/components/Table"; // Ensure @/components/Table resolves correctly
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import AlertPopup from "@/components/AlertPopup";
 import FormEditPopup from "@/components/EditPopup";
 import { apiClient } from "@/utils/apiClient";
@@ -42,7 +42,7 @@ export default function UniversityDetailPage({
   const router = useRouter();
 
   const { token } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
 
   const [university, setUniversity] = useState<University | null>(null);
   const [faculties, setFaculties] = useState<Faculty[]>([]);
@@ -208,7 +208,7 @@ export default function UniversityDetailPage({
           },
         ]}
       />
-      <ToastElement />
+
 
       {/* UNIVERSITY DETAILS SECTION (The "Top Data") */}
       <div className="bg-white p-6 rounded-xl shadow-xl mb-8 border-l-4 border-orange-500">

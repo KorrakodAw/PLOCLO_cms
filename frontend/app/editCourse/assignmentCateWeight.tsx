@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { apiClient } from "@/utils/apiClient";
 import { Trash2, Plus, Save, Loader2 } from "lucide-react";
 import DropdownSelect from "@/components/DropdownSelect";
@@ -20,7 +20,7 @@ export default function AssignmentCateWeight({
 }: {
   sectionId: string;
 }) {
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { t } = useTranslation("common");
   const { token } = useAuth();
 
@@ -181,7 +181,7 @@ export default function AssignmentCateWeight({
 
   return (
     <div className="p-8 max-w-2xl mx-auto bg-white shadow-2xl rounded-[2rem] border border-slate-100 mt-10">
-      <ToastElement />
+
 
       <div className="mb-8">
         <h1 className="text-2xl font-black text-slate-800 tracking-tight">

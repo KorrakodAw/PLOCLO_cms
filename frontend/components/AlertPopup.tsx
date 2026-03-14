@@ -69,41 +69,43 @@ export default function AlertPopup({
   if (!isOpen) return null;
 
   return (
-    // 1. Fixed Overlay (Removed Framer Motion)
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      // 🟢 ปรับ z-index เป็น 10000 เพื่อให้อยู่เหนือ Loading (9999) และ Toast (9990)
+      className="fixed inset-0 z-[9991] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onCancel}
     >
-      {/* 2. Modal Content Container (Removed Framer Motion) */}
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8"
+        // 🟢 เพิ่ม transition เล็กน้อยเพื่อให้ดู Tidier
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col items-center">
-          {/* ICON */}
+          {/* ... ส่วนเนื้อหา Icon, Title, Message ... */}
+
           <div className="mb-4">{getIcon()}</div>
 
-          {/* TITLE */}
-          <h2 className="text-xl font-light text-gray-900 mb-2">
-            {title || (type === "confirm" ? "Confirm Action" : "Notice")}
+          <h2 className="text-xl font-medium text-gray-900 mb-2 uppercase tracking-tight">
+            {title || (type === "confirm" ? t("Confirm Action") : t("Notice"))}
           </h2>
 
-          {/* MESSAGE */}
-          <p className="text-gray-600 font-light text-center mb-6 text-[16px]">
+          <p className="text-gray-500 font-light text-center mb-8 text-[14px] leading-relaxed">
             {message}
           </p>
 
-          {/* BUTTONS */}
           <div className="flex justify-center gap-3 w-full">
-            {/* Secondary/Cancel Button (Only for confirm type or if explicit cancel handler is given) */}
             {(type === "confirm" || onCancel) && (
-              <button className={getButtonClasses(false)} onClick={onCancel}>
+              <button
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-light py-3 rounded-2xl transition-all active:scale-95"
+                onClick={onCancel}
+              >
                 {cancelText || t("cancel")}
               </button>
             )}
 
-            {/* Primary/Confirm Button */}
-            <button className={getButtonClasses(true)} onClick={onConfirm}>
+            <button
+              className={`flex-1 font-light py-3 rounded-2xl transition-all active:scale-95 text-white ${getButtonClasses(true)}`}
+              onClick={onConfirm}
+            >
               {confirmText || t("confirm")}
             </button>
           </div>

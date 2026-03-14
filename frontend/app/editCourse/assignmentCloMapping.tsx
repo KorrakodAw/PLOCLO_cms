@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
-import { useToast } from "../../components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { apiClient } from "../../utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { CLO } from "@/utils/cloApi";
@@ -36,7 +36,7 @@ export default function AssignmentCloMapping({
   courseId: string | number;
 }) {
   const { token } = useAuth();
-  const { showToast, ToastElement } = useToast();
+  const { showToast } = useGlobalToast();
   const { i18n } = useTranslation("common");
   const lang = i18n.language;
   const [loading, setLoading] = useState(false);
@@ -327,7 +327,7 @@ export default function AssignmentCloMapping({
 
   return (
     <div className="flex flex-col gap-6">
-      <ToastElement />
+
       {/* Weight Breakdown Summary */}
       {weightSummary.length > 0 && (
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
