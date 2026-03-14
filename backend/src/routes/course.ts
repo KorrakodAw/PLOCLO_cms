@@ -96,6 +96,7 @@ router.get(
           code: s.course.code,
           name: s.course.name,
           name_th: s.course.name_th,
+          credits: s.course.credits,
           program_id: s.course.program_id,
           section: s.section,
           semester: s.semester,
@@ -152,6 +153,7 @@ router.get(
           code: course.code,
           name: course.name,
           name_th: course.name_th,
+          credits: course.credits,
           program_id: course.program.id,
           program_code: course.program.program_code,
           program_year: course.program.program_year,
@@ -187,6 +189,7 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
         code: s.course.code,
         name: s.course.name,
         nameTh: s.course.name_th,
+        credits: s.course.credits,
         programId: s.course.program_id,
         section: s.section,
         semester: s.semester,
@@ -200,8 +203,8 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
 
 // POST / - สร้าง Master Course และ Section ใหม่
 router.post("/", authenticateToken, async (req: Request, res: Response) => {
-  const { code, name, name_th, program_id, section, semester, year } = req.body;
-  if (!code || !name || !program_id || !section || !semester || !year) {
+  const { code, name, name_th, credits, program_id, section, semester, year } = req.body;
+  if (!code || !name || !credits || !program_id || !section || !semester || !year) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -217,6 +220,7 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
             code,
             name,
             name_th: name_th || name,
+            credits,
             program_id: parseInt(program_id),
           },
         });
@@ -325,7 +329,7 @@ router.delete("/", authenticateToken, async (req: Request, res: Response) => {
 // PATCH /:id - อัปเดตข้อมูล Section
 router.patch("/:id", authenticateToken, async (req: Request, res: Response) => {
   const id = parseInt(String(req.params.id));
-  const { code, name, name_th, program_id, section, semester, year } = req.body;
+  const { code, name, name_th, credits, program_id, section, semester, year } = req.body;
   try {
     const updated = await prisma.$transaction(async (tx) => {
       const current = await tx.courseSection.findUnique({
@@ -337,7 +341,7 @@ router.patch("/:id", authenticateToken, async (req: Request, res: Response) => {
       if (code !== current.course.code || name !== current.course.name) {
         await tx.course.update({
           where: { id: current.course_id },
-          data: { code, name, name_th, program_id: parseInt(program_id) },
+          data: { code, name, name_th, credits, program_id: parseInt(program_id) },
         });
       }
 

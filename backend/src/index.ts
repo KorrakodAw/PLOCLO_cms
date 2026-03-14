@@ -25,6 +25,7 @@ import Calculate from "./routes/calculation";
 import Instructor from "./routes/instuctor";
 import instructorOnCOurseRoutes from "./routes/InstructorOnCourse";
 import scoreCalculate from "./routes/reports";
+import programOnCourseRoutes from "./routes/programOnCourse";
 
 import passport from "passport";
 import "./config/passport"; // Import ไฟล์ตั้งค่าที่เราสร้างไว้
@@ -61,6 +62,7 @@ app.use("/api/calculation", Calculate);
 app.use("/api/instructor", Instructor);
 app.use("/api/instructorOnCourse", instructorOnCOurseRoutes);
 app.use("/api/reports", scoreCalculate);
+app.use("/api/programOnCourse", programOnCourseRoutes);
 
 app.listen(3001, async () => {
   await seedAdminUser();
