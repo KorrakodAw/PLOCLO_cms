@@ -81,7 +81,7 @@ model Course {
 
   // Relations
   clos        Clo[]
-  sections    CourseSection[]
+  semesters  CourseSemester[]
   instructors CourseInstructor[]
   programs    ProgramOnCourse[]
   gradeSettings GradeSetting[]
@@ -89,23 +89,37 @@ model Course {
   @@map("course")
 }
 
+model CourseSemester {
+  id        Int      @id @default(autoincrement())
+  course_id Int
+  semester  Int      @default(1)
+  year      Int
+  
+  course    Course   @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  // 🟢 สิ่งที่แชร์ร่วมกันในทุก Section ของเทอมนี้
+  assignments      Assignment[]
+  categoryWeights   AssignmentCategoryWeight[]
+  
+  // เชื่อมไปยังกลุ่มเรียนต่างๆ (Section 1, 2, 3...)
+  sections          CourseSection[]
+
+  @@unique([course_id, semester, year])
+  @@map("course_semester")
+}
+
 model CourseSection {
-  id        Int @id @default(autoincrement())
-  course_id Int
-  section   Int @default(1)
-  semester  Int @default(1)
-  year      Int
+  id                  Int    @id @default(autoincrement())
+  course_semester_id  Int    // 🟢 เชื่อมกลับมาที่ Semester
+  section             Int    @default(1)
 
-  course Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  semester_config     CourseSemester @relation(fields: [course_semester_id], references: [id], onDelete: Cascade)
 
-  // ✅ MOVED: Relations now link to Section
-  assignments      Assignment[]
-  categoryWeights  AssignmentCategoryWeight[]
-  
-  students         StudentOnSection[]
-  scores           StudentScore[]
+  // ข้อมูลเฉพาะของแต่ละกลุ่มเรียน
+  students            StudentOnSection[]
+  scores              StudentScore[]
 
-  @@map("course_section")
+  @@map("course_section")
 }
 
 model Instructor {
@@ -181,23 +195,23 @@ model CloPloMapping {
 
 // --- Assignments ---
 model Assignment {
-  id Int @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
+  
+  // 🟢 เปลี่ยน: ผูกกับ Semester แทน Section รายตัว
+  semester_id Int      @map("course_semester_id")
+  semester    CourseSemester @relation(fields: [semester_id], references: [id], onDelete: Cascade)
 
-  // ✅ CHANGED: Link to Section instead of Course
-  section_id Int           @map("section_id")
-  section    CourseSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  name        String
+  category    AssCategory @default(assignment)
+  description String?
+  maxScore    Decimal     @default(100) @map("max_score") @db.Decimal(7, 4)
+  weight      Decimal     @default(0) @db.Decimal(7, 4)
+  createdAt   DateTime    @default(now()) @map("created_at")
 
-  name        String
-  category    AssCategory @default(assignment)
-  description String?
-  maxScore    Decimal     @default(100) @map("max_score") @db.Decimal(7, 4)
-  weight      Decimal     @default(0) @db.Decimal(7, 4)
-  createdAt   DateTime    @default(now()) @map("created_at")
+  assignment_clo_mappings AssignmentCloMapping[]
+  scores                  StudentScore[]
 
-  assignment_clo_mappings AssignmentCloMapping[]
-  scores                  StudentScore[]
-
-  @@map("assignment")
+  @@map("assignment")
 }
 
 model AssignmentCloMapping {
@@ -215,19 +229,18 @@ model AssignmentCloMapping {
 }
 
 model AssignmentCategoryWeight {
-  id         Int         @id @default(autoincrement())
-  
-  // ✅ CHANGED: Link to Section
-  section_id Int         @map("section_id")
-  category   AssCategory
-  maxWeight  Decimal     @default(0) @db.Decimal(7, 4) @map("max_weight")
-  createdAt  DateTime    @default(now()) @map("created_at")
-  updatedAt  DateTime    @default(now()) @updatedAt @map("updated_at")
+  id           Int            @id @default(autoincrement())
+  
+  // 🟢 เปลี่ยน: ผูกกับ Semester
+  semester_id  Int            @map("course_semester_id")
+  semester     CourseSemester @relation(fields: [semester_id], references: [id], onDelete: Cascade)
 
-  section CourseSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  category     AssCategory
+  maxWeight    Decimal        @default(0) @db.Decimal(7, 4) @map("max_weight")
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
 
-  @@unique([section_id, category])
-  @@map("assignment_category_weight")
+  @@unique([semester_id, category])
+  @@map("assignment_category_weight")
 }
 
 // --- Scores ---

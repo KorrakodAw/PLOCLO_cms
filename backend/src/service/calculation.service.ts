@@ -16,7 +16,7 @@ export async function getCloScorePerStudentPerCourse(
       where: {
         student_id: Number(studentId),
         assignment: {
-          section: {
+          semester: {
             course_id: Number(courseId),
           },
         },
@@ -103,7 +103,7 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
     const studentClo = await tx.studentScore.findMany({
       where: {
         assignment: {
-          section:{
+          semester:{
             course_id: Number(courseId)
           }
         },
@@ -235,7 +235,7 @@ export async function getCloScoreAllStudentPerCourse(
     const studentClo = await tx.studentScore.findMany({
       where: {
         assignment: {
-          section: {
+          semester: {
             course_id: Number(courseId),
           },
         },
@@ -367,7 +367,7 @@ export async function getCloPercentageAllStudentPerCourse(
 
     // 2) ดึง highestPossible ของแต่ละ CLO
     const assignments = await tx.assignment.findMany({
-      where: { section: { course_id: Number(courseId) } },
+      where: { semester: { course_id: Number(courseId) } },
       select: {
         weight: true,
         assignment_clo_mappings: {
@@ -467,7 +467,7 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     // 2) เพิ่มการหา highest clo possible จาก assignment weight
     // -----------------------------
     const assignments = await tx.assignment.findMany({
-      where: { section: { course_id: Number(courseId) } },
+      where: { semester: { course_id: Number(courseId) } },
       select: {
         weight: true,
         assignment_clo_mappings: {
@@ -658,7 +658,7 @@ export async function getRealScorePerStudentPerCourse(
       where: {
         student_id: Number(studentId),
         assignment: {
-          section: {
+          semester: {
             course_id: Number(courseId),
           },
         },
@@ -716,7 +716,7 @@ export async function getRealScoreAllStudentPerCourse(
     const studentScores = await tx.studentScore.findMany({
       where: {
         assignment: {
-          section: {
+          semester: {
             course_id: Number(courseId),
           },
         },
@@ -792,7 +792,7 @@ export async function getRealScorePercentageAllStudentPerCourse(
 
     // 2) ดึง highestPossible ต่อ category
     const assignments = await tx.assignment.findMany({
-      where: { section: { course_id: Number(courseId) } },
+      where: { semester: { course_id: Number(courseId) } },
       select: {
         weight: true,
         category: true,
@@ -978,7 +978,7 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
     // 2) หา highestPossible ต่อ category จาก assignment weight
     // -----------------------------
     const assignments = await tx.assignment.findMany({
-      where: { section: { course_id: Number(courseId) } },
+      where: { semester: { course_id: Number(courseId) } },
       select: {
         weight: true,
         category: true,

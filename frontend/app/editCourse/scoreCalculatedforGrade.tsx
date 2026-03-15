@@ -20,10 +20,10 @@ interface StudentResult {
 }
 
 export default function ScoreCalculated({
-  masterCourseId,
+  semesterId,
   sectionId,
 }: {
-  masterCourseId: string | number;
+  semesterId: string | number;
   sectionId: string | number;
 }) {
   const { token } = useAuth();
@@ -33,13 +33,13 @@ export default function ScoreCalculated({
 
   // 1. Fetch Summary Data
   useEffect(() => {
-    if (!masterCourseId || !sectionId) return;
+    if (!semesterId || !sectionId) return;
 
     const fetchSummary = async () => {
       setLoading(true);
       try {
         const res = await apiClient.get(
-          `/reports/summary?sectionId=${sectionId}&masterCourseId=${masterCourseId}`,
+          `/reports/summary?sectionId=${sectionId}&semesterId=${semesterId}`,
         );
         setProcessedData(res.data);
       } catch (err) {
@@ -51,7 +51,7 @@ export default function ScoreCalculated({
     };
 
     fetchSummary();
-  }, [masterCourseId, sectionId, showToast]);
+  }, [semesterId, sectionId, showToast]);
 
   // 🟢 2. Sort Data by Student Code
   const sortedData = useMemo(() => {
@@ -94,7 +94,7 @@ export default function ScoreCalculated({
     try {
       const res = apiClient.get("/calculation/ass-clo/gradeSummary", {
         headers: { Authorization: `Bearer ${token}` },
-        params: { courseId: masterCourseId },
+        params: { courseId: semesterId },
       });
       res.then((response) => {
         setGradeSummaryData(response.data);
@@ -102,7 +102,7 @@ export default function ScoreCalculated({
     } catch (err) {
       console.error(err);
     }
-  },[token, masterCourseId]);
+  }, [token, semesterId]);
 
   const [gradeSummaryData, setGradeSummaryData] = useState<any>(null);
 

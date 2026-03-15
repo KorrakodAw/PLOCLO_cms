@@ -6,23 +6,59 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 const router = Router();
 
-interface UpdateItem {
-  assignment_id: number;
-  clo_id: number;
-  weight: number | string;
-}
+router.post("/clo-plo", authenticateToken, async (req, res) => {
+  // 🟢 รับ 'updates' ซึ่งเป็น Array จาก req.body
+  const { updates } = req.body;
 
-// GET /api/mapping/clo-plo/:courseId
-// Fetches mappings for the Master Course
+  if (!Array.isArray(updates)) {
+    return res
+      .status(400)
+      .json({ error: "Invalid updates format. Expected an array." });
+  }
+
+  try {
+    // ใช้ Transaction เพื่อให้มั่นใจว่าข้อมูลจะถูกบันทึกสำเร็จทั้งหมดหรือล้มเหลวทั้งหมด
+    await prisma.$transaction(
+      updates.map((item) => {
+        const cloId = Number(item.clo_id);
+        const ploId = Number(item.plo_id);
+        const weight = Number(item.weight);
+
+        if (weight > 0 && weight <= 100) {
+          return prisma.cloPloMapping.upsert({
+            where: {
+              cloId_ploId: { cloId, ploId },
+            },
+            update: { weight, updatedAt: new Date() },
+            create: { cloId, ploId, weight },
+          });
+        } else {
+          // ถ้า weight เป็น 0 หรือติดลบ ให้ทำการลบ Mapping นั้นทิ้ง
+          return prisma.cloPloMapping.deleteMany({
+            where: { cloId, ploId },
+          });
+        }
+      }),
+    );
+
+    res.json({
+      success: true,
+      message: "All CLO-PLO Mappings saved successfully",
+    });
+  } catch (err) {
+    console.error("Bulk Save Error:", err);
+    res.status(500).json({ error: "Failed to save mappings" });
+  }
+});
+
+// --- 1. CLO to PLO Mapping (ยังคงผูกกับ Course เป็นหลัก) ---
+
 router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
   try {
-    const courseId = parseInt(req.params.courseId as string);
-
-    if (isNaN(courseId)) {
+    const courseId = parseInt(req.params.courseId as string );
+    if (isNaN(courseId))
       return res.status(400).json({ error: "Invalid Course ID" });
-    }
 
-    // Using pool query for direct SQL control or consistency with existing patterns
     const result = await pool.query(
       `SELECT m.clo_id, m.plo_id, m.weight 
        FROM clo_plo_mapping m
@@ -30,187 +66,105 @@ router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
        WHERE c.course_id = $1`,
       [courseId],
     );
-
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch mappings" });
+    res.status(500).json({ error: "Failed to fetch CLO-PLO mappings" });
   }
 });
 
-// POST /api/mapping/clo-plo
-router.post("/clo-plo", authenticateToken, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const { updates } = req.body; // Array of { clo_id, plo_id, weight }
+// --- 2. Assignment to CLO Mapping (ปรับตามโครงสร้าง Semester) ---
 
-    await client.query("BEGIN");
-
-    for (const item of updates) {
-      if (item.weight > 0) {
-        await client.query(
-          `INSERT INTO clo_plo_mapping (clo_id, plo_id, weight)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (clo_id, plo_id) 
-           DO UPDATE SET weight = EXCLUDED.weight, updated_at = NOW()`,
-          [item.clo_id, item.plo_id, item.weight],
-        );
-      } else {
-        await client.query(
-          `DELETE FROM clo_plo_mapping 
-           WHERE clo_id = $1 AND plo_id = $2`,
-          [item.clo_id, item.plo_id],
-        );
-      }
-    }
-
-    await client.query("COMMIT");
-    res.json({ success: true, message: "Mapping saved" });
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error(err);
-    res.status(500).json({ error: "Failed to save mapping" });
-  } finally {
-    client.release();
-  }
-});
-
-// POST /api/mapping/assignment-clo
 router.post("/assignment-clo", authenticateToken, async (req, res) => {
-  const { updates } = req.body;
+  const { updates } = req.body; // Array of { assignment_id, clo_id, weight }
 
   try {
     await prisma.$transaction(async (tx) => {
-      for (const item of updates as UpdateItem[]) {
+      for (const item of updates) {
         const weight = Number(item.weight ?? 0);
+        const assId = Number(item.assignment_id);
+        const cloId = Number(item.clo_id);
 
-        // 1. Fetch Assignment (Now directly linked to Course)
+        // 1. Fetch Assignment & CLO เพื่อเช็คว่ามาจาก Course เดียวกันไหม
         const assignment = await tx.assignment.findUnique({
-          where: { id: Number(item.assignment_id) },
-          select: { 
-            section_id: true,
-            section: {
-              select: { course_id: true },
-            },
-          }, // Direct relation
+          where: { id: assId },
+          include: {
+            semester: { select: { course_id: true } },
+          },
         });
 
-        // 2. Fetch CLO (Linked to Course)
         const clo = await tx.clo.findUnique({
-          where: { id: Number(item.clo_id) },
+          where: { id: cloId },
           select: { course_id: true },
         });
 
-        if (!assignment || !clo) {
-          throw new Error("ASSIGNMENT_OR_CLO_NOT_FOUND");
-        }
+        if (!assignment || !clo) throw new Error("ASSIGNMENT_OR_CLO_NOT_FOUND");
 
-        // 3. Validation: Must belong to the same Master Course
-        if (assignment.section.course_id !== clo.course_id) {
+        // 2. Validation: ต้องเป็นวิชาเดียวกัน (แม้จะคนละเทอมแต่ CLO ต้องตรงกับวิชา)
+        if (assignment.semester.course_id !== clo.course_id) {
           throw new Error("COURSE_MISMATCH");
         }
 
-        // 4. Weight Validation (Optional: Check total weight for assignment)
-        //
-        const existingMappings = await tx.assignmentCloMapping.findMany({
-          where: {
-            assId: Number(item.assignment_id),
-            cloId: { not: Number(item.clo_id) }, // Exclude current CLO being updated
-          },
-          select: { weight: true },
-        });
-
-        const currentTotal = existingMappings.reduce(
-          (acc, curr) => acc + Number(curr.weight ?? 0),
-          0,
-        );
-
-        // Note: Strict validation logic depends on your business rules.
-        // If updating mapping for one CLO, checking total > 100 might be tricky
-        // if user hasn't finished adjusting others. Be careful here.
-        if (currentTotal + weight > 100) {
-          // throw new Error("WEIGHT_LIMIT_EXCEEDED"); // Uncomment if strict enforcement is desired
-        }
-
-        // 5. Update DB
+        // 3. Save Logic
         if (weight > 0 && weight <= 100) {
           await tx.assignmentCloMapping.upsert({
-            where: {
-              assId_cloId: {
-                assId: Number(item.assignment_id),
-                cloId: Number(item.clo_id),
-              },
-            },
-            update: {
-              weight,
-              updatedAt: new Date(),
-            },
-            create: {
-              assId: Number(item.assignment_id),
-              cloId: Number(item.clo_id),
-              weight,
-              updatedAt: new Date(),
-            },
+            where: { assId_cloId: { assId, cloId } },
+            update: { weight, updatedAt: new Date() },
+            create: { assId, cloId, weight },
           });
         } else {
           await tx.assignmentCloMapping.deleteMany({
-            where: {
-              assId: Number(item.assignment_id),
-              cloId: Number(item.clo_id),
-            },
+            where: { assId, cloId },
           });
         }
       }
     });
 
-    res.json({ success: true, message: "Mapping saved" });
-  } catch (err) {
+    res.json({ success: true, message: "Assignment-CLO Mapping saved" });
+  } catch (err: any) {
     console.error(err);
-    if (err instanceof Error) {
-      if (err.message === "ASSIGNMENT_OR_CLO_NOT_FOUND") {
-        return res.status(404).json({ error: "Assignment or CLO not found" });
-      }
-      if (err.message === "COURSE_MISMATCH") {
-        return res
-          .status(400)
-          .json({ error: "Assignment and CLO must belong to the same course" });
-      }
-      if (err.message === "WEIGHT_LIMIT_EXCEEDED") {
-        return res
-          .status(400)
-          .json({ error: "Total weight for assignment cannot exceed 100" });
-      }
-    }
-    res.status(500).json({ error: "Failed to save mapping" });
+    const status = err.message === "ASSIGNMENT_OR_CLO_NOT_FOUND" ? 404 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 
-// GET /api/mapping/assignment-clo/:courseId
+// GET /api/mapping/assignment-clo/:sectionId
 router.get(
-  "/assignment-clo/:sectionId",
+  "/assignment-clo/:semesterId",
   authenticateToken,
   async (req, res) => {
     try {
-      const sectionId = parseInt(req.params.sectionId as string);
+      const semesterId = parseInt(req.params.semesterId as string); ;
 
-      if (isNaN(sectionId)) {
-        return res.status(400).json({ error: "Invalid Course ID" });
+      if (isNaN(semesterId)) {
+        return res.status(400).json({ error: "Invalid Semester ID" });
       }
 
-      // Updated Query: Both Assignment and CLO are now directly under Course
-      const result = await pool.query(
-        `SELECT m.assignment_id, m.clo_id, m.weight 
-       FROM assignment_clo_mapping m
-       JOIN assignment a ON m.assignment_id = a.id
-       JOIN clo c ON m.clo_id = c.id
-       WHERE a.section_id = $1 AND c.course_id = $1`,
-        [sectionId],
-      );
+      // 🟢 ใช้ Prisma ดึงข้อมูล Mapping ผ่านความสัมพันธ์ของ Assignment ใน Semester นั้น
+      const mappings = await prisma.assignmentCloMapping.findMany({
+        where: {
+          assignment: {
+            semester_id: semesterId, // 👈 กรองเฉพาะงานที่อยู่ในเทอมนี้
+          },
+        },
+        select: {
+          assId: true, // 👈 อ้างอิงตามชื่อใน Model (assId)
+          cloId: true, // 👈 อ้างอิงตามชื่อใน Model (cloId)
+          weight: true,
+        },
+      });
 
-      res.json(result.rows);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to fetch mappings" });
+      // Prisma จะคืนค่า Decimal เป็น Object/String เราสามารถแปลงเป็น Number ได้หากต้องการ
+      const formattedMappings = mappings.map((m) => ({
+        ...m,
+        weight: m.weight ? Number(m.weight) : 0,
+      }));
+
+      res.json(formattedMappings);
+    } catch (err: any) {
+      console.error("Fetch Mapping Error:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch Assignment-CLO mappings" });
     }
   },
 );

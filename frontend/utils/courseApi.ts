@@ -8,6 +8,7 @@ export interface Course {
   name: string;
   name_th: string;
   program_id: number;
+  credits: number;
   section: number; // Now included
   semester: number; // Now included
   year: number; // Now included

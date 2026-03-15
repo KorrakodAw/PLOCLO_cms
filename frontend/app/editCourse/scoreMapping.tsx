@@ -30,10 +30,10 @@ interface StudentScore {
 }
 
 export default function ScoreMapping({
-  masterCourseId,
+  semesterId,
   sectionId,
 }: {
-  masterCourseId: string | number;
+  semesterId: string | number;
   sectionId?: string | number;
 }) {
   const { token } = useAuth();
@@ -59,7 +59,7 @@ export default function ScoreMapping({
           apiClient.get(`/studentOnCourse?sectionId=${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          apiClient.get(`/assignment?sectionId=${sectionId}`, {
+          apiClient.get(`/assignment?semesterId=${semesterId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           apiClient.get(`/score?sectionId=${sectionId}`, {
@@ -87,7 +87,7 @@ export default function ScoreMapping({
     };
 
     fetchData();
-  }, [masterCourseId, sectionId, token]);
+  }, [semesterId, sectionId, token]);
 
   const sortedAssignments = useMemo(() => {
     // 1. กำหนดลำดับความสำคัญของหมวดหมู่ (Category)
@@ -306,7 +306,6 @@ export default function ScoreMapping({
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-8 relative min-h-[400px]">
       {loading && <LoadingOverlay />}
-
 
       <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
         <h3 className="font-bold text-gray-800 uppercase text-xs tracking-widest">

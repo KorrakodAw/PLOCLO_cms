@@ -125,7 +125,7 @@ router.get("/", authenticateToken, async (req, res) => {
       `SELECT id, code, name, name_th, course_id FROM clo
        ${courseId ? "WHERE course_id = $1" : ""}
        ORDER BY id ASC`,
-      courseId ? [courseId] : []
+      courseId ? [courseId] : [],
     );
 
     res.json(result.rows);
@@ -148,7 +148,7 @@ router.post("/", authenticateToken, async (req, res) => {
       `INSERT INTO clo (code, name, name_th, course_id) 
        VALUES ($1, $2, $3, $4) 
        RETURNING id, code, name, name_th, course_id`,
-      [code, name, name_th, course_id]
+      [code, name, name_th, course_id],
     );
     res.status(201).json(result.rows[0]);
   } catch (err: any) {
@@ -183,7 +183,7 @@ router.post("/bulk", authenticateToken, async (req, res) => {
         await pool.query(
           `INSERT INTO clo (code, name, name_th, course_id) 
            VALUES ($1, $2, $3, $4)`,
-          [code, name, name_th, course_id]
+          [code, name, name_th, course_id],
         );
       } catch (err: any) {
         if (err.code === "23505") {
@@ -213,11 +213,8 @@ router.delete("/bulk-delete", authenticateToken, async (req, res) => {
 
   try {
     await pool.query("BEGIN");
-    
-    await pool.query(
-      "DELETE FROM clo WHERE id = ANY($1::int[])",
-      [cloIds]
-    );
+
+    await pool.query("DELETE FROM clo WHERE id = ANY($1::int[])", [cloIds]);
 
     await pool.query("COMMIT");
     res.status(200).json({ message: "Bulk delete successful" });
@@ -254,7 +251,7 @@ router.patch("/:id", authenticateToken, async (req, res) => {
        SET code = $1, name = $2, name_th = $3
        WHERE id = $4
        RETURNING id, code, name, name_th, course_id`,
-      [code, name, name_th, cloId]
+      [code, name, name_th, cloId],
     );
 
     if (result.rows.length === 0) {
