@@ -371,6 +371,7 @@ export default function CourseManagement({
         year: selectedYear,
         semester: selectedSemester || "1",
         section: selectedSection || "1",
+        credits: 3, // Default credits, adjust as needed
       };
 
       try {

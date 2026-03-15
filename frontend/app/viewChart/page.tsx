@@ -107,21 +107,25 @@ export default function PLOChart() {
 
     try {
       setLoading(true);
-      // 🟢 รอให้ Animation ของกราฟนิ่งสนิท
-      await new Promise((r) => setTimeout(r, 800));
+      // 1. รอให้ Animation นิ่ง (Firefox อาจต้องการเวลามากกว่าปกติเล็กน้อย)
+      await new Promise((r) => setTimeout(r, 1000));
 
-      // 🟢 กำหนด Filter เพื่อเอาปุ่มและขอบที่ไม่ต้องการออก
       const dataUrl = await toPng(graphRef.current, {
         cacheBust: true,
         backgroundColor: "#ffffff",
+        // 🟢 เพิ่มส่วนนี้: บังคับให้โหลดสไตล์ทั้งหมดเข้าไปใหม่
+        skipFonts: false,
+        // 🟢 สำคัญมากสำหรับ Firefox: ถ้ามีรูปภาพในกราฟ
+        includeQueryParams: true,
         style: {
           borderRadius: "0",
-          padding: "20px",
+          padding: "40px", // เพิ่มพื้นที่ขอบให้ Firefox วาดได้ครบ
+          margin: "0",
         },
-        // 🟢 กรองเฉพาะสิ่งที่ต้องการ: เก็บเฉพาะกราฟและคำอธิบาย (Legend)
         filter: (node) => {
+          // ใช้ optional chaining เพื่อความปลอดภัยใน Firefox
           const exclusionClasses = ["button", "toggle-btn", "no-export"];
-          if (node.classList) {
+          if (node instanceof HTMLElement && node.classList) {
             return !exclusionClasses.some((cls) =>
               node.classList.contains(cls),
             );
@@ -130,15 +134,22 @@ export default function PLOChart() {
         },
       });
 
+      // 2. ตรวจสอบว่าได้ Data URL จริงหรือไม่ (Firefox บางครั้งคืนค่าเป็น String เปล่าถ้า Error)
+      if (!dataUrl || dataUrl === "data:,") {
+        throw new Error("Generated image is empty");
+      }
+
       const link = document.createElement("a");
-      link.download = `CLO_Analysis_${new Date().getTime()}.png`;
+      link.download = `CLO_Analysis_${new Date().toISOString().split("T")[0]}.png`;
       link.href = dataUrl;
+      document.body.appendChild(link); // 🟢 Firefox ต้องการสิ่งนี้เพื่อให้ Click ได้
       link.click();
+      document.body.removeChild(link); // Clean up
 
       showToast("บันทึกรูปภาพสำเร็จ!", "success");
     } catch (error) {
       console.error("Capture Error:", error);
-      showToast("ไม่สามารถบันทึกภาพได้", "error");
+      showToast("ไม่สามารถบันทึกภาพได้ (รองรับได้ดีที่สุดบน Chrome)", "error");
     } finally {
       setLoading(false);
     }

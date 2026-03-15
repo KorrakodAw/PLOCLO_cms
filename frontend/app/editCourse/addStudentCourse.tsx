@@ -140,10 +140,12 @@ export default function AddStudentCourse({
 
         const validStudentIds: number[] = [];
         const missingFromProgram: string[] = [];
-        let skipCount = 0;
+        let skipCount = 0;  
 
         data.forEach((row) => {
-          const code = String(row.student_id || row["รหัสนิสิต"] || "").trim();
+          const code = String(
+            row.student_id || row["รหัสนิสิต"] || row.student_code || "",
+          ).trim();
           if (!code) return;
 
           // 1. ตรวจสอบว่ารหัสนิสิตนี้มีตัวตนอยู่ใน Program นี้หรือไม่

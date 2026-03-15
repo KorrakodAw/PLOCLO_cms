@@ -11,7 +11,7 @@ router.get("/settings/:courseId", authenticateToken, async (req, res) => {
     const courseId = parseInt(req.params.courseId as string);
 
     if (isNaN(courseId)) {
-      return res.status(400).json({ error: "Invalid Section ID" });
+      return res.status(400).json({ error: "Invalid Course ID" });
     }
 
     const settings = await prisma.gradeSetting.findMany({
@@ -29,7 +29,7 @@ router.get("/settings/:courseId", authenticateToken, async (req, res) => {
 // POST /api/grade/settings
 router.post("/settings", authenticateToken, async (req, res) => {
   try {
-    const { courseId, settings } = req.body;
+    const { courseId , settings } = req.body;
 
     // 1. Validation
     if (!courseId || !Array.isArray(settings)) {
@@ -38,7 +38,7 @@ router.post("/settings", authenticateToken, async (req, res) => {
 
     // 2. TRANSACTION: Delete old settings, then insert new ones
     await prisma.$transaction(async (tx) => {
-      // A. Delete existing settings for this section
+      // A. Delete existing settings for this course
       await tx.gradeSetting.deleteMany({
         where: { course_id: courseId },
       });

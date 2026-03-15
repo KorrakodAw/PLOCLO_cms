@@ -87,7 +87,12 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
         // 1. Fetch Assignment (Now directly linked to Course)
         const assignment = await tx.assignment.findUnique({
           where: { id: Number(item.assignment_id) },
-          select: { section_id: true }, // Direct relation
+          select: { 
+            section_id: true,
+            section: {
+              select: { course_id: true },
+            },
+          }, // Direct relation
         });
 
         // 2. Fetch CLO (Linked to Course)
@@ -101,7 +106,7 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
         }
 
         // 3. Validation: Must belong to the same Master Course
-        if (assignment.section_id !== clo.course_id) {
+        if (assignment.section.course_id !== clo.course_id) {
           throw new Error("COURSE_MISMATCH");
         }
 
