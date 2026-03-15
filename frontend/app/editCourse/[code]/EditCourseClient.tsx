@@ -345,7 +345,7 @@ export default function EditCourseClient({
               <CLOManagement courseId={String(formData.course_id)} />
             )}
             {activeTab === "grade-setting" && (
-              <GradeSetting masterCourseId={String(formData.course_id)} />
+              <GradeSetting semesterId={String(formData.semester_id)} />
             )}
             {activeTab === "mapping" && (
               <CloPloMapping

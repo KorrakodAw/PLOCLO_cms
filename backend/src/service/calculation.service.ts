@@ -577,7 +577,7 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
 
     // 2) ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { course_id: Number(courseId)  },
+      where: { semester_id: Number(courseId)  },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -860,7 +860,7 @@ export async function getTotalScoreAndGradePerStudentPerCourse(
 
     // 3. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { course_id: Number(courseId) },
+      where: { semester_id: Number(courseId) },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -895,7 +895,7 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 
     // 2. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { course_id: Number(courseId) },
+      where: { semester_id: Number(courseId) },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 

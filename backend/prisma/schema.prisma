@@ -84,7 +84,7 @@ model Course {
   semesters  CourseSemester[]
   instructors CourseInstructor[]
   programs    ProgramOnCourse[]
-  gradeSettings GradeSetting[]
+ 
 
   @@map("course")
 }
@@ -103,6 +103,7 @@ model CourseSemester {
   
   // เชื่อมไปยังกลุ่มเรียนต่างๆ (Section 1, 2, 3...)
   sections          CourseSection[]
+  gradeSettings GradeSetting[]
 
   @@unique([course_id, semester, year])
   @@map("course_semester")
@@ -263,17 +264,15 @@ model StudentScore {
 
 // --- Grades ---
 model GradeSetting {
-  id         Int      @id @default(autoincrement())
-  grade      String
-  score      Decimal  @db.Decimal(7, 4)
-  
-  course_id Int      @map("course_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
-
-  course Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
-
-  @@map("grade_setting")
+  id          Int            @id @default(autoincrement())
+  semester_id Int            @map("course_semester_id") // เชื่อมกับ Semester แทน Course
+  semester    CourseSemester @relation(fields: [semester_id], references: [id], onDelete: Cascade)
+  
+  grade       String         // เช่น A, B+, B
+  score       Decimal        @db.Decimal(5, 2) // คะแนนขั้นต่ำ
+  
+  @@map("grade_setting")
+  @@unique([semester_id, grade]) // ป้องกันเกรดซ้ำในเทอมเดียวกัน
 }
 
 // --- Students ---

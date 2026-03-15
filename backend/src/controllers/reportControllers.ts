@@ -1,27 +1,22 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-// 1. สรุปภาพรวมรายวิชา (รวมทุก Section ในเทอมเดียวกัน)
+// 1. สรุปภาพรวมรายวิชา (รวมทุก Section ใน Semester เดียวกัน)
 export const getGradeSummary = async (req: any, res: any) => {
-  const { semesterId } = req.query; // 🟢 เปลี่ยนมารับ semesterId (CourseSemester)
+  const { semesterId } = req.query;
 
-  if (!semesterId) {
+  if (!semesterId)
     return res.status(400).json({ message: "Missing semesterId" });
-  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      // 🟢 ดึงข้อมูลพื้นฐานที่แชร์กันทั้งเทอม
       const [assignments, gradeSettings, semesterData] = await Promise.all([
-        // ดึงงานที่แชร์กันใน Semester นี้
         tx.assignment.findMany({ where: { semester_id: Number(semesterId) } }),
-        // ดึงเกณฑ์จาก Course (ผ่าน Semester)
         tx.gradeSetting.findMany({
-          where: {
-            course: { semesters: { some: { id: Number(semesterId) } } },
-          },
+          where: { semester_id: Number(semesterId) },
           orderBy: { score: "desc" },
         }),
-        // ดึงนักเรียนจากทุก Section ใน Semester นี้
         tx.courseSemester.findUnique({
           where: { id: Number(semesterId) },
           include: {
@@ -48,7 +43,7 @@ export const getGradeSummary = async (req: any, res: any) => {
 
       if (!semesterData) throw new Error("SEMESTER_NOT_FOUND");
 
-      // Calculate Full Scores
+      // คำนวณคะแนนเต็มรวมของแต่ละหมวดหมู่
       const categoryFullScores: Record<string, number> = {};
       assignments.forEach((assign) => {
         categoryFullScores[assign.category] = Number(
@@ -58,7 +53,7 @@ export const getGradeSummary = async (req: any, res: any) => {
         );
       });
 
-      // Flatten students from all sections
+      // จัดการรวบรวมนักเรียนจากทุก Section
       const studentMap = new Map();
       semesterData.sections.forEach((sec) => {
         sec.students.forEach((rec) =>
@@ -76,6 +71,8 @@ export const getGradeSummary = async (req: any, res: any) => {
               (s: any) => s.assignment_id === assign.id,
             );
             const raw = scoreRec ? Number(scoreRec.score) : 0;
+
+            // สูตร: (คะแนนดิบ / คะแนนเต็มข้อ) * น้ำหนักข้อนั้น
             const weighted =
               (raw / Number(assign.maxScore)) * Number(assign.weight);
 
@@ -87,6 +84,7 @@ export const getGradeSummary = async (req: any, res: any) => {
             );
           });
 
+          // 🟢 ตัดเกรดตามเกณฑ์ของ Semester นี้
           const grade =
             gradeSettings.find((g) => totalWeightedScore >= Number(g.score))
               ?.grade || "F";
@@ -97,7 +95,7 @@ export const getGradeSummary = async (req: any, res: any) => {
             first_name: student.first_name,
             last_name: student.last_name,
             categoryEarnedScores,
-            totalScore: Number(totalWeightedScore.toFixed(4)),
+            totalScore: Number(totalWeightedScore.toFixed(2)),
             grade,
           };
         },
@@ -108,16 +106,13 @@ export const getGradeSummary = async (req: any, res: any) => {
 
     return res.status(200).json(result);
   } catch (error: any) {
-    return res
-      .status(500)
-      .json({ message: error.message || "Internal server error" });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// 2. สรุปราย Section (แต่ใช้ Assignment ร่วมกันใน Semester)
+// 2. สรุปราย Section
 export const getSectionGradeSummary = async (req: any, res: any) => {
   const { sectionId } = req.query;
-
   if (!sectionId) return res.status(400).json({ message: "Missing sectionId" });
 
   try {
@@ -128,9 +123,7 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
           semester_config: {
             include: {
               assignments: true,
-              course: {
-                include: { gradeSettings: { orderBy: { score: "desc" } } },
-              },
+              gradeSettings: { orderBy: { score: "desc" } }, // 🟢 ดึงจาก SemesterConfig ตรงๆ
             },
           },
           students: {
@@ -138,13 +131,8 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
               student: {
                 include: {
                   scores: {
-                    where: {
-                      assignment: {
-                        semester: {
-                          sections: { some: { id: Number(sectionId) } },
-                        },
-                      },
-                    },
+                    where: { section_id: Number(sectionId) }, // 🟢 ดึงคะแนนเฉพาะในกลุ่มนี้
+                    include: { assignment: true },
                   },
                 },
               },
@@ -156,7 +144,7 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
       if (!sectionData) throw new Error("SECTION_NOT_FOUND");
 
       const assignments = sectionData.semester_config.assignments;
-      const gradeSettings = sectionData.semester_config.course.gradeSettings;
+      const gradeSettings = sectionData.semester_config.gradeSettings;
 
       return sectionData.students.map((record) => {
         const student = record.student;
@@ -198,11 +186,10 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
 
 // 3. สรุปรายบุคคล
 export const getIndividualStudentSummary = async (req: any, res: any) => {
-  const { studentId, semesterId } = req.query; // 🟢 ใช้ semesterId
+  const { studentId, semesterId } = req.query;
 
-  if (!studentId || !semesterId) {
-    return res.status(400).json({ message: "Missing studentId or semesterId" });
-  }
+  if (!studentId || !semesterId)
+    return res.status(400).json({ message: "Missing params" });
 
   try {
     const [student, assignments, semesterInfo] = await Promise.all([
@@ -220,11 +207,7 @@ export const getIndividualStudentSummary = async (req: any, res: any) => {
       }),
       prisma.courseSemester.findUnique({
         where: { id: Number(semesterId) },
-        include: {
-          course: {
-            include: { gradeSettings: { orderBy: { score: "desc" } } },
-          },
-        },
+        include: { gradeSettings: { orderBy: { score: "desc" } } }, // 🟢 ดึงจาก SemesterConfig
       }),
     ]);
 
@@ -253,9 +236,9 @@ export const getIndividualStudentSummary = async (req: any, res: any) => {
       totalWeighted += earned;
     });
 
-    const gradeSettings = semesterInfo.course.gradeSettings;
-    const finalGrade =
-      gradeSettings.find((g) => totalWeighted >= Number(g.score))?.grade || "F";
+    const grade =
+      semesterInfo.gradeSettings.find((g) => totalWeighted >= Number(g.score))
+        ?.grade || "F";
 
     res.json({
       info: {
@@ -263,10 +246,7 @@ export const getIndividualStudentSummary = async (req: any, res: any) => {
         code: student.student_code,
         name: `${student.first_name} ${student.last_name}`,
       },
-      summary: {
-        totalScore: Number(totalWeighted.toFixed(2)),
-        grade: finalGrade,
-      },
+      summary: { totalScore: Number(totalWeighted.toFixed(2)), grade },
       categories: categoryBreakdown,
     });
   } catch (error) {
