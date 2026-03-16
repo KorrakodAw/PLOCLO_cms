@@ -33,6 +33,20 @@ import GradeSetting from "../gradeSetting";
 import ScoreCalculated from "../scoreCalculatedforGrade";
 import AssignmentCateWeight from "../assignmentCateWeight";
 
+interface formDataType {
+  id: number;
+  course_id: number;
+  program_id: number;
+  semester_id: number;
+  code: string;
+  name: string;
+  name_th: string;
+  year: number;
+  semester: number;
+  section: number;
+  credits: number;
+}
+
 export default function EditCourseClient({
   courseCode,
 }: {
@@ -45,7 +59,7 @@ export default function EditCourseClient({
   const lang = i18n.language;
 
   const [duplicateCourses, setDuplicateCourses] = useState<Course[]>([]);
-  const [formData, setFormData] = useState<any | null>(null);
+  const [formData, setFormData] = useState<formDataType | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,7 +79,7 @@ export default function EditCourseClient({
     try {
       const res = await getCoursePaginate(token, 1, 100, { courseCode });
       const matching = (res.data || []).filter(
-        (c: any) => String(c.code) === String(courseCode),
+        (c: Course) => String(c.code) === String(courseCode),
       );
 
       if (matching.length > 0) {
@@ -97,14 +111,14 @@ export default function EditCourseClient({
 
   useEffect(() => {
     const found = duplicateCourses.find(
-      (c) => String(c.id) === selectedSectionId,
+      (c: Course) => String(c.id) === selectedSectionId,
     );
     if (found) setFormData(found);
   }, [selectedSectionId, duplicateCourses]);
 
   const termOptions = useMemo(() => {
     const unique = Array.from(
-      new Set(duplicateCourses.map((c: any) => `${c.year}-${c.semester}`)),
+      new Set(duplicateCourses.map((c: Course) => `${c.year}-${c.semester}`)),
     )
       .map((term) => {
         const [y, s] = term.split("-");
@@ -120,9 +134,9 @@ export default function EditCourseClient({
   const sectionOptions = useMemo(() => {
     const [y, s] = selectedTerm.split("-");
     return duplicateCourses
-      .filter((c: any) => String(c.year) === y && String(c.semester) === s)
-      .sort((a: any, b: any) => Number(a.section) - Number(b.section))
-      .map((c: any) => ({
+      .filter((c: Course) => String(c.year) === y && String(c.semester) === s)
+      .sort((a: Course, b: Course) => Number(a.section) - Number(b.section))
+      .map((c: Course) => ({
         label: `${t("Section")} ${c.section}`,
         value: String(c.id),
       }));
@@ -132,7 +146,7 @@ export default function EditCourseClient({
     setSelectedTerm(termValue);
     const [y, s] = termValue.split("-");
     const firstMatch = duplicateCourses.find(
-      (c: any) => String(c.year) === y && String(c.semester) === s,
+      (c: Course) => String(c.year) === y && String(c.semester) === s,
     );
     if (firstMatch) setSelectedSectionId(String(firstMatch.id));
   };
@@ -153,7 +167,9 @@ export default function EditCourseClient({
       showToast(`${t("Duplicated to Section")} ${nextNum}`, "success");
       const refresh = await getCoursePaginate(token, 1, 100, { courseCode });
       setDuplicateCourses(
-        refresh.data.filter((c: any) => String(c.code) === String(courseCode)),
+        refresh.data.filter(
+          (c: Course) => String(c.code) === String(courseCode),
+        ),
       );
       setSelectedSectionId(String(res.data.data.id));
     } catch {
@@ -384,7 +400,6 @@ export default function EditCourseClient({
             {/* Section Specific Data (ID ระดับกลุ่มเรียน) */}
             {activeTab === "student" && (
               <AddStudentCourse
-                masterCourseId={String(formData.course_id)}
                 programId={formData.program_id}
                 sectionId={String(formData.id)}
                 semesterId={String(formData.semester_id)}
@@ -425,6 +440,28 @@ export default function EditCourseClient({
         onConfirm={handleDeleteSection}
         onCancel={() => setShowDeletePopup(false)}
       />
+
+      {showEditPopup && (
+        <FormEditPopup
+          title={t("Edit Course Information")}
+          data={formData}
+          fields={[
+            { label: t("Course Name (EN)"), key: "name", type: "text" },
+            { label: t("Course Name (TH)"), key: "name_th", type: "text" },
+            { label: t("Course Code"), key: "code", type: "text" },
+            { label: t("credits"), key: "credits", type: "number" },
+          ]}
+          onChange={(updated) => setFormData(updated)}
+          onSave={() => {
+            // Implement save logic here (e.g., API call to update course)
+            setShowEditPopup(false);
+            showToast(t("Course information updated"), "success");
+            // Optionally, refresh data after saving
+            loadInitialData();
+          }}
+          onClose={() => setShowEditPopup(false)}
+        />
+      )}
     </div>
   );
 }

@@ -6,7 +6,6 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import { useToast } from "@/components/Toast";
 import { Calculator } from "lucide-react";
 import { GradeDistributionChart } from "../viewChart/viewChartComponent/gradeDistributionChart";
-import { useAuth } from "../context/AuthContext";
 
 // --- Interfaces ---
 interface StudentResult {
@@ -26,7 +25,6 @@ export default function ScoreCalculated({
   semesterId: string | number;
   sectionId: string | number;
 }) {
-  const { token } = useAuth();
   const [loading, setLoading] = useState(true);
   const { ToastElement, showToast } = useToast();
   const [processedData, setProcessedData] = useState<StudentResult[]>([]);

@@ -6,6 +6,7 @@ import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverLay from "@/components/LoadingOverlay";
 import { Save, AlertCircle } from "lucide-react";
 import AlertPopup from "@/components/AlertPopup";
+import { useTranslation } from "react-i18next";
 
 interface GradeLevel {
   id?: number;
@@ -26,6 +27,7 @@ export default function GradeSetting({
     DEFAULT_GRADES.map((g) => ({ grade: g, score: "" })),
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { t } = useTranslation("common");
 
   // 1. Fetch Existing Data
   // 1. Fetch Existing Data
@@ -139,11 +141,19 @@ export default function GradeSetting({
     }
   };
 
+  useEffect(() => {
+    console.log(fMaxScore);
+  });
+
   // คำนวณคะแนนสูงสุดของเกรด F (คะแนนต่ำสุดที่มีในระบบ)
-  const fMaxScore = gradeSettings.reduce((min, item) => {
-    if (item.score === "") return min;
-    return Math.min(min, Number(item.score));
-  }, 0);
+ const fMaxScore = gradeSettings.reduce((min, item) => {
+   if (item.score === "" || item.score === null) return min;
+
+   const currentScore = Number(item.score);
+   // 🟢 ถ้า min ยังเป็น 0 (ค่าเริ่มต้น) ให้ใช้ค่าปัจจุบันไปก่อน
+   // หรือใช้ Infinity เป็นค่าเริ่มต้นแทน
+   return min === 0 ? currentScore : Math.min(min, currentScore);
+ }, 0);
 
   return (
     <div className="p-2 max-w-2xl mx-auto space-y-6">
@@ -152,28 +162,28 @@ export default function GradeSetting({
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-            Grade Cutoff
+          <h2 className="text-2xl font-light text-slate-800 tracking-tight">
+            {t("Grade Cutoff")}
           </h2>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-            Configure minimum score for each grade
+          <p className="text-[12px] font-light text-slate-400 uppercase tracking-widest mt-1">
+            {t("Configure minimum score for each grade")}
           </p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 bg-rose-50 text-rose-600 font-bold text-xs uppercase tracking-widest rounded-2xl hover:bg-rose-100 flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+            className="px-4 py-2 bg-rose-50 text-rose-600 font-light text-[12px] uppercase tracking-widest rounded-2xl hover:bg-rose-100 flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
           >
             <AlertCircle size={16} />
-            Clear All
+            {t("Clear All")}
           </button>
         </div>
         <button
           onClick={handleSave}
-          className="w-full sm:w-auto px-8 py-3 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-blue-600 flex items-center justify-center gap-2 shadow-xl shadow-slate-200 active:scale-95 transition-all group"
+          className="w-full sm:w-auto px-8 py-3 bg-slate-900 text-white font-light text-[12px] uppercase tracking-widest rounded-2xl hover:bg-blue-600 flex items-center justify-center gap-2 shadow-xl shadow-slate-200 active:scale-95 transition-all group"
         >
           <Save size={18} className="group-hover:animate-bounce" />
-          Save Settings
+          {t("Save Settings")}
         </button>
       </div>
 
@@ -182,11 +192,11 @@ export default function GradeSetting({
         <table className="min-w-full">
           <thead className="bg-slate-50/50">
             <tr>
-              <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                Grade Symbol
+              <th className="px-10 py-5 text-left text-[16px] font-light text-slate-600 uppercase tracking-[0.2em]">
+                {t("Grade Symbol")}
               </th>
-              <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                Min Score Requirement
+              <th className="px-10 py-5 text-left text-[16px] font-light text-slate-600 uppercase tracking-[0.2em]">
+                {t("Min Score Requirement")}
               </th>
             </tr>
           </thead>
@@ -245,8 +255,8 @@ export default function GradeSetting({
               <td className="px-10 py-6">
                 <div className="flex items-center gap-3 text-rose-400">
                   <AlertCircle size={18} />
-                  <span className="text-sm font-black uppercase tracking-widest italic">
-                    Below {fMaxScore > 0 ? fMaxScore : "-"}
+                  <span className="text-[16px] font-light uppercase tracking-widest italic">
+                    {t("Below")} {fMaxScore > 0 ? fMaxScore : "-"}
                   </span>
                 </div>
               </td>
@@ -257,10 +267,10 @@ export default function GradeSetting({
 
       <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3">
         <AlertCircle className="text-amber-500 shrink-0" size={20} />
-        <p className="text-[11px] text-amber-700 font-bold leading-relaxed uppercase tracking-wider">
-          Warning: Ensure scores are in descending order (A &gt; B+ &gt; B ...).
-          Students who do not meet the D requirement will automatically receive
-          an F
+        <p className="text-[16px] text-amber-700 font-light leading-relaxed uppercase tracking-wider">
+          {t(
+            "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F",
+          )}
         </p>
       </div>
 

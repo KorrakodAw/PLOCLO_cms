@@ -26,13 +26,22 @@ interface StudentCourse {
   assignedAt: string;
 }
 
+interface ExcelRow {
+  student_id?: string | number;
+  student_code?: string | number;
+  รหัสนิสิต?: string | number; // 🟢 รองรับคอลัมน์ภาษาไทย
+  first_name?: string;
+  last_name?: string;
+  ชื่อ?: string;
+  นามสกุล?: string;
+  [key: string]: string | number | undefined; // 🟢 จำกัด type แทนการใช้ any
+}
+
 export default function AddStudentCourse({
-  masterCourseId,
   programId,
   sectionId,
   semesterId,
 }: {
-  masterCourseId: string | number;
   programId: string | number;
   sectionId: string;
   semesterId: string | number;
@@ -138,7 +147,7 @@ export default function AddStudentCourse({
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const data = XLSX.utils.sheet_to_json(ws) as ExcelRow[];
 
         const validStudentIds: number[] = [];
         const missingFromProgram: string[] = [];

@@ -13,6 +13,7 @@ export interface Course {
   semester: number; // Now included
   year: number; // Now included
   program_year: number; // Now included
+  semester_id: number; // Now included
 }
 
 export interface PaginatedResponse {

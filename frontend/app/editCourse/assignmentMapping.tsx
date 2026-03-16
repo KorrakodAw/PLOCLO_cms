@@ -9,14 +9,7 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import FormEditPopup from "@/components/EditPopup";
 import AlertPopup from "@/components/AlertPopup";
 import DropdownSelect from "@/components/DropdownSelect";
-import {
-  Calculator,
-  RefreshCcw,
-  Trash2,
-  Edit3,
-  Info,
-  Upload,
-} from "lucide-react";
+import { Calculator, RefreshCcw, Trash2, Edit3, Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface Assignment {
@@ -31,6 +24,17 @@ interface Assignment {
 interface CategoryWeight {
   category: string;
   maxWeight: number;
+}
+
+interface ExcelRow {
+  student_id?: string | number;
+  student_code?: string | number;
+  รหัสนิสิต?: string | number; // 🟢 รองรับคอลัมน์ภาษาไทย
+  first_name?: string;
+  last_name?: string;
+  ชื่อ?: string;
+  นามสกุล?: string;
+  [key: string]: string | number | undefined; // 🟢 จำกัด type แทนการใช้ any
 }
 
 export default function AssignmentMapping({
@@ -223,7 +227,7 @@ export default function AssignmentMapping({
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const data = XLSX.utils.sheet_to_json(ws) as ExcelRow[];
 
         const payload = data
           .map((row) => ({
@@ -249,7 +253,7 @@ export default function AssignmentMapping({
         showToast(t("Import Success"), "success");
         await fetchData(); // โหลดข้อมูลใหม่มาแสดง
         await handleRecalculateWeights(); // กระจาย % น้ำหนักใหม่
-      } catch  {
+      } catch {
         showToast("Failed to import excel", "error");
       } finally {
         setLoading(false);
@@ -260,78 +264,78 @@ export default function AssignmentMapping({
   };
 
   // --- Sorting & Filtering ---
-const sortedAssignments = useMemo(() => {
-  // 1. กำหนดลำดับความสำคัญของหมวดหมู่ (Category)
-  const categoryOrder: Record<string, number> = {
-    presentation: 1,
-    assignment: 2,
-    midtermExam: 3,
-    finalExam: 4,
-    project: 5,
-    quiz: 6,
-  };
+  const sortedAssignments = useMemo(() => {
+    // 1. กำหนดลำดับความสำคัญของหมวดหมู่ (Category)
+    const categoryOrder: Record<string, number> = {
+      presentation: 1,
+      assignment: 2,
+      midtermExam: 3,
+      finalExam: 4,
+      project: 5,
+      quiz: 6,
+    };
 
-  // 2. ลำดับ Keyword ในชื่อ (กรณี Category เหมือนกัน แต่อยากเช็ค Keyword ในชื่อต่อ)
-  const keywordOrder = [
-    "presentation",
-    "assignment",
-    "midterm",
-    "final",
-    "project",
-    "quiz",
-  ];
+    // 2. ลำดับ Keyword ในชื่อ (กรณี Category เหมือนกัน แต่อยากเช็ค Keyword ในชื่อต่อ)
+    const keywordOrder = [
+      "presentation",
+      "assignment",
+      "midterm",
+      "final",
+      "project",
+      "quiz",
+    ];
 
-  const getKeywordScore = (name: string) => {
-    const lowerName = name.toLowerCase();
-    const index = keywordOrder.findIndex((keyword) =>
-      lowerName.includes(keyword),
-    );
-    return index === -1 ? 999 : index;
-  };
+    const getKeywordScore = (name: string) => {
+      const lowerName = name.toLowerCase();
+      const index = keywordOrder.findIndex((keyword) =>
+        lowerName.includes(keyword),
+      );
+      return index === -1 ? 999 : index;
+    };
 
-  // 3. แปลงเลขโรมันเป็นตัวเลขเพื่อให้เรียงลำดับได้ถูกต้อง
-  const romanMap: Record<string, number> = {
-    i: 1,
-    ii: 2,
-    iii: 3,
-    iv: 4,
-    v: 5,
-    vi: 6,
-    vii: 7,
-    viii: 8,
-    ix: 9,
-    x: 10,
-    xi: 11,
-    xii: 12,
-  };
+    // 3. แปลงเลขโรมันเป็นตัวเลขเพื่อให้เรียงลำดับได้ถูกต้อง
+    const romanMap: Record<string, number> = {
+      i: 1,
+      ii: 2,
+      iii: 3,
+      iv: 4,
+      v: 5,
+      vi: 6,
+      vii: 7,
+      viii: 8,
+      ix: 9,
+      x: 10,
+      xi: 11,
+      xii: 12,
+    };
 
-  const normalizeName = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
-        // ใช้ padStart(2, '0') เพื่อให้ "10" เรียงต่อจาก "09" ได้ถูกต้อง
-        return romanMap[match].toString().padStart(2, "0");
-      });
-  };
+    const normalizeName = (name: string) => {
+      return name
+        .toLowerCase()
+        .replace(/\b(xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)\b/g, (match) => {
+          // ใช้ padStart(2, '0') เพื่อให้ "10" เรียงต่อจาก "09" ได้ถูกต้อง
+          return romanMap[match].toString().padStart(2, "0");
+        });
+    };
 
-  // 4. เริ่มการเรียงลำดับแบบหลายชั้น
-  return [...assignments].sort((a, b) => {
-    // ชั้นที่ 1: เรียงตาม Category (เช่น Presentation ขึ้นก่อน Assignment)
-    const catA = categoryOrder[a.category] || 99;
-    const catB = categoryOrder[b.category] || 99;
-    if (catA !== catB) return catA - catB;
+    // 4. เริ่มการเรียงลำดับแบบหลายชั้น
+    return [...assignments].sort((a, b) => {
+      // ชั้นที่ 1: เรียงตาม Category (เช่น Presentation ขึ้นก่อน Assignment)
+      const catA = categoryOrder[a.category] || 99;
+      const catB = categoryOrder[b.category] || 99;
+      if (catA !== catB) return catA - catB;
 
-    // ชั้นที่ 2: เรียงตาม Keyword ที่ปรากฏในชื่อ (ถ้ามี)
-    const scoreA = getKeywordScore(a.name);
-    const scoreB = getKeywordScore(b.name);
-    if (scoreA !== scoreB) return scoreA - scoreB;
+      // ชั้นที่ 2: เรียงตาม Keyword ที่ปรากฏในชื่อ (ถ้ามี)
+      const scoreA = getKeywordScore(a.name);
+      const scoreB = getKeywordScore(b.name);
+      if (scoreA !== scoreB) return scoreA - scoreB;
 
-    // ชั้นที่ 3: เรียงตามชื่อแบบ Natural Sort (รองรับทั้งตัวเลขและเลขโรมัน)
-    const normA = normalizeName(a.name);
-    const normB = normalizeName(b.name);
-    return normA.localeCompare(normB, undefined, { numeric: true });
-  });
-}, [assignments]);
+      // ชั้นที่ 3: เรียงตามชื่อแบบ Natural Sort (รองรับทั้งตัวเลขและเลขโรมัน)
+      const normA = normalizeName(a.name);
+      const normB = normalizeName(b.name);
+      return normA.localeCompare(normB, undefined, { numeric: true });
+    });
+  }, [assignments]);
 
   return (
     <div className="max-w-7xl mx-auto p-2 space-y-6">
