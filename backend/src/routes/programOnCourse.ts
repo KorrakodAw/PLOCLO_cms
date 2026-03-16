@@ -7,7 +7,7 @@ const router = Router();
 
 interface ProgramOnCourseItem {
   program_id: number;
-  course_id: number;
+  semester_id: number;
   type: string;
 }
 
@@ -22,20 +22,20 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
         const program = await tx.program.findUnique({
           where: { id: Number(item.program_id) },
         });
-        const course = await tx.course.findUnique({
-          where: { id: Number(item.course_id) },
+        const semester = await tx.courseSemester.findUnique({
+          where: { id: Number(item.semester_id) },
         });
 
-        if (!program || !course) {
-          throw new Error("PROGRAM_OR_COURSE_NOT_FOUND");
+        if (!program || !semester) {
+          throw new Error("PROGRAM_OR_SEMESTER_NOT_FOUND");
         }
 
         // Upsert: ถ้ามีอยู่แล้วก็ update, ถ้าไม่มีให้ create
         await tx.programOnCourse.upsert({
           where: {
-            program_id_course_id: {
+            program_id_semester_id: {
               program_id: Number(item.program_id),
-              course_id: Number(item.course_id),
+              semester_id: Number(item.semester_id),
             },
           },
           update: {
@@ -44,7 +44,7 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
           },
           create: {
             program_id: Number(item.program_id),
-            course_id: Number(item.course_id),
+            semester_id: Number(item.semester_id),
             type: item.type,
             assignedAt: new Date(),
           },
@@ -67,16 +67,16 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
 // GET: ดึง ProgramOnCourse ทั้งหมด
 router.get("/", authenticateToken, async (req: Request, res: Response) => {
   try {
-    const { program_id, course_id } = req.query;
+    const { program_id, semester_id } = req.query;
 
     const relations = await prisma.programOnCourse.findMany({
       where: {
         program_id: program_id ? Number(program_id) : undefined,
-        course_id: course_id ? Number(course_id) : undefined,
+        semester_id: semester_id ? Number(semester_id) : undefined,
       },
       include: {
         program: true,
-        course: true,
+        semester: true,
       },
     });
 

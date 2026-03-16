@@ -80,10 +80,8 @@ model Course {
   program Program @relation(fields: [program_id], references: [id], onDelete: Cascade)
 
   // Relations
-  clos        Clo[]
   semesters  CourseSemester[]
   instructors CourseInstructor[]
-  programs    ProgramOnCourse[]
  
 
   @@map("course")
@@ -100,10 +98,14 @@ model CourseSemester {
   // 🟢 สิ่งที่แชร์ร่วมกันในทุก Section ของเทอมนี้
   assignments      Assignment[]
   categoryWeights   AssignmentCategoryWeight[]
+  clos             Clo[]
   
   // เชื่อมไปยังกลุ่มเรียนต่างๆ (Section 1, 2, 3...)
   sections          CourseSection[]
   gradeSettings GradeSetting[]
+
+  //เชื่อม Program กับ course semester นี้
+  programsOnCourse ProgramOnCourse[]
 
   @@unique([course_id, semester, year])
   @@map("course_semester")
@@ -169,9 +171,9 @@ model Clo {
   code      String @db.VarChar(20)
   name      String @db.VarChar(255)
   name_th   String @db.VarChar(255)
-  course_id Int
+  course_semester_id Int
 
-  course Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  course_semester CourseSemester @relation(fields: [course_semester_id], references: [id], onDelete: Cascade)
 
   clo_plo_mappings        CloPloMapping[]
   assignment_clo_mappings AssignmentCloMapping[]
@@ -258,7 +260,7 @@ model StudentScore {
   assignment Assignment    @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
   section    CourseSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
 
-  @@unique([student_id, assignment_id])
+  @@unique([student_id, assignment_id, section_id], name: "student_id_assignment_id_section_id")
   @@map("student_score")
 }
 
@@ -307,15 +309,15 @@ model StudentOnSection {
 
 model ProgramOnCourse {
   program_id Int  @map("program_id")
-  course_id  Int  @map("course_id")
+  semester_id  Int            @map("course_semester_id")
   type       String @db.VarChar(50) // เช่น "core", "elective", "general"
 
   program Program @relation(fields: [program_id], references: [id], onDelete: Cascade)
-  course  Course  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  semester CourseSemester @relation(fields: [semester_id], references: [id], onDelete: Cascade)
 
   assignedAt DateTime @default(now())
 
-  @@id([program_id, course_id]) // ใช้ composite primary key
+  @@id([program_id, semester_id]) // ใช้ composite primary key
   @@map("program_on_course")
 }
 

@@ -8,6 +8,82 @@ const prisma = new PrismaClient();
 // POST: Batch save/update scores
 router.post("/", authenticateToken, async (req, res) => {
   try {
+    const { updates, sectionId } = req.body;
+
+    if (!updates || !Array.isArray(updates)) {
+      return res.status(400).json({ error: "Invalid updates format" });
+    }
+
+    const results = await prisma.$transaction(async (tx) => {
+      const res: any[] = [];
+
+      for (const item of updates) {
+        const scoreValue =
+          item.score === null || item.score === undefined || item.score === ""
+            ? 0
+            : Number(item.score);
+
+        const currentSectionId = Number(item.section_id || sectionId);
+        if (isNaN(currentSectionId)) {
+          throw new Error("Missing section_id for one or more entries");
+        }
+
+        // 🟢 ตรวจสอบว่า assignment อยู่ใน semester เดียวกับ section
+        const section = await tx.courseSection.findUnique({
+          where: { id: currentSectionId },
+          select: { course_semester_id: true },
+        });
+        if (!section) throw new Error(`Section ${currentSectionId} not found`);
+
+        const assignment = await tx.assignment.findUnique({
+          where: { id: Number(item.assignment_id) },
+          select: { semester_id: true },
+        });
+        if (!assignment) throw new Error(`Assignment ${item.assignment_id} not found`);
+
+        if (assignment.semester_id !== section.course_semester_id) {
+          throw new Error(
+            `Assignment ${item.assignment_id} does not belong to the same semester as Section ${currentSectionId}`
+          );
+        }
+
+        // 🟢 ผ่านการตรวจสอบแล้ว ค่อย upsert
+        const result = await tx.studentScore.upsert({
+          where: {
+            student_id_assignment_id_section_id: {
+              student_id: Number(item.student_id),
+              assignment_id: Number(item.assignment_id),
+              section_id: currentSectionId,
+            },
+          },
+          update: {
+            score: scoreValue,
+            section_id: currentSectionId,
+            updatedAt: new Date(),
+          },
+          create: {
+            student_id: Number(item.student_id),
+            assignment_id: Number(item.assignment_id),
+            section_id: currentSectionId,
+            score: scoreValue,
+          },
+        });
+
+        res.push(result);
+      }
+
+      return res;
+    });
+
+    res.json({ message: "Scores updated successfully", count: results.length });
+  } catch (err: any) {
+    console.error("Error saving scores:", err);
+    res.status(500).json({ error: "Failed to save scores: " + err.message });
+  }
+});
+
+/*router.post("/", authenticateToken, async (req, res) => {
+  try {
     const { updates, sectionId } = req.body; // 🟢 แนะนำให้ส่ง sectionId มาใน body ด้วย
 
     if (!updates || !Array.isArray(updates)) {
@@ -31,9 +107,10 @@ router.post("/", authenticateToken, async (req, res) => {
         return prisma.studentScore.upsert({
           where: {
             // 🟢 อ้างอิงตาม Unique Constraint ที่คุณตั้งไว้
-            student_id_assignment_id: {
+            student_id_assignment_id_section_id: {
               student_id: Number(item.student_id),
               assignment_id: Number(item.assignment_id),
+              section_id: currentSectionId,
             },
           },
           update: {
@@ -56,7 +133,7 @@ router.post("/", authenticateToken, async (req, res) => {
     console.error("Error saving scores:", err);
     res.status(500).json({ error: "Failed to save scores: " + err.message });
   }
-});
+});*/ 
 
 // GET: Fetch scores for a specific SECTION
 router.get("/", authenticateToken, async (req, res) => {

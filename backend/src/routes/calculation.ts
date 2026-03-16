@@ -49,17 +49,17 @@ const router = Router();
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ของ student 1 คน ใน 1 course
-// GET http://localhost:9771/api/calculation/ass-clo/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/studentCourse?studentId=ไอดีนักศึกษา&CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/studentCourse", authenticateToken, async (req, res) => {
-  const { studentId, courseId } = req.query;
+  const { studentId, CsemesterId } = req.query;
   try {
     const resultCloStudent = await prisma.$transaction(async (tx) => {
       return await getCloScorePerStudentPerCourse(
         tx,
         Number(studentId),
-        Number(courseId),
+        Number(CsemesterId),
       );
     });
 
@@ -72,15 +72,15 @@ router.get("/ass-clo/studentCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ใน 1 course (รวมคะแนนของนักศึกษาทุกคนใน course)
-// GET http://localhost:9771/api/calculation/ass-clo/course?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/course?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/course", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     // TRANSACTION
     const resultCloCourse = await prisma.$transaction(async (tx) => {
-      return await getCloScorePerCourse(tx, Number(courseId));
+      return await getCloScorePerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloCourse);
@@ -92,14 +92,14 @@ router.get("/ass-clo/course", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ของ student แต่ละคน ใน 1 course (ส่งกลับค่า clo ของนักเรียนแต่ละคนทุกคนทีเดียว)
-// GET http://localhost:9771/api/calculation/ass-clo/allStudentCourse?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/allStudentCourse?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getCloScoreAllStudentPerCourse(tx, Number(courseId));
+      return await getCloScoreAllStudentPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -111,14 +111,14 @@ router.get("/ass-clo/allStudentCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo ของนักเรียนแต่ละคนออกมาเป็น percentage
-// GET http://localhost:9771/api/calculation/ass-clo/allStudentCourse/percentage?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/allStudentCourse/percentage?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/allStudentCourse/percentage", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getCloPercentageAllStudentPerCourse(tx, Number(courseId));
+      return await getCloPercentageAllStudentPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -130,14 +130,14 @@ router.get("/ass-clo/allStudentCourse/percentage", authenticateToken, async (req
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ min, max, mean, median, highestPossible ของ clo แต่ละตัว ใน 1 course
-// GET http://localhost:9771/api/calculation/ass-clo/course/stats?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/course/stats?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getCloStatsPerCourse(tx, Number(courseId));
+      return await getCloStatsPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -149,14 +149,14 @@ router.get("/ass-clo/course/stats", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // แปลง cloStats ให้เป็นเปอร์เซ็นต์
-// GET http://localhost:9771/api/calculation/ass-clo/course/stats/percentage?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/course/stats/percentage?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/course/stats/percentage", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getCloStatsPercentagePerCourse(tx, Number(courseId));
+      return await getCloStatsPercentagePerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -169,14 +169,14 @@ router.get("/ass-clo/course/stats/percentage", authenticateToken, async (req, re
 /////////////////////////////////////////////////////////////////////////
 // สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน clo ต่อเกรด, ผลรวมของค่าเฉลี่ย
 // ตารางฟ้าใน TABEE
-// GET http://localhost:9771/api/calculation/ass-clo/gradeSummary?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/ass-clo/gradeSummary?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/ass-clo/gradeSummary", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getCloGradeSummaryPerCourse(tx, Number(courseId));
+      return await getCloGradeSummaryPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -191,20 +191,20 @@ router.get("/ass-clo/gradeSummary", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณคะแนนรวม และเกรดของ 1 นักเรียนใน 1 course
-// GET http://localhost:9771/api/calculation/realScoreAndGrade/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/studentCourse?studentId=ไอดีนักศึกษา&CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get(
   "/realScoreAndGrade/studentCourse",
   authenticateToken,
   async (req, res) => {
-    const { studentId, courseId } = req.query;
+    const { studentId, CsemesterId } = req.query;
     try {
       const resultCloPerStudent = await prisma.$transaction(async (tx) => {
         return await getTotalScoreAndGradePerStudentPerCourse(
           tx,
           Number(studentId),
-          Number(courseId),
+          Number(CsemesterId),
         );
       });
 
@@ -218,19 +218,19 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณคะแนนรวม และเกรดของนักเรียนทุกคนใน 1 course และ mean ของทั้ง course
-// GET http://localhost:9771/api/calculation/realScoreAndGrade/allStudentCourse?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/allStudentCourse?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get(
   "/realScoreAndGrade/allStudentCourse",
   authenticateToken,
   async (req, res) => {
-    const { courseId } = req.query;
+    const { CsemesterId } = req.query;
     try {
       const resultCloPerStudent = await prisma.$transaction(async (tx) => {
         return await getTotalScoreAndGradeAllStudentPerCourse(
           tx,
-          Number(courseId),
+          Number(CsemesterId),
         );
       });
 
@@ -244,14 +244,14 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ realScore ของนักเรียนแต่ละคนออกมาเป็น percentage
-// GET http://localhost:9771/api/calculation/realScoreAndGrade/allStudentCourse/percentage?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/allStudentCourse/percentage?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/realScoreAndGrade/allStudentCourse/percentage", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getRealScorePercentageAllStudentPerCourse(tx, Number(courseId));
+      return await getRealScorePercentageAllStudentPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -263,14 +263,14 @@ router.get("/realScoreAndGrade/allStudentCourse/percentage", authenticateToken, 
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ min, max, mean, median, highestPossible ของแต่ละ category ใน 1 course
-// GET http://localhost:9771/api/calculation/realScoreAndGrade/stats?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/stats?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/realScoreAndGrade/stats", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getRealScoreStatsPerCourse(tx, Number(courseId));
+      return await getRealScoreStatsPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -282,14 +282,14 @@ router.get("/realScoreAndGrade/stats", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // แปลง realScoreStats ให้เป็นเปอร์เซ็นต์
-// GET http://localhost:9771/api/calculation/realScoreAndGrade/stats/percentage?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/stats/percentage?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/realScoreAndGrade/stats/percentage", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-      return await getRealScoreStatsPercentagePerCourse(tx, Number(courseId));
+      return await getRealScoreStatsPercentagePerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloPerStudent);
@@ -302,17 +302,17 @@ router.get("/realScoreAndGrade/stats/percentage", authenticateToken, async (req,
 /////////////////////////////////////////////////////////////////////////
 // สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน category ต่อเกรด, ผลรวมของค่าเฉลี่ย
 // ตารางเหลืองใน TABEE
-// GET http://localhost:9771/api/calculation/realScoreAndGrade/gradSummary?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/gradSummary?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get(
   "/realScoreAndGrade/gradSummary",
   authenticateToken,
   async (req, res) => {
-    const { courseId } = req.query;
+    const { CsemesterId } = req.query;
     try {
       const resultCloPerStudent = await prisma.$transaction(async (tx) => {
-        return await getGradeSummaryPerCourse(tx, Number(courseId));
+        return await getGradeSummaryPerCourse(tx, Number(CsemesterId));
       });
 
       res.json(resultCloPerStudent);
@@ -328,38 +328,38 @@ router.get(
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student 1 คนใน 1 course
-// GET http://localhost:9771/api/calculation/clo-plo/studentCourse?studentId=ไอดีนักศึกษา&courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/studentCourse?studentId=ไอดีนักศึกษา&CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/studentCourse", authenticateToken, async (req, res) => {
-  const { studentId, courseId } = req.query;
+  const { studentId, CsemesterId } = req.query;
   try {
     const resultPloStudent = await prisma.$transaction(async (tx) => {
       return await getPloScorePerStudentPerCourse(
         tx,
         Number(studentId),
-        Number(courseId),
+        Number(CsemesterId),
       );
     });
 
     res.json(resultPloStudent);
   } catch (err) {
     console.error(err);
-    //res.status(500).json({ err });
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ err });
+    //res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 course
-// GET http://localhost:9771/api/calculation/clo-plo/course?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/course?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/course", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultPloCourse = await prisma.$transaction(async (tx) => {
-      return await getPloScorePerCourse(tx, Number(courseId));
+      return await getPloScorePerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultPloCourse);
@@ -372,14 +372,14 @@ router.get("/clo-plo/course", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student ทุกคนใน 1 course
-// GET http://localhost:9771/api/calculation/clo-plo/allStudentCourse?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/allStudentCourse?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/allStudentCourse", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultPloStudent = await prisma.$transaction(async (tx) => {
-      return await getPloScoreAllStudentPerCourse(tx, Number(courseId));
+      return await getPloScoreAllStudentPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultPloStudent);
@@ -392,14 +392,14 @@ router.get("/clo-plo/allStudentCourse", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ PLO ของนักเรียนแต่ละคนออกมาเป็น percentage
-// GET http://localhost:9771/api/calculation/clo-plo/allStudentCourse/percentage?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/allStudentCourse/percentage?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////////////////
 router.get("/clo-plo/allStudentCourse/percentage", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultPloStudent = await prisma.$transaction(async (tx) => {
-      return await getPloPercentageAllStudentPerCourse(tx, Number(courseId));
+      return await getPloPercentageAllStudentPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultPloStudent);
@@ -469,14 +469,14 @@ router.get("/clo-plo/wherePloComeFrom", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
-// GET http://localhost:9771/api/calculation/clo-plo/course/stats?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/course/stats?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////
 router.get("/clo-plo/course/stats", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloStudent = await prisma.$transaction(async (tx) => {
-      return await getPloStatsPerCourse(tx, Number(courseId));
+      return await getPloStatsPerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloStudent);
@@ -488,14 +488,14 @@ router.get("/clo-plo/course/stats", authenticateToken, async (req, res) => {
 
 /////////////////////////////////////////////////////////////
 // แปลง ploStats ให้เป็นเปอร์เซ็นต์ 
-// GET http://localhost:9771/api/calculation/clo-plo/course/stats/percentage?courseId=ไอดีวิชา
+// GET http://localhost:9771/api/calculation/clo-plo/course/stats/percentage?CsemesterId=ไอดีเทอม
 // Test result: OK
 /////////////////////////////////////////////////////////////
 router.get("/clo-plo/course/stats/percentage", authenticateToken, async (req, res) => {
-  const { courseId } = req.query;
+  const { CsemesterId } = req.query;
   try {
     const resultCloStudent = await prisma.$transaction(async (tx) => {
-      return await getPloStatsPercentagePerCourse(tx, Number(courseId));
+      return await getPloStatsPercentagePerCourse(tx, Number(CsemesterId));
     });
 
     res.json(resultCloStudent);
