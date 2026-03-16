@@ -12,24 +12,23 @@ const prisma = new PrismaClient();
  */
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const { sectionId, courseId } = req.query;
+    const { sectionId, semesterId } = req.query; // 🟢 เปลี่ยนจาก courseId เป็น semesterId
 
-    if (!sectionId && !courseId) {
+    if (!sectionId && !semesterId) {
       return res
         .status(400)
-        .json({ error: "Either sectionId or courseId is required" });
+        .json({ error: "Either sectionId or semesterId is required" });
     }
 
-    // CASE A: ค้นหานิสิตที่ลงทะเบียนในวิชานี้แล้ว (ทุก Section ภายใต้ Semester เดียวกัน)
-    if (courseId) {
+    // CASE A: ค้นหานิสิตที่ลงทะเบียนใน Semester นี้แล้ว (ทุก Section ภายใต้ Semester เดียวกัน)
+    // ใช้สำหรับเช็ค Duplicate ในระดับเทอมก่อน Import Excel
+    if (semesterId) {
       const students = await prisma.student.findMany({
         where: {
           sections: {
             some: {
               section: {
-                semester_config: {
-                  course_id: Number(courseId),
-                },
+                course_semester_id: Number(semesterId), // 🟢 กรองเฉพาะนิสิตในเทอมที่ระบุเท่านั้น
               },
             },
           },
@@ -44,7 +43,7 @@ router.get("/", authenticateToken, async (req, res) => {
       return res.json(students);
     }
 
-    // CASE B: ค้นหานิสิตในเฉพาะ Section ที่ระบุ
+    // CASE B: ค้นหานิสิตเฉพาะใน Section ที่ระบุ
     if (sectionId) {
       const enrollments = await prisma.studentOnSection.findMany({
         where: { section_id: Number(sectionId) },
@@ -63,7 +62,6 @@ router.get("/", authenticateToken, async (req, res) => {
         },
       });
 
-      // Map ข้อมูลกลับไปให้ตรงกับ Format เดิมของ Frontend
       return res.json(
         enrollments.map((e) => ({
           student_id: e.student_id,
@@ -81,6 +79,7 @@ router.get("/", authenticateToken, async (req, res) => {
       );
     }
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch student records" });
   }
 });

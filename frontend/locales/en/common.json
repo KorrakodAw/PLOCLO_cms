@@ -230,5 +230,11 @@
   "averageScore": "Average",
   "medianScore": "Median",
   "assessment": "Assessment",
-  "assessment-category-weights": "Assessment Category Weights"
+  "assessment-category-weights": "Assessment Category Weights",
+  "Delete This Section": "Delete This Section",
+  "Semester / Year": "Semester / Year",
+  "Section Group": "Section Group",
+  "Settings": "Settings",
+  "Scores & Grading": "Scores & Grading"
+  
 }

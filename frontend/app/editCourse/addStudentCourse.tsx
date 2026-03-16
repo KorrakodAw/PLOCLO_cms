@@ -30,10 +30,12 @@ export default function AddStudentCourse({
   masterCourseId,
   programId,
   sectionId,
+  semesterId,
 }: {
   masterCourseId: string | number;
   programId: string | number;
   sectionId: string;
+  semesterId: string | number;
 }) {
   const [allProgramStudents, setAllProgramStudents] = useState<Student[]>([]);
   const [enrolledStudents, setEnrolledStudents] = useState<StudentCourse[]>([]);
@@ -61,7 +63,7 @@ export default function AddStudentCourse({
         `/studentOnCourse?sectionId=${sectionId}`,
       );
       const courseRes = await apiClient.get(
-        `/studentOnCourse?courseId=${masterCourseId}`,
+        `/studentOnCourse?semesterId=${semesterId}`,
       );
 
       setAllProgramStudents(programRes.data);
@@ -75,11 +77,11 @@ export default function AddStudentCourse({
     } finally {
       setLoading(false);
     }
-  }, [programId, sectionId, masterCourseId]);
+  }, [programId, sectionId, semesterId]);
 
   useEffect(() => {
-    if (programId && sectionId && masterCourseId) loadData();
-  }, [programId, sectionId, masterCourseId, loadData]);
+    if (programId && sectionId && semesterId) loadData();
+  }, [programId, sectionId, semesterId, loadData]);
 
   // Filter Logic
   const availableStudents = allProgramStudents
@@ -127,7 +129,7 @@ export default function AddStudentCourse({
   // 🟢 ฟังก์ชันสำหรับ Import จาก Excel พร้อมระบบ Skip และ Alert
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !token || !sectionId) return;
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -140,69 +142,71 @@ export default function AddStudentCourse({
 
         const validStudentIds: number[] = [];
         const missingFromProgram: string[] = [];
-        let skipCount = 0;  
+        let skipCount = 0;
 
         data.forEach((row) => {
+          // ดึงรหัสจาก Column ที่เป็นไปได้
           const code = String(
             row.student_id || row["รหัสนิสิต"] || row.student_code || "",
           ).trim();
           if (!code) return;
 
-          // 1. ตรวจสอบว่ารหัสนิสิตนี้มีตัวตนอยู่ใน Program นี้หรือไม่
+          // 🟢 1. หาตัวนิสิตในฐานข้อมูลหลักสูตร (All Program Students)
           const studentInfo = allProgramStudents.find(
             (s) => s.student_code === code,
           );
 
           if (!studentInfo) {
-            // กรณีไม่มีรหัสนี้ในระบบเลย (แจ้งเตือน)
+            // ไม่พบในหลักสูตร -> เก็บไว้แจ้งเตือน
             missingFromProgram.push(code);
           } else {
-            // 2. ถ้ามีตัวตน ตรวจสอบต่อว่า "ลงทะเบียนวิชานี้ไปหรือยัง" (ไม่ว่าจะ Section ไหน)
-            const isAlreadyInCourse = studentsInAnySection.some(
-              (enrolled) => enrolled.id === studentInfo.id,
+            // 🟢 2. ตรวจสอบว่านิสิตคนนี้ "อยู่ในวิชานี้แล้วหรือยัง"
+            const isAlreadyEnrolled = studentsInAnySection.some(
+              (s) => s.id === studentInfo.id,
             );
 
-            if (isAlreadyInCourse) {
-              // กรณีมีอยู่แล้วในคอร์ส (ข้ามไปเงียบๆ)
+            if (isAlreadyEnrolled) {
+              // มีอยู่แล้ว -> ข้ามไป
               skipCount++;
             } else {
-              // กรณีเป็นนิสิตใหม่ที่ยังไม่เคยลงวิชานี้ (เพิ่มเข้า List)
+              // เป็นนิสิตใหม่สำหรับวิชานี้ -> ใส่ใน List เตรียมเพิ่ม
               validStudentIds.push(studentInfo.id);
             }
           }
         });
 
-        // 3. จัดการแสดงผล Alert สำหรับรหัสที่ไม่มีในระบบ (แต่ยังยอมให้เพิ่มคนอื่นๆ ต่อได้)
+        // 🔴 แสดง Error Popup สำหรับรหัสที่ไม่พบในหลักสูตร
         if (missingFromProgram.length > 0) {
           setInvalidCodes(missingFromProgram);
           setShowErrorPopup(true);
-          // เราจะไม่ return ตรงนี้เพื่อให้ validStudentIds ที่เหลือทำงานต่อได้
         }
 
-        // 4. ส่งข้อมูลเฉพาะนิสิตที่ผ่านเงื่อนไข (มีในระบบ และ ยังไม่เคยลงวิชานี้)
+        // 🔵 ส่งเฉพาะรายการที่สามารถเพิ่มได้จริง
         if (validStudentIds.length > 0) {
-          await apiClient.post("/studentOnCourse/bulk", {
-            sectionId: parseInt(sectionId),
-            studentIds: validStudentIds,
-          });
+          await apiClient.post(
+            "/studentOnCourse/bulk",
+            {
+              sectionId: Number(sectionId),
+              studentIds: validStudentIds,
+            },
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
 
           showToast(
-            `Added ${validStudentIds.length} new students. (Skipped ${skipCount} already enrolled)`,
+            `Successfully added ${validStudentIds.length} students. (Skipped ${skipCount} already in course)`,
             "success",
           );
-          await loadData();
+          await loadData(); // รีโหลดข้อมูลตาราง
         } else if (missingFromProgram.length === 0) {
-          showToast(
-            `No new students to add. (${skipCount} were already in the course)`,
-            "error",
-          );
+          // กรณีไม่มี Error แต่ก็ไม่มีคนใหม่ให้เพิ่มเลย
+          showToast(`All students in the file are already enrolled.`, "error");
         }
       } catch (err) {
-        console.error("Excel processing error", err);
+        console.error("Excel Error:", err);
         showToast("Failed to process Excel file", "error");
       } finally {
         setLoading(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (e.target) e.target.value = ""; // เคลียร์ Input
       }
     };
     reader.readAsBinaryString(file);

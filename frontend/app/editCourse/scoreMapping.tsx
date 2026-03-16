@@ -6,6 +6,7 @@ import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { Save } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useTranslation } from "next-i18next";
 
 interface Assignment {
   id: number;
@@ -38,6 +39,7 @@ export default function ScoreMapping({
 }) {
   const { token } = useAuth();
   const { showToast } = useGlobalToast();
+  const { t } = useTranslation("common");
 
   const [students, setStudents] = useState<Student[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -361,8 +363,15 @@ export default function ScoreMapping({
                   - Added 'bg-white' (Solid color, not transparent)
                   - Increased 'z-30' (Highest priority to stay on top)
               */}
-              <th className="p-4 border-b w-64 sticky left-0 bg-white z-30 shadow-md border-r">
-                Student
+              {/* 1. Header: Code */}
+              <th className="p-4 border-b text-xs font-black text-slate-400 uppercase tracking-widest w-[132px] sticky left-0 bg-slate-50 z-30 border-r border-slate-200">
+                <div className="text-left">{t("Code")}</div>
+              </th>
+
+              {/* 2. Header: Student */}
+              {/* 🟢 แก้ไข: ใช้ left-[132px] เพื่อให้ต่อจากคอลัมน์แรกพอดี */}
+              <th className="p-4 border-b text-xs font-black text-slate-400 uppercase tracking-widest w-[212px] sticky left-[132px] bg-slate-50 z-30 border-r border-slate-200 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.1)]">
+                <div className="text-left">{t("Student")}</div>
               </th>
               {sortedAssignments.map((assign, index) => (
                 <th
@@ -403,14 +412,26 @@ export default function ScoreMapping({
                         - Added 'z-20' (Higher than scrolling cells)
                         - Added 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' (Optional: nice shadow on the right edge)
                     */}
-                    <td className="p-4 font-bold text-gray-700 sticky left-0 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-20">
-                      <div className="flex flex-col w-[200px]">
-                        <span>
-                          {student.first_name} {student.last_name}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-medium">
+                    {/* 1. คอลัมน์รหัสนิสิต */}
+                    <td className="p-4 sticky left-0 bg-white border-r border-slate-100 z-20 shadow-[2px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                      <div className="flex flex-col w-[100px]">
+                        <span className="text-xs font-black text-slate-500 tracking-wider">
                           {student.student_code}
                         </span>
+                      </div>
+                    </td>
+
+                    {/* 2. คอลัมน์ชื่อ-นามสกุล */}
+                    {/* 🟢 แก้ไข: ใช้ left-[132px] (ขนาดของคอลัมน์แรก + padding) เพื่อไม่ให้ทับกัน */}
+                    <td className="p-4 sticky left-[132px] bg-white border-r border-slate-100 z-20 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.08)]">
+                      <div className="flex flex-col w-[180px]">
+                        <span className="text-sm font-bold text-slate-800 truncate">
+                          {student.first_name} {student.last_name}
+                        </span>
+                        {/* 💡 เพิ่ม UX: ถ้าอยากประหยัดพื้นที่ สามารถเอารหัสมาไว้บรรทัดล่างตัวจางๆ ได้ */}
+                        {/* <span className="text-[10px] text-slate-400 font-medium tracking-tight">
+      {student.student_code}
+    </span> */}
                       </div>
                     </td>
 

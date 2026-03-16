@@ -111,84 +111,109 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
 });
 
 // GET /paginate - กรองข้อมูลผ่าน Hierarchy ใหม่
-router.get("/paginate", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const programParam = req.query.programId as string | undefined;
-    const universityId = parseIntSafe(req.query.universityId);
-    const facultyId = parseIntSafe(req.query.facultyId);
-    const year = parseIntSafe(req.query.year);
-    const semester = parseIntSafe(req.query.semester);
-    const section = parseIntSafe(req.query.section);
-    const courseCode = req.query.courseCode as string | undefined;
+router.get(
+  "/paginate",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const programCode = req.query.programId as string | undefined; // รับมาเป็น string (รหัสหลักสูตร)
+      const universityId = parseIntSafe(req.query.universityId);
+      const facultyId = parseIntSafe(req.query.facultyId);
+      const year = parseIntSafe(req.query.year);
+      const semester = parseIntSafe(req.query.semester);
+      const section = parseIntSafe(req.query.section);
+      const courseCode = req.query.courseCode as string | undefined;
 
-    const page = parseIntSafe(req.query.page) || 1;
-    const limit = parseIntSafe(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+      const page = parseIntSafe(req.query.page) || 1;
+      const limit = parseIntSafe(req.query.limit) || 10;
+      const skip = (page - 1) * limit;
 
-    // 🟢 กรองที่ระดับ CourseSection และเชื่อมโยงไปหา Semester/Course
-    const where: any = {
-      section: section || undefined,
-      semester_config: {
-        semester: semester || undefined,
-        year: year || undefined,
-        course: {
-          OR: courseCode ? [
-            { code: { contains: courseCode, mode: "insensitive" } },
-            { name: { contains: courseCode, mode: "insensitive" } },
-            { name_th: { contains: courseCode, mode: "insensitive" } },
-          ] : undefined,
-          program: programParam ? {
-            id: !isNaN(parseInt(programParam)) ? parseInt(programParam) : undefined,
-            program_code: isNaN(parseInt(programParam)) ? programParam : undefined,
-            faculty: (facultyId || universityId) ? {
-              id: facultyId,
-              university: universityId ? { id: universityId } : undefined
-            } : undefined
-          } : undefined
-        }
-      }
-    };
+      // 🟢 ปรับ Logic การกรอง: เน้นไปที่ program_code
+      const where: any = {
+        section: section || undefined,
+        semester_config: {
+          semester: semester || undefined,
+          year: year || undefined,
+          course: {
+            // ค้นหาจากรหัสวิชาหรือชื่อวิชา
+            OR: courseCode
+              ? [
+                  { code: { contains: courseCode, mode: "insensitive" } },
+                  { name: { contains: courseCode, mode: "insensitive" } },
+                  { name_th: { contains: courseCode, mode: "insensitive" } },
+                ]
+              : undefined,
 
-    const [total, sections] = await prisma.$transaction([
-      prisma.courseSection.count({ where }),
-      prisma.courseSection.findMany({
-        where,
-        include: {
-          semester_config: {
-            include: { course: true }
-          }
+            // 🔵 กรองที่ระดับ Program โดยใช้ program_code แทน ID
+            program: programCode
+              ? {
+                  program_code: programCode, // 👈 ใช้รหัสหลักสูตรตรงๆ เพื่อให้ครอบคลุมทุก ID ที่รหัสเดียวกัน
+                  faculty:
+                    facultyId || universityId
+                      ? {
+                          id: facultyId || undefined,
+                          university: universityId
+                            ? { id: universityId }
+                            : undefined,
+                        }
+                      : undefined,
+                }
+              : undefined,
+          },
         },
-        orderBy: [
-          { semester_config: { year: "desc" } },
-          { semester_config: { semester: "desc" } },
-          { section: "asc" },
-        ],
-        skip,
-        take: limit,
-      }),
-    ]);
+      };
 
-    res.json({
-      data: sections.map((s) => ({
-        id: s.id,
-        course_id: s.semester_config.course.id,
-        code: s.semester_config.course.code,
-        name: s.semester_config.course.name,
-        name_th: s.semester_config.course.name_th,
-        program_id: s.semester_config.course.program_id,
-        semester_id: s.semester_config.id,
-        credits: s.semester_config.course.credits,
-        section: s.section,
-        semester: s.semester_config.semester,
-        year: s.semester_config.year,
-      })),
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Pagination failed" });
-  }
-});
+      const [total, sections] = await prisma.$transaction([
+        prisma.courseSection.count({ where }),
+        prisma.courseSection.findMany({
+          where,
+          include: {
+            semester_config: {
+              include: {
+                course: {
+                  include: { program: true }, // ดึงข้อมูล program มาด้วยเพื่อดู code
+                },
+              },
+            },
+          },
+          orderBy: [
+            { semester_config: { year: "desc" } },
+            { semester_config: { semester: "desc" } },
+            { section: "asc" },
+          ],
+          skip,
+          take: limit,
+        }),
+      ]);
+
+      res.json({
+        data: sections.map((s) => ({
+          id: s.id,
+          course_id: s.semester_config.course.id,
+          code: s.semester_config.course.code,
+          name: s.semester_config.course.name,
+          name_th: s.semester_config.course.name_th,
+          program_id: s.semester_config.course.program_id,
+          program_code: s.semester_config.course.program?.program_code, // 🟢 เพิ่ม program_code ใน response
+          semester_id: s.semester_config.id,
+          credits: s.semester_config.course.credits,
+          section: s.section,
+          semester: s.semester_config.semester,
+          year: s.semester_config.year,
+        })),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Pagination failed" });
+    }
+  },
+);
 
 /**
  * 2. GENERAL & DYNAMIC ROUTES

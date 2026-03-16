@@ -117,37 +117,43 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const sectionData = await tx.courseSection.findUnique({
+      // 1. ดึงข้อมูลพื้นฐานของ Section และ Assignment ก่อน
+      const sectionInfo = await tx.courseSection.findUnique({
         where: { id: Number(sectionId) },
         include: {
           semester_config: {
             include: {
               assignments: true,
-              gradeSettings: { orderBy: { score: "desc" } }, // 🟢 ดึงจาก SemesterConfig ตรงๆ
+              gradeSettings: { orderBy: { score: "desc" } },
             },
           },
-          students: {
+        },
+      });
+
+      if (!sectionInfo) throw new Error("SECTION_NOT_FOUND");
+
+      // 2. 🟢 เปลี่ยนมาดึงจาก Table การลงทะเบียน (Enrollment Table) โดยตรง
+      // เพื่อให้มั่นใจว่าได้เฉพาะรายชื่อนิสิตใน Section นี้เท่านั้น
+      const enrollments = await tx.studentOnSection.findMany({
+        where: { section_id: Number(sectionId) },
+        include: {
+          student: {
             include: {
-              student: {
-                include: {
-                  scores: {
-                    where: { section_id: Number(sectionId) }, // 🟢 ดึงคะแนนเฉพาะในกลุ่มนี้
-                    include: { assignment: true },
-                  },
-                },
+              scores: {
+                // ดึงเฉพาะคะแนนที่เกิดขึ้นใน Section นี้
+                where: { section_id: Number(sectionId) },
               },
             },
           },
         },
       });
 
-      if (!sectionData) throw new Error("SECTION_NOT_FOUND");
+      const assignments = sectionInfo.semester_config.assignments;
+      const gradeSettings = sectionInfo.semester_config.gradeSettings;
 
-      const assignments = sectionData.semester_config.assignments;
-      const gradeSettings = sectionData.semester_config.gradeSettings;
-
-      return sectionData.students.map((record) => {
-        const student = record.student;
+      // 3. คำนวณคะแนนจากรายการ Enrollment
+      return enrollments.map((enroll) => {
+        const student = enroll.student;
         let totalWeighted = 0;
         const categoryScores: Record<string, number> = {};
 
@@ -155,14 +161,20 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
           const scoreRec = student.scores.find(
             (s) => s.assignment_id === assign.id,
           );
-          const weighted =
-            (Number(scoreRec?.score || 0) / Number(assign.maxScore)) *
-            Number(assign.weight);
 
-          categoryScores[assign.category] =
-            (categoryScores[assign.category] || 0) + weighted;
+          const rawScore = scoreRec ? Number(scoreRec.score) : 0;
+          const weighted =
+            (rawScore / Number(assign.maxScore)) * Number(assign.weight);
+
+          categoryScores[assign.category] = Number(
+            ((categoryScores[assign.category] || 0) + weighted).toFixed(4),
+          );
           totalWeighted += weighted;
         });
+
+        const finalGrade =
+          gradeSettings.find((g) => totalWeighted >= Number(g.score))?.grade ||
+          "F";
 
         return {
           student_id: student.id,
@@ -171,9 +183,7 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
           last_name: student.last_name,
           categoryScores,
           totalScore: Number(totalWeighted.toFixed(2)),
-          grade:
-            gradeSettings.find((g) => totalWeighted >= Number(g.score))
-              ?.grade || "F",
+          grade: finalGrade,
         };
       });
     });

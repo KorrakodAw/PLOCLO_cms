@@ -109,7 +109,7 @@ export default function EditCourseClient({
       .map((term) => {
         const [y, s] = term.split("-");
         return {
-          label: `${t("Year")} ${y} / ${t("Semester")} ${s}`,
+          label: `${t("year")} ${y} / ${t("semester")} ${s}`,
           value: term,
         };
       })
@@ -227,54 +227,67 @@ export default function EditCourseClient({
                       `/editCourse/${courseCode}/instructors?courseId=${formData.course_id}`,
                     )
                   }
-                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-black text-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100 uppercase tracking-wider"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-light text-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100 uppercase tracking-wider"
                 >
                   <UserPlus size={16} strokeWidth={2.5} />{" "}
                   {t("Manage Instructors")}
                 </button>
                 <button
                   onClick={() => setShowEditPopup(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-black text-slate-500 bg-slate-50 hover:bg-slate-200 rounded-xl transition-all border border-slate-100 uppercase tracking-wider"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-light text-slate-500 bg-slate-50 hover:bg-slate-200 rounded-xl transition-all border border-slate-100 uppercase tracking-wider"
                 >
                   <Edit3 size={16} strokeWidth={2.5} /> {t("Settings")}
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-inner">
-              <div className="flex-1 sm:w-56">
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-3 block tracking-widest">
+            <div className="flex flex-col md:flex-row gap-6 w-full lg:w-auto bg-white p-2 rounded-[2.5rem] ">
+              {/* Semester / Year Selector */}
+              <div className="flex-1 lg:w-64 p-4 transition-colors rounded-[2rem] group">
+                <label className="flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-3 ml-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
                   {t("Semester / Year")}
                 </label>
-                <DropdownSelect
-                  value={selectedTerm}
-                  options={termOptions}
-                  onChange={(v) => handleTermChange(String(v))}
-                />
+                <div className="relative">
+                  <DropdownSelect
+                    value={selectedTerm}
+                    options={termOptions}
+                    onChange={(v) => handleTermChange(String(v))}
+                    // แนะนำให้เพิ่ม className ใน DropdownSelect เพื่อปรับแต่งขอบให้มนขึ้น
+                  />
+                </div>
               </div>
-              <div className="flex-1 sm:w-40">
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-3 block tracking-widest">
+
+              {/* Divider (แสดงเฉพาะบนจอใหญ่) */}
+              <div className="hidden md:block w-px h-12 bg-slate-100 self-center" />
+
+              {/* Section Group Selector */}
+              <div className="flex-1 lg:w-52 p-4 transition-colors rounded-[2rem] group">
+                <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1 group-hover:text-blue-500 transition-colors">
+                  <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-400 transition-colors" />
                   {t("Section Group")}
                 </label>
-                <DropdownSelect
-                  value={selectedSectionId}
-                  options={sectionOptions}
-                  onChange={(v) => setSelectedSectionId(String(v))}
-                />
+                <div className="relative">
+                  <DropdownSelect
+                    value={selectedSectionId}
+                    options={sectionOptions}
+                    onChange={(v) => setSelectedSectionId(String(v))}
+                  />
+                </div>
               </div>
             </div>
           </div>
           <div className="px-10 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end items-center gap-6">
             <button
               onClick={() => setShowDuplicatePopup(true)}
-              className="flex items-center gap-2 text-[11px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors"
+              className="flex items-center gap-2 text-[14px] font-light text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors"
             >
               <Copy size={14} /> {t("Duplicate Section")}
             </button>
             <div className="h-4 w-px bg-slate-200" />
             <button
               onClick={() => setShowDeletePopup(true)}
-              className="flex items-center gap-2 text-[11px] font-black text-slate-400 hover:text-rose-600 uppercase tracking-widest transition-colors"
+              className="flex items-center gap-2 text-[14px] font-light text-slate-400 hover:text-rose-600 uppercase tracking-widest transition-colors"
             >
               <Trash2 size={14} /> {t("Delete This Section")}
             </button>
@@ -289,7 +302,7 @@ export default function EditCourseClient({
                 setViewMode("setup");
                 setActiveTab("clo");
               }}
-              className={`flex-1 px-8 py-3.5 rounded-[1.4rem] text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all ${viewMode === "setup" ? "bg-slate-900 text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:bg-slate-50"}`}
+              className={`flex-1 px-8 py-3.5 rounded-[1.4rem] text-[16px] font-light uppercase tracking-widest flex items-center justify-center gap-3 transition-all ${viewMode === "setup" ? "bg-slate-900 text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:bg-slate-50"}`}
             >
               <BookOpen size={18} strokeWidth={2.5} /> {t("Course Setup")}
             </button>
@@ -298,7 +311,7 @@ export default function EditCourseClient({
                 setViewMode("grading");
                 setActiveTab("grade-setting");
               }}
-              className={`flex-1 px-8 py-3.5 rounded-[1.4rem] text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all ${viewMode === "grading" ? "bg-emerald-600 text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:bg-slate-50"}`}
+              className={`flex-1 px-8 py-3.5 rounded-[1.4rem] text-[16px] font-light uppercase tracking-widest flex items-center justify-center gap-3 transition-all ${viewMode === "grading" ? "bg-emerald-600 text-white shadow-lg scale-[1.02]" : "text-slate-400 hover:bg-slate-50"}`}
             >
               <Calculator size={18} strokeWidth={2.5} /> {t("Scores & Grading")}
             </button>
@@ -329,7 +342,7 @@ export default function EditCourseClient({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-3.5 rounded-[1.4rem] text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? "bg-white text-blue-600 shadow-md scale-105" : "text-slate-400 hover:text-slate-600 hover:bg-white/50"}`}
+                className={`px-6 py-3.5 rounded-[1.4rem] text-[16px] font-light uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? "bg-white text-blue-600 shadow-md scale-105" : "text-slate-400 hover:text-slate-600 hover:bg-white/50"}`}
               >
                 {tab.label}
               </button>
@@ -374,6 +387,7 @@ export default function EditCourseClient({
                 masterCourseId={String(formData.course_id)}
                 programId={formData.program_id}
                 sectionId={String(formData.id)}
+                semesterId={String(formData.semester_id)}
               />
             )}
             {activeTab === "score-mapping" && (

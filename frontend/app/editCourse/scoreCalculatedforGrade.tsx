@@ -39,7 +39,7 @@ export default function ScoreCalculated({
       setLoading(true);
       try {
         const res = await apiClient.get(
-          `/reports/summary?sectionId=${sectionId}&semesterId=${semesterId}`,
+          `/reports/summary?sectionId=${sectionId}`,
         );
         setProcessedData(res.data);
       } catch (err) {
@@ -90,34 +90,27 @@ export default function ScoreCalculated({
     return "bg-red-100 text-red-700";
   };
 
-  useEffect(() => {
-    try {
-      const res = apiClient.get("/calculation/ass-clo/gradeSummary", {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { courseId: semesterId },
-      });
-      res.then((response) => {
-        setGradeSummaryData(response.data);
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  }, [token, semesterId]);
-
-  const [gradeSummaryData, setGradeSummaryData] = useState<any>(null);
-
   const formattedGradeData = useMemo(() => {
-    const grades = gradeSummaryData || {};
-    return Object.entries(grades)
-      .map(([grade, details]: [string, any]) => ({
-        grade,
-        count: details.count,
-      }))
-      .sort((a, b) => {
-        const order = ["A", "B+", "B", "C+", "C", "D+", "D", "F"];
-        return order.indexOf(a.grade) - order.indexOf(b.grade);
-      });
-  }, [gradeSummaryData]);
+    const students = Array.isArray(processedData) ? processedData : [];
+
+    // 1. นับจำนวนนักเรียนรายเกรด
+    const gradeCounts = students.reduce((acc: Record<string, number>, curr) => {
+      const g = curr.grade || "F";
+      acc[g] = (acc[g] || 0) + 1;
+      return acc;
+    }, {});
+
+    // 2. ลำดับเกรดมาตรฐาน
+    const order = ["A", "B+", "B", "C+", "C", "D+", "D", "F"];
+
+    // 3. แสดงเฉพาะเกรดที่มีคนได้ (count > 0)
+    return order
+      .filter((g) => gradeCounts[g] > 0) // 🟢 กรองเอาเฉพาะเกรดที่มีข้อมูลจริง
+      .map((g) => ({
+        grade: g,
+        count: gradeCounts[g],
+      }));
+  }, [processedData]);
 
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-8 relative min-h-[400px]">
