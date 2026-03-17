@@ -1628,7 +1628,6 @@ export async function getPloProgramWhereScoreComeFrom(
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ PLO ของนักเรียนแต่ละคนใน 1 semester (รวมทุก course ที่เรียน)
 /////////////////////////////////////////////////////////////////////////
-
 export async function getPloScoreAllStudentPerSemester(
   tx: any,
     programId: number,
@@ -1691,6 +1690,79 @@ export async function getPloScoreAllStudentPerSemester(
   results.sort((a, b) => a.student_id - b.student_id);
   return results;
 }
+
+/////////////////////////////////////////////////////////////////////////
+// getPloScoreAllStudentPerSemester แบบที่แปลงคะแนนเป็น percentage เทียบกับ highestPossible ของแต่ละ PLO ในเทอมนี้
+/////////////////////////////////////////////////////////////////////////
+export async function getPloScoreAllStudentPerSemesterPercentage(
+  tx: any,
+  programId: number,
+  year: number,
+  semester: number
+) {
+  // 1. ดึงข้อมูลคะแนนดิบรายบุคคล (ที่คูณ credits มาแล้ว)
+  const studentResults = await getPloScoreAllStudentPerSemester(tx, programId, year, semester);
+
+  // 2. คำนวณหา Highest Possible ของแต่ละ PLO สำหรับ Semester นี้
+  // (ต้องใช้ Logic เดียวกับที่ใช้ใน Summary เพื่อให้ฐานเปอร์เซ็นต์ตรงกัน)
+  const courseSemesters = await tx.courseSemester.findMany({
+    where: { year, semester },
+    select: {
+      id: true,
+      course_id: true,
+      course: { select: { credits: true } },
+    },
+  });
+
+  const semesterPloHighest: Record<string, number> = {};
+
+  for (const cs of courseSemesters) {
+    const { cloStats } = await getCloStatsPerCourse(tx, cs.id);
+    const mappings = await tx.cloPloMapping.findMany({
+      where: { 
+        clo: { course_id: cs.course_id }, 
+        plo: { program_id: programId } 
+      },
+      select: {
+        clo: { select: { code: true } },
+        plo: { select: { code: true } },
+        weight: true,
+      },
+    });
+
+    const credits = Number(cs.course.credits);
+
+    mappings.forEach((map: any) => {
+      const cloHighest = cloStats.find((c: any) => c.cloCode === map.clo.code)?.highestPossible ?? 0;
+      const contribution = (cloHighest * (Number(map.weight) / 100)) * credits;
+      const ploCode = map.plo.code;
+      semesterPloHighest[ploCode] = (semesterPloHighest[ploCode] ?? 0) + contribution;
+    });
+  }
+
+  // 3. แปลงคะแนนของนักเรียนทุกคนให้เป็น Percentage
+  const results = studentResults.map((student) => {
+    const percentageScores = student.ploScores.map((item) => {
+      const highest = semesterPloHighest[item.ploCode] || 0;
+      const denominator = highest > 0 ? highest : 1;
+      
+      return {
+        ploCode: item.ploCode,
+        ploScore: Number(((item.ploScore / denominator) * 100).toFixed(2)),
+        highestPossible: 100 // แสดงเป็น 100%
+      };
+    });
+
+    return {
+      student_id: student.student_id,
+      programId: student.programId,
+      ploScores: percentageScores,
+    };
+  });
+
+  return results;
+}
+
 /*
 export async function getPloScoreAllStudentPerSemester(
   tx: any,
