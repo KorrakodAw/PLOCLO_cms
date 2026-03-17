@@ -257,11 +257,11 @@ export default function EditCourseClient({
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-6 w-full lg:w-auto bg-white p-2 rounded-[2.5rem] ">
-              {/* Semester / Year Selector */}
-              <div className="flex-1 lg:w-64 p-4 transition-colors rounded-[2rem] group">
-                <label className="flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-3 ml-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-fit bg-white p-2 sm:p-3 rounded-[1.5rem] sm:rounded-full shadow-md border-2 border-slate-100">
+              {/* 1. Semester / Year Selector */}
+              <div className="flex-1 min-w-[200px] px-3 py-1 transition-colors group">
+                <label className="flex items-center gap-2 text-[11px] font-black text-indigo-600 uppercase tracking-widest mb-1 ml-1">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                   {t("Semester / Year")}
                 </label>
                 <div className="relative">
@@ -269,18 +269,18 @@ export default function EditCourseClient({
                     value={selectedTerm}
                     options={termOptions}
                     onChange={(v) => handleTermChange(String(v))}
-                    // แนะนำให้เพิ่ม className ใน DropdownSelect เพื่อปรับแต่งขอบให้มนขึ้น
+                    // มั่นใจว่าข้างใน DropdownSelect มี text-lg หรือขนาดที่ใหญ่อ่านง่าย
                   />
                 </div>
               </div>
 
-              {/* Divider (แสดงเฉพาะบนจอใหญ่) */}
-              <div className="hidden md:block w-px h-12 bg-slate-100 self-center" />
+              {/* Divider - แสดงเป็นเส้นตั้งในจอคอม และเส้นนอนจางๆ ในมือถือ */}
+              <div className="h-px w-full sm:h-10 sm:w-0.5 bg-slate-100 self-center mx-1" />
 
-              {/* Section Group Selector */}
-              <div className="flex-1 lg:w-52 p-4 transition-colors rounded-[2rem] group">
-                <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1 group-hover:text-blue-500 transition-colors">
-                  <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-blue-400 transition-colors" />
+              {/* 2. Section Group Selector */}
+              <div className="flex-1 min-w-[180px] px-3 py-1 transition-colors group">
+                <label className="flex items-center gap-2 text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1 ml-1 group-hover:text-blue-600">
+                  <div className="w-2 h-2 rounded-full bg-slate-300 group-hover:bg-blue-500 transition-colors" />
                   {t("Section Group")}
                 </label>
                 <div className="relative">

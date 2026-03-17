@@ -88,6 +88,12 @@ export default function ScoreCalculated({
     return "bg-red-100 text-red-700";
   };
 
+  useEffect(() => {
+    console.log(processedData);
+    console.log(formattedGradeData);
+    
+  })
+
   const formattedGradeData = useMemo(() => {
     const students = Array.isArray(processedData) ? processedData : [];
 
