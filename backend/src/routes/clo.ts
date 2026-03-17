@@ -8,108 +8,6 @@ const router = Router();
 // 1. GET /paginate (For the Table)
 // =========================================
 
-// =========================================
-// 1. GET /paginate (For the Table)
-// =========================================
-router.get("/paginate", authenticateToken, async (req, res) => {
-  try {
-    const {
-      universityId,
-      facultyId,
-      programId,
-      year,
-      semester,
-      section,
-      courseSemesterId, // 🟢 เปลี่ยนชื่อ param
-    } = req.query;
-
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const offset = (page - 1) * limit;
-
-    const params: any[] = [];
-    const conditions: string[] = ["1=1"];
-
-    if (universityId) {
-      params.push(universityId);
-      conditions.push(`university.id = $${params.length}`);
-    }
-    if (facultyId) {
-      params.push(facultyId);
-      conditions.push(`faculty.id = $${params.length}`);
-    }
-    if (programId) {
-      params.push(programId);
-      conditions.push(`program.id = $${params.length}`);
-    }
-    if (year) {
-      params.push(year);
-      conditions.push(`course_semester.year = $${params.length}`); // 🟢 ใช้ year จาก course_semester
-    }
-    if (semester) {
-      params.push(semester);
-      conditions.push(`course_semester.semester = $${params.length}`); // 🟢 ใช้ semester จาก course_semester
-    }
-    if (section) {
-      params.push(section);
-      conditions.push(`course_section.section = $${params.length}`); // 🟢 section อยู่ใน course_section
-    }
-    if (courseSemesterId) {
-      params.push(courseSemesterId);
-      conditions.push(`course_semester.id = $${params.length}`); // 🟢 ใช้ course_semester.id
-    }
-
-    const whereClause = "WHERE " + conditions.join(" AND ");
-
-    // 🟢 ปรับ Query ให้ join ผ่าน course_semester
-    const dataQuery = `
-      SELECT 
-        clo.id, clo.code, clo.name, clo.name_th, clo.course_id,
-        course_semester.id AS course_semester_id,
-        program.id AS program_id
-      FROM clo
-      JOIN course ON clo.course_id = course.id
-      JOIN course_semester ON course.id = course_semester.course_id
-      JOIN program ON course.program_id = program.id
-      JOIN faculty ON program.faculty_id = faculty.id
-      JOIN university ON faculty.university_id = university.id
-      ${whereClause}
-      ORDER BY clo.id ASC 
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-    `;
-
-    const countQuery = `
-      SELECT COUNT(*) AS total
-      FROM clo
-      JOIN course ON clo.course_id = course.id
-      JOIN course_semester ON course.id = course_semester.course_id
-      JOIN program ON course.program_id = program.id
-      JOIN faculty ON program.faculty_id = faculty.id
-      JOIN university ON faculty.university_id = university.id
-      ${whereClause}
-    `;
-
-    const [result, countResult] = await Promise.all([
-      pool.query(dataQuery, [...params, limit, offset]),
-      pool.query(countQuery, params),
-    ]);
-
-    const total = parseInt(countResult.rows[0].total, 10);
-
-    res.json({
-      data: result.rows,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (err: any) {
-    console.error("Pagination Error:", err.message);
-    res.status(500).json({ error: "Failed to fetch paginated CLOs" });
-  }
-});
-
-/*
 router.get("/paginate", authenticateToken, async (req, res) => {
   try {
     // 1. Destructure and Normalize Query Params
@@ -216,20 +114,20 @@ router.get("/paginate", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch paginated CLOs" });
   }
 });
-*/
+
 
 // =========================================
 // 2. GET / (Simple List / Dropdown)
 // =========================================
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const courseSemesterId = req.query.courseSemesterId as string | undefined;
+    const courseId = req.query.courseId as string | undefined;
 
     const result = await pool.query(
-      `SELECT id, code, name, name_th, course_semester_id FROM clo
-       ${courseSemesterId ? "WHERE course_semester_id = $1" : ""}
+      `SELECT id, code, name, name_th, course_id FROM clo
+       ${courseId ? "WHERE course_id = $1" : ""}
        ORDER BY id ASC`,
-      courseSemesterId ? [courseSemesterId] : [],
+      courseId ? [courseId] : [],
     );
 
     res.json(result.rows);
@@ -243,16 +141,16 @@ router.get("/", authenticateToken, async (req, res) => {
 // 3. POST / (Add CLO)
 // =========================================
 router.post("/", authenticateToken, async (req, res) => {
-  const { code, name, name_th, course_semester_id } = req.body;
+  const { code, name, name_th, course_id } = req.body;
 
   try {
     // 1. Insert the CLO
     // We let the database handle the unique check now (via the new constraint)
     const result = await pool.query(
-      `INSERT INTO clo (code, name, name_th, course_semester_id) 
+      `INSERT INTO clo (code, name, name_th, course_id) 
        VALUES ($1, $2, $3, $4) 
-       RETURNING id, code, name, name_th, course_semester_id`,
-      [code, name, name_th, course_semester_id],
+       RETURNING id, code, name, name_th, course_id`,
+      [code, name, name_th, course_id],
     );
     res.status(201).json(result.rows[0]);
   } catch (err: any) {
@@ -281,13 +179,13 @@ router.post("/bulk", authenticateToken, async (req, res) => {
     await pool.query("BEGIN");
 
     for (const clo of clos) {
-      const { code, name, name_th, course_semester_id } = clo;
+      const { code, name, name_th, course_id } = clo;
 
       try {
         await pool.query(
-          `INSERT INTO clo (code, name, name_th, course_semester_id) 
+          `INSERT INTO clo (code, name, name_th, course_id) 
            VALUES ($1, $2, $3, $4)`,
-          [code, name, name_th, course_semester_id],
+          [code, name, name_th, course_id],
         );
       } catch (err: any) {
         if (err.code === "23505") {

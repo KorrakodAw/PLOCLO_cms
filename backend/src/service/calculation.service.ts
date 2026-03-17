@@ -1119,71 +1119,71 @@ return gradeSummarySorted;
 // คำนวณ plo ของ student 1 คนใน 1 course
 /////////////////////////////////////////////////////////////////////////
 
-/////////////////////////////////////////////////////////////////////////
-// คำนวณ PLO ของ student 1 คน ใน 1 course (ไม่ normalize)
-/////////////////////////////////////////////////////////////////////////
-
-
 export async function getPloScorePerStudentPerCourse(
   tx: any,
   studentId: number,
   CsemesterId: number,
+  courseId: number,
 ) {
-  // 1. ดึง CLO scores ของ student ใน course_semester ที่เลือก
+  // 1. หาว่า student อยู่ program ไหน
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true },
+  });
+  if (!student) throw new Error("Student not found");
+
+  const studentProgramId = student.program_id;
+
+  // 2. ดึง CLO scores ของนักเรียน
   const cloResult = await getCloScorePerStudentPerCourse(
     tx,
     studentId,
     CsemesterId,
   );
 
-  // 2. ดึง section ที่ student อยู่ใน course_semester นี้
-  const studentSections = await tx.studentOnSection.findMany({
-    where: {
-      student_id: studentId,
-      section: { course_semester_id: Number(CsemesterId) },
-    },
-    select: { section_id: true },
-  });
-  const validSectionIds = studentSections.map((s: { section_id: number }) => s.section_id);
-
-  // 3. กรอง cloScores ให้เหลือเฉพาะ section ที่ student อยู่
-  const filteredCloScores = cloResult.cloScores.filter((c) =>
-    validSectionIds.includes(c.sectionId),
-  );
-
-  // 4. ดึง CLO → PLO mapping ของ course_semester นี้
   type CloMapping = {
     clo: { code: string };
-    plo: { code: string };
+    plo: { id: number; code: string; program_id: number };
     weight: number;
   };
 
+  // 3. ดึง CLO → PLO mapping ของ course
   const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
-    where: { clo: { course_semester_id: Number(CsemesterId) } },
-    distinct: ["cloId", "ploId"], // กันแถวซ้ำตามคู่ clo-plo
+    where: { clo: { course_id: Number(courseId) } },
     select: {
       clo: { select: { code: true } },
-      plo: { select: { code: true } },
+      plo: { select: { id: true, code: true, program_id: true } },
       weight: true,
     },
   });
 
-  // 5. คำนวณ PLO score โดยใช้ cloScores ที่กรองแล้ว
+  // 4. คำนวณ contribution และ group ตาม program_id + ploCode
   const ploGroups: Record<string, number> = {};
+
   cloMappings.forEach((map: CloMapping) => {
-    const cloScoreArray = filteredCloScores.find(
+    // ข้ามถ้าไม่ใช่ program ของนักเรียน
+    if (map.plo.program_id !== studentProgramId) return;
+
+    const cloScore = cloResult.cloScores.find(
       (c) => String(c.cloCode) === String(map.clo.code),
     );
-    if (!cloScoreArray) return;
+    if (!cloScore) return;
 
-    const contribution = Number(cloScoreArray.cloScore) * (map.weight / 100);
-    ploGroups[map.plo.code] = (ploGroups[map.plo.code] ?? 0) + contribution;
+    const contribution = Number(cloScore.cloScore) * (Number(map.weight) / 100);
+
+    const key = `${map.plo.program_id}_${map.plo.code}`;
+    ploGroups[key] = (ploGroups[key] ?? 0) + contribution;
   });
 
-  const ploScores = Object.entries(ploGroups).map(([ploCode, ploScore]) => ({
-    ploCode,
-    ploScore,
-  }));
+  // 5. คืนค่าเฉพาะ program ของนักเรียน
+  const ploScores = Object.entries(ploGroups).map(([key, ploScore]) => {
+    const [programId, ploCode] = key.split("_");
+    return {
+      programId: Number(programId),
+      ploCode,
+      ploScore,
+    };
+  });
 
   return { ploScores };
 }
@@ -1193,7 +1193,17 @@ export async function getPloScorePerStudentPerCourse(
   tx: any,
   studentId: number,
   CsemesterId: number,
+  courseId: number,
 ) {
+   // 1. หาว่า student อยู่ program ไหน
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true },
+  });
+  if (!student) throw new Error("Student not found");
+
+  const studentProgramId = student.program_id;
+
   const cloResult = await getCloScorePerStudentPerCourse(
     tx,
     studentId,
@@ -1201,70 +1211,55 @@ export async function getPloScorePerStudentPerCourse(
   );
 
   type CloMapping = {
-    clo: { code: any };
-    plo: { code: any };
+    clo: { code: string };
+    plo: { id: number; code: string; program_id: number };
     weight: number;
   };
 
   const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
-    where: {
-      clo: {
-        course_semester_id: Number(CsemesterId),
-        course_semester: {
-          sections: {
-            some: {
-              students: {
-                some: { student_id: studentId }
-              }
-            }
-          }
-        }
-      }
-    },
-    distinct: ["cloId", "ploId"], // กันแถวซ้ำตามคู่ clo-plo
+    where: { clo: { course_id: Number(courseId) } },
     select: {
       clo: { select: { code: true } },
-      plo: { select: { code: true } },
+      plo: { select: { id: true, code: true, program_id: true } },
       weight: true,
     },
   });
 
-  
-  const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
-    where: { clo: { course_semester_id: Number(CsemesterId) } },
-    distinct: ["cloId", "ploId"], // 🟢 กันแถวซ้ำตามคู่ clo-plo
-    select: {
-      clo: { select: { code: true } },
-      plo: { select: { code: true } },
-      weight: true,
-    },
-  });
-
-
+  // group ตาม program_id + ploCode
   const ploGroups: Record<string, number> = {};
+
   cloMappings.forEach((map: CloMapping) => {
-    const cloScoreArray = cloResult.cloScores.find(
+    const cloScore = cloResult.cloScores.find(
       (c) => String(c.cloCode) === String(map.clo.code),
     );
-    if (!cloScoreArray) return;
+    if (!cloScore) return;
 
-    const contribution = Number(cloScoreArray.cloScore) * (map.weight / 100);
-    ploGroups[map.plo.code] = (ploGroups[map.plo.code] ?? 0) + contribution;
+    const contribution = Number(cloScore.cloScore) * (Number(map.weight) / 100);
+
+    const key = `${map.plo.program_id}_${map.plo.code}`;
+    ploGroups[key] = (ploGroups[key] ?? 0) + contribution;
   });
 
-  const ploScores = Object.entries(ploGroups).map(([ploCode, ploScore]) => ({
-    ploCode,
-    ploScore,
-  }));
+  // แปลงกลับเป็น array พร้อม programId
+  const ploScores = Object.entries(ploGroups).map(([key, ploScore]) => {
+    const [programId, ploCode] = key.split("_");
+    return {
+      programId: Number(programId),
+      ploCode,
+      ploScore,
+    };
+  });
 
   return { ploScores };
-}
-*/
+}*/
+
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 course
 /////////////////////////////////////////////////////////////////////////
-export async function getPloScorePerCourse(tx: any, CsemesterId: number) {
+
+/*
+export async function getPloScorePerCourse(tx: any, CsemesterId: number, courseId: number) {
   const cloResult = await getCloScorePerCourse(tx, CsemesterId);
 
   type CloMapping = {
@@ -1274,7 +1269,7 @@ export async function getPloScorePerCourse(tx: any, CsemesterId: number) {
   };
 
   const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
-    where: { clo: { course: { semester_id: Number(CsemesterId) } } },
+    where: { clo: { courseId } },
     select: {
       clo: { select: { code: true } },
       plo: { select: { code: true } },
@@ -1318,6 +1313,7 @@ export async function getPloScorePerCourse(tx: any, CsemesterId: number) {
 
   return { ploScores };
 }
+*/
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student ทุกคนใน 1 course
@@ -1325,11 +1321,12 @@ export async function getPloScorePerCourse(tx: any, CsemesterId: number) {
 export async function getPloScoreAllStudentPerCourse(
   tx: any,
   CsemesterId: number,
+  courseId: number
 ) {
   const students = await tx.studentScore.findMany({
     where: {
       assignment: {
-        semesterId: Number(CsemesterId),
+        semester_id: Number(CsemesterId),
       },
     },
     distinct: ["student_id"],
@@ -1342,29 +1339,107 @@ export async function getPloScoreAllStudentPerCourse(
       tx,
       s.student_id,
       CsemesterId,
+      courseId
     );
     results.push({
       student_id: s.student_id,
-      ploScores: ploResult.ploScores,
+      programId: ploResult.ploScores.length > 0 ? ploResult.ploScores[0].programId : null,
+      //ploScores: ploResult.ploScores,
+      ploScores: ploResult.ploScores.map(({ ploCode, ploScore }) => ({
+        ploCode,
+        ploScore,
+      })),
     });
   }
-
+    // เรียงตาม student_id เพื่อให้ง่ายต่อการอ่านผลลัพธ์
+    results.sort((a, b) => a.student_id - b.student_id);
   return results;
 }
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ PLO ของนักเรียนแต่ละคนออกมาเป็น percentage เทียบกับ highestPossible
 /////////////////////////////////////////////////////////////////////////
+// กำหนด type ของ stat ที่อยู่ใน plos
+type PloStat = {
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+  highestPossible: number;
+};
+
 export async function getPloPercentageAllStudentPerCourse(
   tx: any,
-  CsemesterId: number
+  CsemesterId: number,
+  courseId: number
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1) ดึงคะแนน PLO ของนักเรียนแต่ละคน
-    const perStudent = await getPloScoreAllStudentPerCourse(tx, CsemesterId);
+    const perStudent = await getPloScoreAllStudentPerCourse(
+      tx,
+      CsemesterId,
+      courseId
+    );
+
+    // 2) ดึงค่า highestPossible ของแต่ละ PLO แยกตาม programId
+    const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId, courseId);
+
+    // สร้าง map: programId + ploCode → highestPossible
+    const highestPloMap: Record<string, number> = {};
+    ploStats.forEach((programStat) => {
+      Object.entries(programStat.plos).forEach(([ploCode, stat]) => {
+        const s = stat as PloStat; // ✅ cast type ให้ชัดเจน
+        const key = `${programStat.programId}_${ploCode}`;
+        highestPloMap[key] = s.highestPossible;
+      });
+    });
+
+    // 3) คำนวณเปอร์เซ็นต์ต่อ student ต่อ PLO
+    const results: {
+      studentId: number;
+      programId: number | null; // ✅ รองรับ null ตาม schema
+      ploPercentages: { ploCode: string; percentage: number }[];
+    }[] = [];
+
+    perStudent.forEach((student) => {
+      const ploPercentages: { ploCode: string; percentage: number }[] = [];
+
+      student.ploScores.forEach((plo) => {
+        const key = `${student.programId}_${plo.ploCode}`;
+        const highest = highestPloMap[key] ?? 0;
+        const percentage = highest > 0 ? (plo.ploScore / highest) * 100 : 0;
+
+        ploPercentages.push({
+          ploCode: plo.ploCode,
+          percentage: Number(percentage.toFixed(2)),
+        });
+      });
+
+      results.push({
+        studentId: student.student_id,
+        programId: student.programId,
+        ploPercentages,
+      });
+    });
+
+    return { ploPercentagePerStudent: results };
+  });
+
+  return result;
+}
+
+/*
+export async function getPloPercentageAllStudentPerCourse(
+  tx: any,
+  CsemesterId: number,
+  courseId: number
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1) ดึงคะแนน PLO ของนักเรียนแต่ละคน
+    const perStudent = await getPloScoreAllStudentPerCourse(tx, CsemesterId, courseId);
 
     // 2) ดึงค่า highestPossible ของแต่ละ PLO
-    const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId);
+    const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId, courseId);
     const highestPloMap: Record<string, number> = {};
     ploStats.forEach((stat) => {
       highestPloMap[stat.ploCode] = stat.highestPossible;
@@ -1401,10 +1476,12 @@ export async function getPloPercentageAllStudentPerCourse(
 
   return result;
 }
+*/
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 program
 /////////////////////////////////////////////////////////////////////////
+/*
 export async function getPloScorePerProgram(tx: any, programId: number) {
   const courses = await tx.course.findMany({
     where: { program_id: Number(programId) },
@@ -1434,10 +1511,11 @@ export async function getPloScorePerProgram(tx: any, programId: number) {
 
   return { programPloScores };
 }
-
+*/
 /////////////////////////////////////////////////////////////
 // คำนวณ PLO แต่ละตัว ของ student 1 คน (รวมทุก course ที่เรียน)
 /////////////////////////////////////////////////////////////
+/*
 export async function getPloScorePerStudentFromAllCourse(
   tx: any,
   studentId: number,
@@ -1471,6 +1549,8 @@ export async function getPloScorePerStudentFromAllCourse(
       tx,
       studentId,
       semesterId,
+      courseId
+
     );
 
     ploScores.forEach(({ ploCode, ploScore }) => {
@@ -1487,10 +1567,12 @@ export async function getPloScorePerStudentFromAllCourse(
 
   return { ploScoresAllCourses };
 }
+*/
 
 /////////////////////////////////////////////////////////////////////////
 // หาว่า PLO แต่ละตัวได้คะแนนมาจาก course ไหนบ้าง
 /////////////////////////////////////////////////////////////////////////
+/*
 export async function getPloProgramWhereScoreComeFrom(
   tx: any,
   programId: number,
@@ -1541,124 +1623,188 @@ export async function getPloProgramWhereScoreComeFrom(
 
   return { programPloScores };
 }
-
+*/
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////
-export async function getPloStatsPerCourse(tx: any, CsemesterId: number) {
-  const students = await tx.studentScore.findMany({
-    where: {
-      assignment: {
-        section: {
-          course_id: Number(CsemesterId),
-        },
-      },
-    },
-    select: { student_id: true },
-    distinct: ["student_id"],
+
+export async function getPloStatsPerCourse(
+  tx: any,
+  CsemesterId: number,
+  courseId: number
+) {
+  // 1) ดึงผลลัพธ์ PLO ของนักเรียนทุกคนใน course นี้
+  const allStudentResults = await getPloScoreAllStudentPerCourse(
+    tx,
+    CsemesterId,
+    courseId
+  );
+
+  // 2) รวมคะแนน PLO ของนักเรียนทุกคนตาม programId + ploCode
+  const ploScoresByProgram: Record<string, number[]> = {};
+  allStudentResults.forEach(({ programId, ploScores }) => {
+    ploScores.forEach(({ ploCode, ploScore }) => {
+      const key = `${programId}_${ploCode}`;
+      if (!ploScoresByProgram[key]) {
+        ploScoresByProgram[key] = [];
+      }
+      ploScoresByProgram[key].push(ploScore);
+    });
   });
 
-  const ploScoresByStudent: Record<string, number[]> = {};
-
-  for (const s of students) {
-    const { ploScores } = await getPloScorePerStudentPerCourse(
-      tx,
-      s.student_id,
-      CsemesterId,
-    );
-
-    ploScores.forEach(({ ploCode, ploScore }) => {
-      if (!ploScoresByStudent[ploCode]) {
-        ploScoresByStudent[ploCode] = [];
-      }
-      ploScoresByStudent[ploCode].push(ploScore);
-    });
-  }
-
-  const ploStats = Object.entries(ploScoresByStudent).map(
-    ([ploCode, scores]) => {
+  // 3) คำนวณ min, max, mean, median
+  const ploStats = Object.entries(ploScoresByProgram).map(
+    ([key, scores]) => {
+      const [programId, ploCode] = key.split("_");
       const min = Math.min(...scores);
       const max = Math.max(...scores);
-      const mean = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+      const mean =
+        scores.length > 0
+          ? scores.reduce((sum, s) => sum + s, 0) / scores.length
+          : 0;
 
-      // --- คำนวณ median ---
       let median = 0;
       if (scores.length > 0) {
         const sorted = [...scores].sort((a, b) => a - b);
         const mid = Math.floor(sorted.length / 2);
-        if (sorted.length % 2 === 0) {
-          median = (sorted[mid - 1] + sorted[mid]) / 2;
-        } else {
-          median = sorted[mid];
-        }
+        median =
+          sorted.length % 2 === 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2
+            : sorted[mid];
       }
 
-      return { ploCode, min, max, mean, median };
+      return {
+        programId: Number(programId),
+        ploCode,
+        min,
+        max,
+        mean,
+        median,
+      };
     }
   );
 
-  // 1) ดึง CLO highestPossible จาก function เดิม
+  // 4) ดึง CLO highestPossible จาก function เดิม
   const { cloStats } = await getCloStatsPerCourse(tx, CsemesterId);
 
-  // 2) ดึง CloPloMapping ของ course นี้
+  // 5) ดึง CloPloMapping ของ course นี้
   const cloPloMappings = await tx.cloPloMapping.findMany({
     where: {
-      clo: { course_id: Number(CsemesterId) },
+      clo: { course_id: Number(courseId) },
     },
     select: {
       clo: { select: { code: true } },
-      plo: { select: { code: true } },
+      plo: { select: { code: true, program_id: true } },
       weight: true,
     },
   });
 
-  // 3) รวม CLO highestPossible → PLO highestPossible
+  // สร้าง type สำหรับ CloPloMapping ที่ query ออกมา
+  type CloPloMappingResult = {
+    clo: { code: string };
+    plo: { code: string; program_id: number };
+    weight: number | null;
+  };
+
+  // 6) รวม CLO highestPossible → PLO highestPossible แยกตาม programId
   const highestPloMap: Record<string, number> = {};
-  cloPloMappings.forEach(
-    (mapping: {
-      clo: { code: string };
-      plo: { code: string };
-      weight: number | null;
-    }) => {
-      const cloCode = mapping.clo.code;
-      const ploCode = mapping.plo.code;
-      const cloHighest =
-        cloStats.find((c) => c.cloCode === cloCode)?.highestPossible ?? 0;
+  cloPloMappings.forEach((mapping: CloPloMappingResult) => {
+    const cloCode = mapping.clo.code;
+    const ploCode = mapping.plo.code;
+    const programId = mapping.plo.program_id;
+    const cloHighest =
+      cloStats.find((c) => c.cloCode === cloCode)?.highestPossible ?? 0;
 
-      const contribution = cloHighest * (Number(mapping.weight) / 100);
+    const contribution = cloHighest * (Number(mapping.weight) / 100);
+    const key = `${programId}_${ploCode}`;
+    highestPloMap[key] = (highestPloMap[key] ?? 0) + contribution;
+  });
 
-      highestPloMap[ploCode] = (highestPloMap[ploCode] ?? 0) + contribution;
-    },
-  );
-
-  // 4) merge เข้าไปใน ploStats
+  // 7) merge highestPossible เข้าไปใน stats
   const ploStatsWithHighest = ploStats.map((stat) => ({
+    programId: stat.programId,
     ploCode: stat.ploCode,
-    // 🟢 บังคับทศนิยม 2 ตำแหน่ง และแปลงกลับเป็น Number
     min: Number(stat.min.toFixed(2)),
     max: Number(stat.max.toFixed(2)),
     mean: Number(stat.mean.toFixed(2)),
     median: Number(stat.median.toFixed(2)),
-    highestPossible: Number((highestPloMap[stat.ploCode] ?? 0).toFixed(2)),
+    highestPossible: Number(
+      (highestPloMap[`${stat.programId}_${stat.ploCode}`] ?? 0).toFixed(2)
+    ),
   }));
 
-  // 🟢 เพิ่มส่วนนี้: จัดเรียง ploStats ตามชื่อ ploCode (Alpha-numeric sort)
-  ploStatsWithHighest.sort((a, b) =>
-    a.ploCode.localeCompare(b.ploCode, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    }),
-  );
+  // 8) จัดกลุ่มตาม programId → ploCode
+  const groupedByProgram: Record<number, any> = {};
+  ploStatsWithHighest.forEach((stat) => {
+    if (!groupedByProgram[stat.programId]) {
+      groupedByProgram[stat.programId] = {
+        programId: stat.programId,
+        plos: {},
+      };
+    }
+    groupedByProgram[stat.programId].plos[stat.ploCode] = {
+      min: stat.min,
+      max: stat.max,
+      mean: stat.mean,
+      median: stat.median,
+      highestPossible: stat.highestPossible,
+    };
+  });
 
-  return { ploStats: ploStatsWithHighest };
+  return { ploStats: Object.values(groupedByProgram) };
 }
+
 
 /////////////////////////////////////////////////////////////////////////
 // แปลง ploStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
 /////////////////////////////////////////////////////////////////////////
 
-export async function getPloStatsPercentagePerCourse(tx: any, CsemesterId: number) {
-  const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId);
+export async function getPloStatsPercentagePerCourse(
+  tx: any,
+  CsemesterId: number,
+  courseId: number
+) {
+  const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId, courseId);
+
+  // กำหนด type ของ stat ที่อยู่ใน plos
+  type PloStat = {
+    min: number;
+    max: number;
+    mean: number;
+    median: number;
+    highestPossible: number;
+  };
+
+  // ploStats เป็น array ของ { programId, plos: { [ploCode]: {...} } }
+  const ploStatsPercentage = ploStats.map((programStat) => {
+    const plosPercentage: Record<string, any> = {};
+
+    Object.entries(programStat.plos).forEach(([ploCode, stat]) => {
+      const s = stat as PloStat; // ✅ cast type ให้ชัดเจน
+      const highest = s.highestPossible || 1; // กัน division by zero
+      const toPercent = (value: number) => (value / highest) * 100;
+
+      plosPercentage[ploCode] = {
+        min: Number(toPercent(s.min).toFixed(2)),
+        max: Number(toPercent(s.max).toFixed(2)),
+        mean: Number(toPercent(s.mean).toFixed(2)),
+        median: Number(toPercent(s.median).toFixed(2)),
+        highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
+      };
+    });
+
+    return {
+      programId: programStat.programId,
+      plos: plosPercentage,
+    };
+  });
+
+  return { ploStatsPercentage };
+}
+
+/*
+export async function getPloStatsPercentagePerCourse(tx: any, CsemesterId: number, courseId: number) {
+  const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId, courseId);
 
   const ploStatsPercentage = ploStats.map((stat) => {
     const highest = stat.highestPossible || 1; // กัน division by zero
@@ -1677,10 +1823,12 @@ export async function getPloStatsPercentagePerCourse(tx: any, CsemesterId: numbe
 
   return { ploStatsPercentage };
 }
+*/
 
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 program
 /////////////////////////////////////////////////////////////
+/*
 export async function getPloStatsPerProgram(tx: any, programId: number) {
   const students = await tx.student.findMany({
     select: { id: true },
@@ -1713,6 +1861,7 @@ export async function getPloStatsPerProgram(tx: any, programId: number) {
 
   return { ploStats };
 }
+*/
 
 //-------------------------------------------------------------------------
 // Best/Worst Helpers (These remain mostly logic-only, assuming data is fetched correctly)
@@ -1777,6 +1926,7 @@ export async function getCloBestWorstPerCoursePercentage(
   return { minClo, maxClo, meanClo };
 }
 
+/*
 export async function getPloBestWorstPerStudentPerCourse(
   tx: any,
   studentId: number,
@@ -1800,7 +1950,8 @@ export async function getPloBestWorstPerStudentPerCourse(
 
   return { minClo, maxClo, meanClo };
 }
-
+*/
+/*
 export async function getPloBestWorstPerCourse(tx: any, courseId: number) {
   const resultPloStudent = await getPloScorePerCourse(tx, courseId);
   if (resultPloStudent.ploScores.length === 0) return {};
@@ -1832,3 +1983,4 @@ export async function getPloBestWorstPerProgram(tx: any, programId: number) {
 
   return { minClo, maxClo, meanClo };
 }
+*/

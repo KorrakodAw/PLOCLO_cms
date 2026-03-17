@@ -82,7 +82,7 @@ model Course {
   // Relations
   semesters  CourseSemester[]
   instructors CourseInstructor[]
- 
+  clos       Clo[]
 
   @@map("course")
 }
@@ -98,7 +98,7 @@ model CourseSemester {
   // 🟢 สิ่งที่แชร์ร่วมกันในทุก Section ของเทอมนี้
   assignments      Assignment[]
   categoryWeights   AssignmentCategoryWeight[]
-  clos             Clo[]
+  //clos             Clo[]
   
   // เชื่อมไปยังกลุ่มเรียนต่างๆ (Section 1, 2, 3...)
   sections          CourseSection[]
@@ -171,9 +171,11 @@ model Clo {
   code      String @db.VarChar(20)
   name      String @db.VarChar(255)
   name_th   String @db.VarChar(255)
-  course_semester_id Int
-
-  course_semester CourseSemester @relation(fields: [course_semester_id], references: [id], onDelete: Cascade)
+  course_id  Int
+  //course_semester_id Int
+  
+  course Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  //course_semester CourseSemester @relation(fields: [course_semester_id], references: [id], onDelete: Cascade)
 
   clo_plo_mappings        CloPloMapping[]
   assignment_clo_mappings AssignmentCloMapping[]

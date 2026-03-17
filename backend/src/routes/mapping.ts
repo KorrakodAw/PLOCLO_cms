@@ -94,17 +94,17 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
 
         const clo = await tx.clo.findUnique({
           where: { id: cloId },
-          select: { course_semester_id: true },
+          select: { course_id: true },
         });
 
         if (!assignment || !clo) throw new Error("ASSIGNMENT_OR_CLO_NOT_FOUND");
 
-        /*
+        
         // 2. Validation: ต้องเป็นวิชาเดียวกัน (แม้จะคนละเทอมแต่ CLO ต้องตรงกับวิชา)
-        if (assignment.semester.course_semester_id !== clo.course_semester_id) {
+        if (assignment.semester.course_id !== clo.course_id) {
           throw new Error("COURSE_MISMATCH");
         }
-        */
+        
 
         // 3. Save Logic
         if (weight > 0 && weight <= 100) {
