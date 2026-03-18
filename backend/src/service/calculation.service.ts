@@ -209,7 +209,7 @@ export async function getCloScorePerCourse(tx: any, CsemesterId: number) {
           cloCode,
           cloScore: Number(cloScore.toFixed(4)),
           maxCloScore: Number(maxCloScore.toFixed(4)),
-          percentage: Number(percentage.toFixed(2)),
+          percentage: Number(percentage.toFixed(4)),
         };
       },
     );
@@ -1411,7 +1411,7 @@ export async function getPloPercentageAllStudentPerCourse(
 
         ploPercentages.push({
           ploCode: plo.ploCode,
-          percentage: Number(percentage.toFixed(2)),
+          percentage: Number(percentage.toFixed(4)),
         });
       });
 
@@ -1748,7 +1748,7 @@ export async function getPloScoreAllStudentPerSemesterPercentage(
       
       return {
         ploCode: item.ploCode,
-        ploScore: Number(((item.ploScore / denominator) * 100).toFixed(2)),
+        ploScore: Number(((item.ploScore / denominator) * 100).toFixed(4)),
         highestPossible: 100 // แสดงเป็น 100%
       };
     });
@@ -1817,6 +1817,118 @@ export async function getPloScoreAllStudentPerSemester(
   results.sort((a, b) => a.student_id - b.student_id);
   return results;
 }*/
+
+//////////////////////////////////////////////////////////////////////////////////
+/**
+ * คำนวณ PLO ของนักเรียนแต่ละคนใน 1 ปีการศึกษา (รวมทุก Semester ในปีนั้น)
+ * @param tx - Prisma Transaction Client
+ * @param programId - ID ของหลักสูตร
+ * @param year - ปีการศึกษา (เช่น 2024)
+ */
+////////////////////////////////////////////////////////////////////////////////////
+export async function getPloScoreAllStudentPerYear(
+  tx: any,
+  programId: number,
+  year: number
+) {
+  // 1. ดึงข้อมูล Semester ทั้งหมดที่มีในปีการศึกษานี้ (เช่น เทอม 1, 2, 3)
+  const semestersInYear = await tx.courseSemester.findMany({
+    where: { year },
+    distinct: ["semester"],
+    select: { semester: true },
+  });
+
+  if (semestersInYear.length === 0) return [];
+
+  // 2. ดึงข้อมูลคะแนนของนักเรียนทุกคนในแต่ละ Semester มาเก็บไว้
+  // โครงสร้าง: allSemesterResults = [[student1_sem1, student2_sem1], [student1_sem2, ...]]
+  const allSemesterResults = await Promise.all(
+    semestersInYear.map((s: any) =>
+      getPloScoreAllStudentPerSemester(tx, programId, year, s.semester)
+    )
+  );
+
+  // 3. ยุบรวมข้อมูล (Flatten) และจัดกลุ่มตาม student_id
+  const studentYearlyMap: Record<number, Record<string, number[]>> = {};
+
+  allSemesterResults.flat().forEach((studentResult) => {
+    const sId = studentResult.student_id;
+    if (!studentYearlyMap[sId]) {
+      studentYearlyMap[sId] = {};
+    }
+
+    studentResult.ploScores.forEach((plo: any) => {
+      if (!studentYearlyMap[sId][plo.ploCode]) {
+        studentYearlyMap[sId][plo.ploCode] = [];
+      }
+      // เก็บคะแนนที่คูณ Credits มาแล้ว (จากผลลัพธ์ของ getPloScoreAllStudentPerSemester)
+      studentYearlyMap[sId][plo.ploCode].push(plo.ploScore);
+    });
+  });
+
+  // 4. คำนวณผลรวมคะแนน PLO ตลอดทั้งปีของนักเรียนแต่ละคน
+  const results = Object.entries(studentYearlyMap).map(([studentId, plos]) => {
+    const finalPloScores = Object.entries(plos).map(([ploCode, scores]) => ({
+      ploCode,
+      // รวมคะแนนจากทุกเทอมเข้าด้วยกัน
+      ploScore: Number(scores.reduce((a, b) => a + b, 0).toFixed(4)),
+    }));
+
+    return {
+      student_id: Number(studentId),
+      programId,
+      year,
+      ploScores: finalPloScores,
+    };
+  });
+
+  // เรียงลำดับตามรหัสนักเรียน
+  return results.sort((a, b) => a.student_id - b.student_id);
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+// getPloScoreAllStudentPerYear แบบที่แปลงคะแนนเป็น percentage เทียบกับ highestPossible ของแต่ละ PLO ในปีการศึกษานั้น
+/////////////////////////////////////////////////////////////////////////////////
+export async function getPloScoreAllStudentPerYearPercentage(
+  tx: any,
+  programId: number,
+  year: number
+) {
+  // 1. ดึงคะแนนดิบรายปี
+  const yearlyRaw = await getPloScoreAllStudentPerYear(tx, programId, year);
+
+  // 2. คำนวณ Highest Possible รวมทั้งปี (ต้องรวมทุกเทอม)
+  const semestersInYear = await tx.courseSemester.findMany({
+    where: { year },
+    select: { semester: true },
+    distinct: ["semester"]
+  });
+
+  const yearlyPloHighest: Record<string, number> = {};
+
+  // วนลูปหาค่าสูงสุดของแต่ละเทอมแล้วนำมาบวกกัน
+  for (const s of semestersInYear) {
+    const stats = await getPloStatsPerSemester(tx, programId, year, s.semester);
+    const plos = stats.ploSemesterStats[0]?.plos || {};
+    
+    Object.entries(plos).forEach(([code, detail]: [string, any]) => {
+      yearlyPloHighest[code] = (yearlyPloHighest[code] ?? 0) + detail.highestPossible;
+    });
+  }
+
+  // 3. แปลงเป็น Percentage
+  return yearlyRaw.map(student => ({
+    ...student,
+    ploScores: student.ploScores.map(p => {
+      const highest = yearlyPloHighest[p.ploCode] || 1;
+      return {
+        ploCode: p.ploCode,
+        ploScore: Number(((p.ploScore / highest) * 100).toFixed(2)),
+        highestPossible: 100
+      };
+    })
+  }));
+}
 
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
@@ -1922,7 +2034,7 @@ export async function getPloStatsPerCourse(
     mean: Number(stat.mean.toFixed(2)),
     median: Number(stat.median.toFixed(2)),
     highestPossible: Number(
-      (highestPloMap[`${stat.programId}_${stat.ploCode}`] ?? 0).toFixed(2)
+      (highestPloMap[`${stat.programId}_${stat.ploCode}`] ?? 0).toFixed(4)
     ),
   }));
 
@@ -1949,7 +2061,7 @@ export async function getPloStatsPerCourse(
 
 
 /////////////////////////////////////////////////////////////////////////
-// แปลง ploStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
+// แปลง getPloStatsPercentagePerCourse ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
 /////////////////////////////////////////////////////////////////////////
 
 export async function getPloStatsPercentagePerCourse(
@@ -1978,10 +2090,10 @@ export async function getPloStatsPercentagePerCourse(
       const toPercent = (value: number) => (value / highest) * 100;
 
       plosPercentage[ploCode] = {
-        min: Number(toPercent(s.min).toFixed(2)),
-        max: Number(toPercent(s.max).toFixed(2)),
-        mean: Number(toPercent(s.mean).toFixed(2)),
-        median: Number(toPercent(s.median).toFixed(2)),
+        min: Number(toPercent(s.min).toFixed(4)),
+        max: Number(toPercent(s.max).toFixed(4)),
+        mean: Number(toPercent(s.mean).toFixed(4)),
+        median: Number(toPercent(s.median).toFixed(4)),
         highestPossible: 100, // กำหนดให้เป็น 100% เสมอ
       };
     });
@@ -2094,11 +2206,11 @@ export async function getPloStatsPerSemester(
 
     // ใส่ข้อมูลลงใน Object โดยใช้ ploCode เป็น Key
     plosObj[ploCode] = {
-      min: Number(sorted[0].toFixed(2)),
-      max: Number(sorted[count - 1].toFixed(2)),
-      mean: Number((sum / count).toFixed(2)),
-      median: Number(median.toFixed(2)),
-      highestPossible: Number((highestPloMap[ploCode] ?? 0).toFixed(2)),
+      min: Number(sorted[0].toFixed(4)),
+      max: Number(sorted[count - 1].toFixed(4)),
+      mean: Number((sum / count).toFixed(4)),
+      median: Number(median.toFixed(4)),
+      highestPossible: Number((highestPloMap[ploCode] ?? 0).toFixed(4)),
     };
   });
 
@@ -2157,10 +2269,10 @@ export async function getPloStatsPerSemesterPercentage(
       const denominator = highestPossible > 0 ? highestPossible : 1;
 
       percentagePlos[ploCode] = {
-        min: Number(((min / denominator) * 100).toFixed(2)),
-        max: Number(((max / denominator) * 100).toFixed(2)),
-        mean: Number(((mean / denominator) * 100).toFixed(2)),
-        median: Number(((median / denominator) * 100).toFixed(2)),
+        min: Number(((min / denominator) * 100).toFixed(4)),
+        max: Number(((max / denominator) * 100).toFixed(4)),
+        mean: Number(((mean / denominator) * 100).toFixed(4)),
+        median: Number(((median / denominator) * 100).toFixed(4)),
         highestPossible: 100
       };
     });
@@ -2173,6 +2285,136 @@ export async function getPloStatsPerSemesterPercentage(
 
   return {
     ploSemesterStatsPercentage: result
+  };
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+/**
+ * คำนวณสรุปสถิติ PLO ประจำปีการศึกษา (Min, Max, Mean, Median, HighestPossible)
+ * โดยรวมผลลัพธ์จากทุก Semester ในปีนั้น
+ */
+/////////////////////////////////////////////////////////////////////////////////////
+export async function getPloStatsPerYear(
+  tx: any,
+  programId: number,
+  year: number
+) {
+  // 1. ดึงคะแนนรายบุคคลแบบสะสมทั้งปี (Sum of ploScore * credits จากทุกเทอม)
+  const studentYearlyResults = await getPloScoreAllStudentPerYear(tx, programId, year);
+
+  if (!studentYearlyResults || studentYearlyResults.length === 0) {
+    return { ploYearlyStats: [] };
+  }
+
+  // 2. คำนวณหา Highest Possible รวมของทั้งปี (เทอม 1 + เทอม 2 + ...)
+  const semestersInYear = await tx.courseSemester.findMany({
+    where: { year },
+    select: { semester: true },
+    distinct: ["semester"],
+  });
+
+  const yearlyPloHighest: Record<string, number> = {};
+
+  for (const s of semestersInYear) {
+    // ดึงค่าสูงสุดของแต่ละเทอมจาก function ที่เราทำไว้ก่อนหน้า
+    const stats = await getPloStatsPerSemester(tx, programId, year, s.semester);
+    const plos = stats.ploSemesterStats[0]?.plos || {};
+
+    Object.entries(plos).forEach(([code, detail]: [string, any]) => {
+      yearlyPloHighest[code] = (yearlyPloHighest[code] ?? 0) + detail.highestPossible;
+    });
+  }
+
+  // 3. จัดกลุ่มคะแนนนักเรียนรายปีตาม ploCode เพื่อหาค่าสถิติ
+  const ploGroups: Record<string, number[]> = {};
+  studentYearlyResults.forEach((student) => {
+    student.ploScores.forEach((p) => {
+      if (!ploGroups[p.ploCode]) ploGroups[p.ploCode] = [];
+      ploGroups[p.ploCode].push(p.ploScore);
+    });
+  });
+
+  // 4. คำนวณค่าสถิติและจัด Format ผลลัพธ์
+  const plosObj: Record<string, any> = {};
+
+  Object.entries(ploGroups).forEach(([ploCode, scores]) => {
+    const sorted = [...scores].sort((a, b) => a - b);
+    const count = sorted.length;
+    const sum = sorted.reduce((a, b) => a + b, 0);
+
+    // Median Logic
+    const mid = Math.floor(count / 2);
+    const median = count % 2 !== 0 
+      ? sorted[mid] 
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+
+    plosObj[ploCode] = {
+      min: Number(sorted[0].toFixed(4)),
+      max: Number(sorted[count - 1].toFixed(4)),
+      mean: Number((sum / count).toFixed(4)),
+      median: Number(median.toFixed(4)),
+      highestPossible: Number((yearlyPloHighest[ploCode] ?? 0).toFixed(4)),
+    };
+  });
+
+  return {
+    ploYearlyStats: [
+      {
+        programId,
+        year,
+        plos: plosObj,
+      },
+    ],
+  };
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+/**
+ * แปลงค่าสถิติ PLO รายปี (Yearly) ให้เป็นรูปแบบเปอร์เซ็นต์ (0-100%)
+ * โดยคำนวณจากผลลัพธ์ของ getPloYearlySummaryFormatted
+ */
+/////////////////////////////////////////////////////////////////////////////////////
+export async function getPloStatsPerYearPercentage(
+  tx: any,
+  programId: number,
+  year: number
+) {
+  // 1. เรียกใช้ function สรุปสถิติรายปีแบบ Raw Score
+  const rawData = await getPloStatsPerYear(tx, programId, year);
+
+  if (!rawData.ploYearlyStats || rawData.ploYearlyStats.length === 0) {
+    return { ploYearlyStatsPercentage: [] };
+  }
+
+  // 2. แปลงค่าในแต่ละ Program และแต่ละ PLO ให้เป็นเปอร์เซ็นต์
+  const result = rawData.ploYearlyStats.map((yearStat: any) => {
+    const percentagePlos: Record<string, any> = {};
+
+    Object.entries(yearStat.plos).forEach(([ploCode, stats]: [string, any]) => {
+      const { min, max, mean, median, highestPossible } = stats;
+
+      // ป้องกัน Division by zero
+      const denominator = highestPossible > 0 ? highestPossible : 1;
+
+      percentagePlos[ploCode] = {
+        min: Number(((min / denominator) * 100).toFixed(4)),
+        max: Number(((max / denominator) * 100).toFixed(4)),
+        mean: Number(((mean / denominator) * 100).toFixed(4)),
+        median: Number(((median / denominator) * 100).toFixed(4)),
+        highestPossible: 100 // ฐานเปอร์เซ็นต์คือ 100
+      };
+    });
+
+    return {
+      programId: yearStat.programId,
+      year: yearStat.year,
+      plos: percentagePlos
+    };
+  });
+
+  // 3. ส่งกลับใน format ที่ระบุ (ploYearlyStatsPercentage)
+  return {
+    ploYearlyStatsPercentage: result
   };
 }
 

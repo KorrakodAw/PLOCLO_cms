@@ -28,10 +28,14 @@ import {
   //getPloProgramWhereScoreComeFrom,
   getPloScoreAllStudentPerSemester,
   getPloScoreAllStudentPerSemesterPercentage,
+  getPloScoreAllStudentPerYear,
+  getPloScoreAllStudentPerYearPercentage,
   getPloStatsPerCourse,
   getPloStatsPercentagePerCourse,
   getPloStatsPerSemester,
   getPloStatsPerSemesterPercentage,
+  getPloStatsPerYear,
+  getPloStatsPerYearPercentage,
   //getPloStatsPerProgram,
   getCloBestWorstPerStudentPerCourse,
   getCloBestWorstPerCourse,
@@ -457,6 +461,46 @@ router.get("/clo-plo/allStudentSemester/percentage", authenticateToken, async (r
 });
 
 /////////////////////////////////////////////////////////////////////////
+// คำนวณ plo ของ student ทุกคนใน 1 year (รวมทุก course ที่เรียนในปีการศึกษา)
+// GET http://localhost:9771/api/calculation/clo-plo/allStudentYear?programId=ไอดีหลักสูตร&year=ปีการศึกษา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/clo-plo/allStudentYear", authenticateToken, async (req, res) => {
+  const { programId, year } = req.query;
+  try {
+    const resultPloStudent = await prisma.$transaction(async (tx) => {
+      return await getPloScoreAllStudentPerYear(tx, Number(programId), Number(year) );
+    });
+
+    res.json(resultPloStudent);
+  } catch (err) {
+    console.error(err);
+    //res.status(500).json({ err });
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ plo ของ student ทุกคนใน 1 year (รวมทุก course ที่เรียนในปีการศึกษา) แบบ percentage เทียบกับ highestPossible ของแต่ละ PLO ในปีการศึกษานั้น
+// GET http://localhost:9771/api/calculation/clo-plo/allStudentYear/percentage?programId=ไอดีหลักสูตร&year=ปีการศึกษา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/clo-plo/allStudentYear/percentage", authenticateToken, async (req, res) => {
+  const { programId, year } = req.query;
+  try {
+    const resultPloStudent = await prisma.$transaction(async (tx) => {
+      return await getPloScoreAllStudentPerYearPercentage(tx, Number(programId), Number(year) );
+    });
+
+    res.json(resultPloStudent);
+  } catch (err) {
+    console.error(err);
+    //res.status(500).json({ err });
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 program
 // GET http://localhost:9771/api/calculation/clo-plo/program?programId=ไอดีหลักสูตร
 // Test result: Cancel
@@ -585,6 +629,44 @@ router.get("/clo-plo/semester/stats/percentage", authenticateToken, async (req, 
   try {
     const resultCloStudent = await prisma.$transaction(async (tx) => {
       return await getPloStatsPerSemesterPercentage(tx, Number(programId), Number(year), Number(semester));
+    });
+
+    res.json(resultCloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////
+// คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 year (รวมทุก course ที่เรียนในเทอมนั้น)
+// GET http://localhost:9771/api/calculation/clo-plo/year/stats?programId=ไอดีหลักสูตร&year=ปีการศึกษา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/year/stats", authenticateToken, async (req, res) => {
+  const { programId, year, semester  } = req.query;
+  try {
+    const resultCloStudent = await prisma.$transaction(async (tx) => {
+      return await getPloStatsPerYear(tx, Number(programId), Number(year));
+    });
+
+    res.json(resultCloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////
+// คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 year (รวมทุก course ที่เรียนในเทอมนั้น) แบบ percentage โดยที่ highestPossible = 100%
+// GET http://localhost:9771/api/calculation/clo-plo/year/stats/percentage?programId=ไอดีหลักสูตร&year=ปีการศึกษา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/year/stats/percentage", authenticateToken, async (req, res) => {
+  const { programId, year, semester  } = req.query;
+  try {
+    const resultCloStudent = await prisma.$transaction(async (tx) => {
+      return await getPloStatsPerYearPercentage(tx, Number(programId), Number(year));
     });
 
     res.json(resultCloStudent);
