@@ -2695,7 +2695,7 @@ export async function getStudentPloDetailedCumulative(
   tx: any,
   studentId: number
 ) {
-  // 1. ดึงข้อมูลพื้นฐาน
+  // 1. เตรียมข้อมูลพื้นฐาน
   const student = await tx.student.findUnique({
     where: { id: studentId },
     select: { program_id: true }
@@ -2716,13 +2716,13 @@ export async function getStudentPloDetailedCumulative(
     ).values()
   ).sort((a, b) => a.year !== b.year ? a.year - b.year : a.semester - b.semester);
 
-  // 2. รวบรวมข้อมูลดิบและค่าสูงสุดสะสมรายเทอม
   const tempPloData: Record<string, { 
     totalHighest: number, 
     totalRaw: number,
     terms: { year: number, semester: number, rawScore: number, termHighest: number }[] 
   }> = {};
 
+  // 2. สะสมข้อมูลรายเทอม (Raw Data)
   for (const sem of uniqueSemesters) {
     const { year, semester } = sem;
     const statsData = await getPloStatsPerSemester(tx, student.program_id, year, semester);
@@ -2743,28 +2743,33 @@ export async function getStudentPloDetailedCumulative(
     });
   }
 
-  // 3. คำนวณหาคะแนนเต็มรวมของทุก PLO (totalHighestAll)
   const totalHighestAll = Object.values(tempPloData).reduce((sum, data) => sum + data.totalHighest, 0);
+  const grandTotal = totalHighestAll || 1;
 
-  // 4. จัด Format ผลลัพธ์ตามโครงสร้างที่ต้องการ
+  // 3. จัด Format และคำนวณแบบ Running Total ทั้งหมด
   const result = Object.entries(tempPloData).map(([ploCode, data]) => {
-    const currentPloTotalHighest = data.totalHighest || 1;
-    const allPloTotalHighest = totalHighestAll || 1;
+    
+    const totalHighestPercentage = Number(((data.totalHighest / grandTotal) * 100).toFixed(2));
+    const ploAchievementPercentage = Number(((data.totalRaw / grandTotal) * 100).toFixed(2));
 
-    // totalHighestPercentage: (คะแนนเต็ม PLO นี้ / คะแนนเต็มทุก PLO) * 100
-    const totalHighestPercentage = Number(((data.totalHighest / allPloTotalHighest) * 100).toFixed(2));
+    let runningRawScore = 0;
+    let runningHighestPossible = 0;
 
-    // ploAchievementPercentage: (คะแนนที่ได้จริง / คะแนนเต็ม PLO นี้) * 100
-    const ploAchievementPercentage = Number(((data.totalRaw / currentPloTotalHighest) * 100).toFixed(2));
-
-    const breakdown = data.terms.map(t => ({
-      year: t.year,
-      semester: t.semester,
-      rawScore: Number(t.rawScore.toFixed(2)),
-      termHighestPossible: Number(t.termHighest.toFixed(2)),
-      // contributionPercentage: (คะแนนเทอมนี้ / คะแนนเต็ม PLO นี้) * 100
-      contributionPercentage: Number(((t.rawScore / currentPloTotalHighest) * 100).toFixed(2))
-    }));
+    const breakdown = data.terms.map(t => {
+      runningRawScore += t.rawScore;
+      runningHighestPossible += t.termHighest;
+      
+      return {
+        year: t.year,
+        semester: t.semester, 
+        termHighestPossible: Number(runningHighestPossible.toFixed(2)),
+        // เพดานสะสม ณ เทอมนั้น เทียบกับ Grand Total (เพดานขยับขึ้น)
+        termHighestPossiblePercentage: Number(((runningHighestPossible / grandTotal) * 100).toFixed(2)),
+        rawScore: Number(runningRawScore.toFixed(2)),
+        // คะแนนที่เด็กทำได้สะสม ณ เทอมนั้น เทียบกับ Grand Total (คะแนนวิ่งตามเพดาน)
+        contributionPercentage: Number(((runningRawScore / grandTotal) * 100).toFixed(2))
+      };
+    });
 
     return {
       ploCode,
@@ -2783,6 +2788,99 @@ export async function getStudentPloDetailedCumulative(
   };
 }
 
+/*
+export async function getStudentPloDetailedCumulative(
+  tx: any,
+  studentId: number
+) {
+  // --- 1. เตรียมข้อมูลพื้นฐาน (เหมือนเดิม) ---
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true }
+  });
+  if (!student) throw new Error("Student not found");
+
+  const scores = await tx.studentScore.findMany({
+    where: { student_id: studentId },
+    select: { assignment: { select: { semester: { select: { year: true, semester: true } } } } }
+  });
+
+  const uniqueSemesters = Array.from(
+    new Map<string, SemesterInfo>(
+      scores.map((s: any) => [
+        `${s.assignment.semester.year}-${s.assignment.semester.semester}`, 
+        s.assignment.semester as SemesterInfo
+      ])
+    ).values()
+  ).sort((a, b) => a.year !== b.year ? a.year - b.year : a.semester - b.semester);
+
+  const tempPloData: Record<string, { 
+    totalHighest: number, 
+    totalRaw: number,
+    terms: { year: number, semester: number, rawScore: number, termHighest: number }[] 
+  }> = {};
+
+  // --- 2. สะสมข้อมูลรายเทอม ---
+  for (const sem of uniqueSemesters) {
+    const { year, semester } = sem;
+    const statsData = await getPloStatsPerSemester(tx, student.program_id, year, semester);
+    const semesterPlos = statsData.ploSemesterStats[0]?.plos || {};
+    const semesterData = await getPloScoreAllStudentPerSemester(tx, student.program_id, year, semester);
+    const studentRecord = semesterData.find((s: any) => s.student_id === studentId);
+
+    Object.entries(semesterPlos).forEach(([ploCode, detail]: [string, any]) => {
+      if (!tempPloData[ploCode]) {
+        tempPloData[ploCode] = { totalHighest: 0, totalRaw: 0, terms: [] };
+      }
+      const rawScore = studentRecord?.ploScores.find((p: any) => p.ploCode === ploCode)?.ploScore || 0;
+      const termHighest = detail.highestPossible || 0;
+
+      tempPloData[ploCode].totalHighest += termHighest;
+      tempPloData[ploCode].totalRaw += rawScore;
+      tempPloData[ploCode].terms.push({ year, semester, rawScore, termHighest });
+    });
+  }
+
+  // --- 3. คำนวณหา Grand Total Highest (100%) ---
+  const totalHighestAll = Object.values(tempPloData).reduce((sum, data) => sum + data.totalHighest, 0);
+  const grandTotal = totalHighestAll || 1; // ตัวหารหลักสำหรับทุกจุด
+
+  // --- 4. จัด Format ผลลัพธ์โดยใช้ Grand Total เป็นฐานเดียวกันทั้งหมด ---
+  const result = Object.entries(tempPloData).map(([ploCode, data]) => {
+    
+    // 1. เพดานของ PLO นี้ (เช่น 400 / 1000 = 40%)
+    const totalHighestPercentage = Number(((data.totalHighest / grandTotal) * 100).toFixed(2));
+
+    // 2. คะแนนที่เด็กทำได้จริงเทียบกับ Grand Total (เช่น 120 / 1000 = 12%)
+    // ค่านี้จะไม่มีทางเกิน totalHighestPercentage แน่นอน
+    const ploAchievementPercentage = Number(((data.totalRaw / grandTotal) * 100).toFixed(2));
+
+    const breakdown = data.terms.map(t => ({
+      year: t.year,
+      semester: t.semester,
+      rawScore: Number(t.rawScore.toFixed(2)),
+      termHighestPossible: Number(t.termHighest.toFixed(2)),
+      // 3. ส่วนแบ่งรายเทอมเทียบกับ Grand Total (เช่น 80 / 1000 = 8%)
+      contributionPercentage: Number(((t.rawScore / grandTotal) * 100).toFixed(2))
+    }));
+
+    return {
+      ploCode,
+      totalHighest: Number(data.totalHighest.toFixed(2)),
+      totalHighestPercentage,
+      ploAchievementRaw: Number(data.totalRaw.toFixed(2)),
+      ploAchievementPercentage,
+      breakdown
+    };
+  });
+
+  return {
+    studentId,
+    totalHighestAll: Number(totalHighestAll.toFixed(2)),
+    ploDetailedStats: result
+  };
+}
+*/
 /*
 export async function getStudentPloDetailedTranscript(
   tx: any,
