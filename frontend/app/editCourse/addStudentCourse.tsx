@@ -38,11 +38,9 @@ interface ExcelRow {
 }
 
 export default function AddStudentCourse({
-  programId,
   sectionId,
   semesterId,
 }: {
-  programId: string | number;
   sectionId: string;
   semesterId: string | number;
 }) {
@@ -62,36 +60,64 @@ export default function AddStudentCourse({
 
   const { showToast } = useGlobalToast();
   const { t } = useTranslation("common");
-  const { token } = useAuth();
+  const { token, isLoggedIn } = useAuth();
+
+  const fetchProgramId = async () => {
+    try {
+      const res = await apiClient.get(
+        `/programOnCourse?semester_id=${semesterId}`,
+      );
+      const ids = Array.isArray(res.data)
+        ? res.data.map((item: any) => item.program_id)
+        : [];
+
+      return ids; // 🟢 ส่งค่าออกไปให้ loadData ใช้ทันที
+    } catch {
+      showToast(t("Failed to load programs"), "error");
+      return [];
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const programRes = await apiClient.get(`/student?programId=${programId}`);
-      const sectionRes = await apiClient.get(
-        `/studentOnCourse?sectionId=${sectionId}`,
-      );
-      const courseRes = await apiClient.get(
-        `/studentOnCourse?semesterId=${semesterId}`,
-      );
+      // 🟢 ดึง ID ล่าสุดมาก่อน
+      const currentIds = await fetchProgramId();
 
-      setAllProgramStudents(programRes.data);
+      // ถ้าไม่มี ID เลย ไม่ต้องยิง API ต่อ
+      if (currentIds.length === 0) {
+        setAllProgramStudents([]);
+        return;
+      }
+
+      const programIdsParam = currentIds.join(",");
+
+      // 🟢 ยิง API พร้อมกันเพื่อความเร็ว (Parallel)
+      const [studentRes, sectionRes, courseRes] = await Promise.all([
+        apiClient.get(`/student?programId=${programIdsParam}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        apiClient.get(`/studentOnCourse?sectionId=${sectionId}`),
+        apiClient.get(`/studentOnCourse?semesterId=${semesterId}`),
+      ]);
+
+      setAllProgramStudents(studentRes.data);
       setEnrolledStudents(sectionRes.data);
       setStudentsInAnySection(courseRes.data);
-
-      // Clear selections on reload
       setSelectedEnrolledIds([]);
     } catch (err) {
       console.error("Failed to fetch data", err);
     } finally {
       setLoading(false);
     }
-  }, [programId, sectionId, semesterId]);
+    // 🟢 ลบ getProgramId ออกจากตรงนี้เพื่อหยุด Loop
+  }, [sectionId, semesterId, token, t]);
 
   useEffect(() => {
-    if (programId && sectionId && semesterId) loadData();
-  }, [programId, sectionId, semesterId, loadData]);
-
+    if (isLoggedIn && token && sectionId) {
+      loadData();
+    }
+  }, [isLoggedIn, token, sectionId]); // รันใหม่เมื่อเปลี่ยน Section เท่านั้น
   // Filter Logic
   const availableStudents = allProgramStudents
     .filter((student) => {

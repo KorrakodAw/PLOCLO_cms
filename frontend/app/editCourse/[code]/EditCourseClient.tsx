@@ -6,13 +6,13 @@ import {
   Calculator,
   UserPlus,
   Trash2,
-  Edit3,
   Copy,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useGlobalToast } from "@/app/context/ToastContext";
 import { useTranslation } from "react-i18next";
-import { Course, getCoursePaginate } from "@/utils/courseApi";
+import { Course, getCoursePaginateCode } from "@/utils/courseApi";
 import { apiClient } from "@/utils/apiClient";
 
 import LoadingOverlay from "@/components/LoadingOverlay";
@@ -35,16 +35,17 @@ import AssignmentCateWeight from "../assignmentCateWeight";
 
 interface formDataType {
   id: number;
-  course_id: number;
-  program_id: number;
-  semester_id: number;
+  program_id: number | string;
+  semester_id: number | string;
+  faculty_id: number | string;
   code: string;
   name: string;
   name_th: string;
-  year: number;
-  semester: number;
-  section: number;
+  year: number | string;
+  semester: number | string;
+  section: number | string;
   credits: number;
+  programs?: string[]; // รหัสโปรแกรมที่เปิดสอนในเทอมนี้ (ดึงจากความสัมพันธ์กับ semester)
 }
 
 export default function EditCourseClient({
@@ -77,21 +78,25 @@ export default function EditCourseClient({
     if (!token || !courseCode) return;
     setLoading(true);
     try {
-      const res = await getCoursePaginate(token, 1, 100, { courseCode });
+      const res = await getCoursePaginateCode(token, 1, 10, { courseCode });
       const matching = (res.data || []).filter(
         (c: Course) => String(c.code) === String(courseCode),
       );
 
       if (matching.length > 0) {
         setDuplicateCourses(matching);
-        const latest = [...matching].sort(
+
+        // เรียงลำดับเพื่อให้ตัวล่าสุด (ปี/เทอม ล่าสุด) แสดงขึ้นมาก่อน
+        const sorted = [...matching].sort(
           (a, b) =>
             Number(b.year) - Number(a.year) ||
             Number(b.semester) - Number(a.semester) ||
             Number(a.section) - Number(b.section),
-        )[0];
+        );
 
+        // ถ้ายังไม่มีการเลือก Section ให้เลือกตัวล่าสุดโดยอัตโนมัติ
         if (!selectedSectionId) {
+          const latest = sorted[0];
           setSelectedTerm(`${latest.year}-${latest.semester}`);
           setSelectedSectionId(String(latest.id));
         }
@@ -155,22 +160,39 @@ export default function EditCourseClient({
     if (!formData || !token) return;
     setLoading(true);
     try {
+      // หาหมายเลข Section ถัดไป
       const currentSections = sectionOptions.map((o) =>
         Number(o.label.split(" ")[1]),
       );
       const nextNum = Math.max(...currentSections, 0) + 1;
+
+      // ส่งข้อมูลเพื่อสร้าง Section ใหม่ภายใต้ Semester เดิม หรือสร้าง Semester ใหม่ถ้าจำเป็น
       const res = await apiClient.post(
         "/course",
-        { ...formData, section: nextNum },
+        {
+          code: formData.code,
+          name: formData.name,
+          name_th: formData.name_th,
+          faculty_id: formData.faculty_id,
+          year: formData.year,
+          semester: formData.semester,
+          section: nextNum,
+          credits: formData.credits,
+          // หากต้องการคัดลอก Program ที่ผูกอยู่ไปด้วย ให้ส่ง program_id ไปด้วย (ถ้า Backend รองรับ)
+        },
         { headers: { Authorization: `Bearer ${token}` } },
       );
+
       showToast(`${t("Duplicated to Section")} ${nextNum}`, "success");
-      const refresh = await getCoursePaginate(token, 1, 100, { courseCode });
-      setDuplicateCourses(
-        refresh.data.filter(
-          (c: Course) => String(c.code) === String(courseCode),
-        ),
+
+      // โหลดข้อมูลใหม่ทั้งหมด
+      const refresh = await getCoursePaginateCode(token, 1, 10, { courseCode });
+      const matching = (refresh.data || []).filter(
+        (c: Course) => String(c.code) === String(courseCode),
       );
+      setDuplicateCourses(matching);
+
+      // สลับไปยัง Section ที่เพิ่งสร้างใหม่
       setSelectedSectionId(String(res.data.data.id));
     } catch {
       showToast(t("Failed to duplicate"), "error");
@@ -228,7 +250,7 @@ export default function EditCourseClient({
           <div className="p-8 md:p-10 flex flex-col lg:flex-row justify-between items-start gap-8">
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">
-                Course ID: {formData.course_id}
+                Course ID: {formData.id}
               </div>
               <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
                 {lang === "en" ? formData.name : formData.name_th}
@@ -236,24 +258,49 @@ export default function EditCourseClient({
                   ({formData.code})
                 </span>
               </h1>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() =>
-                    router.push(
-                      `/editCourse/${courseCode}/instructors?courseId=${formData.course_id}`,
-                    )
-                  }
-                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-light text-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100 uppercase tracking-wider"
-                >
-                  <UserPlus size={16} strokeWidth={2.5} />{" "}
-                  {t("Manage Instructors")}
-                </button>
-                <button
-                  onClick={() => setShowEditPopup(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-light text-slate-500 bg-slate-50 hover:bg-slate-200 rounded-xl transition-all border border-slate-100 uppercase tracking-wider"
-                >
-                  <Edit3 size={16} strokeWidth={2.5} /> {t("Settings")}
-                </button>
+              <div className="flex flex-col gap-6 w-full">
+                {/* 1. Action Buttons Group */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/editCourse/${courseCode}/instructors?courseId=${formData?.id}`,
+                      )
+                    }
+                    className="group flex items-center gap-2 px-5 py-2.5 text-[11px] font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100 shadow-sm hover:shadow-blue-200 uppercase tracking-wider"
+                  >
+                    <UserPlus
+                      size={16}
+                      strokeWidth={2.5}
+                      className="group-hover:scale-110 transition-transform"
+                    />
+                    {t("Manage Instructors")}
+                  </button>
+
+                  <button
+                    onClick={() => setShowEditPopup(true)}
+                    className="group flex items-center gap-2 px-5 py-2.5 text-[11px] font-bold text-slate-500 bg-white hover:bg-slate-50 rounded-xl transition-all border border-slate-200 shadow-sm hover:border-slate-300 uppercase tracking-wider"
+                  >
+                    <Settings
+                      size={16}
+                      strokeWidth={2.5}
+                      className="group-hover:rotate-45 transition-transform"
+                    />
+                    {t("Settings")}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      router.push(
+                        `/editCourse/${courseCode}/link-program?semesterId=${formData.semester_id}&year=${formData.year}&semester=${formData.semester}&facultyId=${formData.faculty_id}`,
+                      );
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-dashed border-slate-200 text-slate-400 rounded-lg text-xs font-bold hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all"
+                  >
+                    <span className="text-lg leading-none">+</span>
+                    {t("Add Program")}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -293,6 +340,7 @@ export default function EditCourseClient({
               </div>
             </div>
           </div>
+
           <div className="px-10 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-end items-center gap-6">
             <button
               onClick={() => setShowDuplicatePopup(true)}
@@ -371,15 +419,15 @@ export default function EditCourseClient({
           <div className="p-8 md:p-12">
             {/* Master Course Data (ID ระดับวิชา) */}
             {activeTab === "clo" && (
-              <CLOManagement courseId={String(formData.course_id)} />
+              <CLOManagement courseId={String(formData.id)} />
             )}
             {activeTab === "grade-setting" && (
               <GradeSetting semesterId={String(formData.semester_id)} />
             )}
             {activeTab === "mapping" && (
               <CloPloMapping
-                masterCourseId={String(formData.course_id)}
-                programId={formData.program_id}
+                masterCourseId={String(formData.id)}
+                semesterId={String(formData.semester_id)}
               />
             )}
 
@@ -393,14 +441,13 @@ export default function EditCourseClient({
             {activeTab === "assignment-clo-mapping" && (
               <AssignmentCloMapping
                 semesterId={String(formData.semester_id)}
-                courseId={String(formData.course_id)}
+                courseId={String(formData.id)}
               />
             )}
 
             {/* Section Specific Data (ID ระดับกลุ่มเรียน) */}
             {activeTab === "student" && (
               <AddStudentCourse
-                programId={formData.program_id}
                 sectionId={String(formData.id)}
                 semesterId={String(formData.semester_id)}
               />
@@ -462,6 +509,8 @@ export default function EditCourseClient({
           onClose={() => setShowEditPopup(false)}
         />
       )}
+
+      {/* Link Program Modal */}
     </div>
   );
 }
