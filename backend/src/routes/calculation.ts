@@ -36,6 +36,8 @@ import {
   getPloStatsPerSemesterPercentage,
   getPloStatsPerYear,
   getPloStatsPerYearPercentage,
+  getStudentPloCumulative,
+  getStudentPloDetailedCumulative,
   //getPloStatsPerProgram,
   getCloBestWorstPerStudentPerCourse,
   getCloBestWorstPerCourse,
@@ -696,6 +698,46 @@ router.get("/clo-plo/program/stats", authenticateToken, async (req, res) => {
   }
 });
 */
+
+/*
+/////////////////////////////////////////////////////////////
+// ดึงผลการเรียน PLO สะสมทั้งหมดของนักเรียนรายบุคคล
+// GET http://localhost:9771/api/calculation/clo-plo/studentCumulative?studentId=ไอดีนักศึกษา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/studentCumulative", authenticateToken, async (req, res) => {
+  const { studentId} = req.query;
+  try {
+    const resultPloStudent = await prisma.$transaction(async (tx) => {
+      return await getStudentPloCumulative(tx, Number(studentId));
+    });
+
+    res.json(resultPloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ err });
+  }
+});
+*/
+
+/////////////////////////////////////////////////////////////
+// Cumulative PLO Transcript แบบละเอียด
+// GET http://localhost:9771/api/calculation/clo-plo/studentCumulative/all?studentId=ไอดีนักศึกษา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/studentCumulative/all", authenticateToken, async (req, res) => {
+  const { studentId} = req.query;
+  try {
+    const resultPloStudent = await prisma.$transaction(async (tx) => {
+      return await getStudentPloDetailedCumulative(tx, Number(studentId));
+    });
+
+    res.json(resultPloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ err });
+  }
+});
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // น่าจะไม่ได้ใช้

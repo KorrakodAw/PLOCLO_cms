@@ -2504,6 +2504,379 @@ export async function getPloStatsPerSemester(
 }
 */
 
+/////////////////////////////////////////////////////////////////////////////////////
+/**
+ * ดึงผลการเรียน PLO สะสมทั้งหมดของนักเรียนรายบุคคล (Cumulative PLO Transcript)
+ * @param tx - Prisma Transaction Client
+ * @param studentId - ID ของนักเรียน
+ */
+/////////////////////////////////////////////////////////////////////////////////////
+// 1. สร้าง Interface สำหรับข้อมูล Semester จาก Prisma
+interface SemesterInfo {
+  year: number;
+  semester: number;
+}
+
+// 2. สร้าง Interface สำหรับผลลัพธ์จากฟังก์ชันอื่น (ถ้ามี)
+interface PloScore {
+  ploCode: string;
+  ploScore: number;
+}
+
+export async function getStudentPloCumulative(
+  tx: any,
+  studentId: number
+) {
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true }
+  });
+
+  if (!student) throw new Error("Student not found");
+
+  const scores = await tx.studentScore.findMany({
+    where: { student_id: studentId },
+    select: {
+      assignment: {
+        select: { semester: { select: { year: true, semester: true } } }
+      }
+    }
+  });
+
+  const uniqueSemesters = Array.from(
+    new Map<string, SemesterInfo>(
+      scores.map((s: any) => [
+        `${s.assignment.semester.year}-${s.assignment.semester.semester}`, 
+        s.assignment.semester as SemesterInfo
+      ])
+    ).values()
+  );
+
+  const ploResults = [];
+  const cumulativeHighestMap: Record<string, number> = {}; // เก็บค่าเต็มสะสม
+  const cumulativeScoreMap: Record<string, number> = {};   // เก็บค่าคะแนนสะสม
+
+  for (const sem of uniqueSemesters) {
+    const { year, semester } = sem;
+    
+    // ดึงข้อมูลสรุปของเทอมนั้นเพื่อเอา highestPossible
+    const statsData = await getPloStatsPerSemester(tx, student.program_id, year, semester);
+    const semesterPlos = statsData.ploSemesterStats[0]?.plos || {};
+
+    // ดึงคะแนนรายบุคคล
+    const semesterData = await getPloScoreAllStudentPerSemester(tx, student.program_id, year, semester);
+    const studentRecord = semesterData.find((s: any) => s.student_id === studentId);
+
+    // บันทึกค่าสะสม
+    Object.entries(semesterPlos).forEach(([ploCode, detail]: [string, any]) => {
+      cumulativeHighestMap[ploCode] = (cumulativeHighestMap[ploCode] ?? 0) + detail.highestPossible;
+    });
+
+    if (studentRecord) {
+      studentRecord.ploScores.forEach((p: any) => {
+        cumulativeScoreMap[p.ploCode] = (cumulativeScoreMap[p.ploCode] ?? 0) + p.ploScore;
+      });
+
+      ploResults.push({
+        year,
+        semester,
+        plos: studentRecord.ploScores
+      });
+    }
+  }
+
+  return {
+    studentId,
+    programId: student.program_id,
+    cumulativePloScores: Object.keys(cumulativeHighestMap).map(ploCode => ({
+      ploCode,
+      ploScore: Number((cumulativeScoreMap[ploCode] ?? 0).toFixed(2)),
+      highestPossible: Number((cumulativeHighestMap[ploCode] ?? 0).toFixed(2))
+    })),
+    
+    semesterHistory: ploResults.sort((a, b) => 
+      a.year !== b.year ? a.year - b.year : a.semester - b.semester
+    )
+    
+  };
+}
+
+/*
+export async function getStudentPloCumulative(
+  tx: any,
+  studentId: number
+) {
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true }
+  });
+
+  if (!student) throw new Error("Student not found");
+
+  // ดึงข้อมูลคะแนนพร้อมระบุโครงสร้างให้ชัดเจน
+  const scores = await tx.studentScore.findMany({
+    where: { student_id: studentId },
+    select: {
+      assignment: {
+        select: {
+          semester: {
+            select: { year: true, semester: true }
+          }
+        }
+      }
+    }
+  });
+
+  // แก้ Error: Parameter 's' implicitly has an 'any' type
+  // และ Error: Property 'year' does not exist on type 'unknown'
+  const uniqueSemesters = Array.from(
+    new Map<string, SemesterInfo>(
+      scores.map((s: any) => [
+        `${s.assignment.semester.year}-${s.assignment.semester.semester}`, 
+        s.assignment.semester as SemesterInfo // Cast เป็น SemesterInfo
+      ])
+    ).values()
+  );
+
+  const ploResults = [];
+  
+  for (const sem of uniqueSemesters) {
+    // ตอนนี้ TypeScript จะรู้แล้วว่า sem มี year และ semester
+    const { year, semester } = sem;
+    
+    const semesterData = await getPloScoreAllStudentPerSemester(
+      tx, 
+      student.program_id, 
+      year, 
+      semester
+    );
+
+    // ระบุ type 's: any' เพื่อแก้ Error
+    const record = semesterData.find((s: any) => s.student_id === studentId);
+    
+    if (record) {
+      ploResults.push({
+        year,
+        semester,
+        plos: record.ploScores as PloScore[]
+      });
+    }
+  }
+
+  const cumulativeMap: Record<string, number> = {};
+  ploResults.forEach(sem => {
+    sem.plos.forEach((p: PloScore) => {
+      cumulativeMap[p.ploCode] = (cumulativeMap[p.ploCode] ?? 0) + p.ploScore;
+    });
+  });
+
+  return {
+    studentId,
+    programId: student.program_id,
+    cumulativePloScores: Object.entries(cumulativeMap).map(([ploCode, ploScore]) => ({
+      ploCode,
+      ploScore: Number(ploScore.toFixed(2))
+    })),
+    /*
+    semesterHistory: ploResults.sort((a, b) => 
+      a.year !== b.year ? a.year - b.year : a.semester - b.semester
+    )
+    */
+  //};
+//}
+//*/
+
+/////////////////////////////////////////////////////////////////////////////////////
+/**
+ * Cumulative PLO Transcript แบบละเอียด
+ */
+/////////////////////////////////////////////////////////////////////////////////////
+export async function getStudentPloDetailedCumulative(
+  tx: any,
+  studentId: number
+) {
+  // 1. ดึงข้อมูลพื้นฐาน
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true }
+  });
+  if (!student) throw new Error("Student not found");
+
+  const scores = await tx.studentScore.findMany({
+    where: { student_id: studentId },
+    select: { assignment: { select: { semester: { select: { year: true, semester: true } } } } }
+  });
+
+  const uniqueSemesters = Array.from(
+    new Map<string, SemesterInfo>(
+      scores.map((s: any) => [
+        `${s.assignment.semester.year}-${s.assignment.semester.semester}`, 
+        s.assignment.semester as SemesterInfo
+      ])
+    ).values()
+  ).sort((a, b) => a.year !== b.year ? a.year - b.year : a.semester - b.semester);
+
+  // 2. รวบรวมข้อมูลดิบและค่าสูงสุดสะสมรายเทอม
+  const tempPloData: Record<string, { 
+    totalHighest: number, 
+    totalRaw: number,
+    terms: { year: number, semester: number, rawScore: number, termHighest: number }[] 
+  }> = {};
+
+  for (const sem of uniqueSemesters) {
+    const { year, semester } = sem;
+    const statsData = await getPloStatsPerSemester(tx, student.program_id, year, semester);
+    const semesterPlos = statsData.ploSemesterStats[0]?.plos || {};
+    const semesterData = await getPloScoreAllStudentPerSemester(tx, student.program_id, year, semester);
+    const studentRecord = semesterData.find((s: any) => s.student_id === studentId);
+
+    Object.entries(semesterPlos).forEach(([ploCode, detail]: [string, any]) => {
+      if (!tempPloData[ploCode]) {
+        tempPloData[ploCode] = { totalHighest: 0, totalRaw: 0, terms: [] };
+      }
+      const rawScore = studentRecord?.ploScores.find((p: any) => p.ploCode === ploCode)?.ploScore || 0;
+      const termHighest = detail.highestPossible || 0;
+
+      tempPloData[ploCode].totalHighest += termHighest;
+      tempPloData[ploCode].totalRaw += rawScore;
+      tempPloData[ploCode].terms.push({ year, semester, rawScore, termHighest });
+    });
+  }
+
+  // 3. คำนวณหาคะแนนเต็มรวมของทุก PLO (totalHighestAll)
+  const totalHighestAll = Object.values(tempPloData).reduce((sum, data) => sum + data.totalHighest, 0);
+
+  // 4. จัด Format ผลลัพธ์ตามโครงสร้างที่ต้องการ
+  const result = Object.entries(tempPloData).map(([ploCode, data]) => {
+    const currentPloTotalHighest = data.totalHighest || 1;
+    const allPloTotalHighest = totalHighestAll || 1;
+
+    // totalHighestPercentage: (คะแนนเต็ม PLO นี้ / คะแนนเต็มทุก PLO) * 100
+    const totalHighestPercentage = Number(((data.totalHighest / allPloTotalHighest) * 100).toFixed(2));
+
+    // ploAchievementPercentage: (คะแนนที่ได้จริง / คะแนนเต็ม PLO นี้) * 100
+    const ploAchievementPercentage = Number(((data.totalRaw / currentPloTotalHighest) * 100).toFixed(2));
+
+    const breakdown = data.terms.map(t => ({
+      year: t.year,
+      semester: t.semester,
+      rawScore: Number(t.rawScore.toFixed(2)),
+      termHighestPossible: Number(t.termHighest.toFixed(2)),
+      // contributionPercentage: (คะแนนเทอมนี้ / คะแนนเต็ม PLO นี้) * 100
+      contributionPercentage: Number(((t.rawScore / currentPloTotalHighest) * 100).toFixed(2))
+    }));
+
+    return {
+      ploCode,
+      totalHighest: Number(data.totalHighest.toFixed(2)),
+      totalHighestPercentage,
+      ploAchievementRaw: Number(data.totalRaw.toFixed(2)),
+      ploAchievementPercentage,
+      breakdown
+    };
+  });
+
+  return {
+    studentId,
+    totalHighestAll: Number(totalHighestAll.toFixed(2)),
+    ploDetailedStats: result
+  };
+}
+
+/*
+export async function getStudentPloDetailedTranscript(
+  tx: any,
+  studentId: number
+) {
+  // 1. ดึงข้อมูลนักเรียนและโปรแกรม
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true }
+  });
+  if (!student) throw new Error("Student not found");
+
+  // 2. หาเทอมทั้งหมดที่มีคะแนน
+  const scores = await tx.studentScore.findMany({
+    where: { student_id: studentId },
+    select: { assignment: { select: { semester: { select: { year: true, semester: true } } } } }
+  });
+
+  const uniqueSemesters = Array.from(
+    new Map<string, SemesterInfo>(
+      scores.map((s: any) => [
+        `${s.assignment.semester.year}-${s.assignment.semester.semester}`, 
+        s.assignment.semester as SemesterInfo
+      ])
+    ).values()
+  ).sort((a, b) => a.year !== b.year ? a.year - b.year : a.semester - b.semester);
+
+  // 3. รวบรวมข้อมูลดิบรายเทอมก่อนเพื่อหา Total Highest
+  const tempPloData: Record<string, { 
+    totalHighest: number, 
+    totalRaw: number,
+    terms: { year: number, semester: number, rawScore: number, termHighest: number }[] 
+  }> = {};
+
+  for (const sem of uniqueSemesters) {
+    const { year, semester } = sem;
+    
+    // ดึงค่าสูงสุดของเทอม
+    const statsData = await getPloStatsPerSemester(tx, student.program_id, year, semester);
+    const semesterPlos = statsData.ploSemesterStats[0]?.plos || {};
+
+    // ดึงคะแนนนักเรียน
+    const semesterData = await getPloScoreAllStudentPerSemester(tx, student.program_id, year, semester);
+    const studentRecord = semesterData.find((s: any) => s.student_id === studentId);
+
+    Object.entries(semesterPlos).forEach(([ploCode, detail]: [string, any]) => {
+      if (!tempPloData[ploCode]) {
+        tempPloData[ploCode] = { totalHighest: 0, totalRaw: 0, terms: [] };
+      }
+
+      const rawScore = studentRecord?.ploScores.find((p: any) => p.ploCode === ploCode)?.ploScore || 0;
+      const termHighest = detail.highestPossible || 0;
+
+      tempPloData[ploCode].totalHighest += termHighest;
+      tempPloData[ploCode].totalRaw += rawScore;
+      tempPloData[ploCode].terms.push({ year, semester, rawScore, termHighest });
+    });
+  }
+
+  // 4. คำนวณ Percentage โดยใช้ Total Highest เป็นฐานเดียวกันหมด
+  const result = Object.entries(tempPloData).map(([ploCode, data]) => {
+    const totalPotential = data.totalHighest || 1; // กันหารด้วย 0
+
+    const breakdown = data.terms.map(t => ({
+      year: t.year,
+      semester: t.semester,
+      rawScore: Number(t.rawScore.toFixed(2)),
+      termHighestPossible: Number(t.termHighest.toFixed(2)),
+      // สูตร: (คะแนนเทอมนี้ / คะแนนเต็มรวมทุกเทอม) * 100
+      contributionPercentage: Number(((t.rawScore / totalPotential) * 100).toFixed(2))
+    }));
+
+    return {
+      ploCode,
+      cumulative: {
+        totalRaw: Number(data.totalRaw.toFixed(2)),
+        totalHighest: Number(data.totalHighest.toFixed(2)),
+        // ผลรวมของ contributionPercentage จะเท่ากับตัวนี้
+        totalPercentage: Number(((data.totalRaw / totalPotential) * 100).toFixed(2))
+      },
+      breakdown
+    };
+  });
+
+  return {
+    studentId,
+    programId: student.program_id,
+    ploDetailedStats: result
+  };
+}
+*/
+
+/*
+
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean ของ PLO แต่ละตัว ใน 1 program
 /////////////////////////////////////////////////////////////
