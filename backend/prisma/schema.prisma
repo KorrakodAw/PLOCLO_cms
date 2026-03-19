@@ -234,8 +234,6 @@ model AssignmentCloMapping {
 
 model AssignmentCategoryWeight {
   id Int @id @default(autoincrement())
-
-  // 🟢 เปลี่ยน: ผูกกับ Semester
   semester_id Int            @map("course_semester_id")
   semester    CourseSemester @relation(fields: [semester_id], references: [id], onDelete: Cascade)
 
@@ -311,7 +309,7 @@ model StudentOnSection {
 model ProgramOnCourse {
   program_id  Int    @map("program_id")
   semester_id Int    @map("course_semester_id")
-  type        String @db.VarChar(50) // เช่น "core", "elective", "general"
+  type        String @db.VarChar(50)
 
   program  Program        @relation(fields: [program_id], references: [id], onDelete: Cascade)
   semester CourseSemester @relation(fields: [semester_id], references: [id], onDelete: Cascade)
