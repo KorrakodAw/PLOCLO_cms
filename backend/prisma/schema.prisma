@@ -94,8 +94,6 @@ model CourseSemester {
   year      Int
 
   course Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
-
-  // 🟢 สิ่งที่แชร์ร่วมกันในทุก Section ของเทอมนี้
   assignments     Assignment[]
   categoryWeights AssignmentCategoryWeight[]
 

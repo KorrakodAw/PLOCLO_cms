@@ -2,13 +2,16 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// CLO
+//---------------------------------------------------------------------------------------------------------------
+
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ clo แต่ละตัว ของ student 1 คน ใน 1 course (ไม่ normalize)
 /////////////////////////////////////////////////////////////////////////
 export async function getCloScorePerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number,
+  CsemesterId: number,
 ) {
   const resultCloStudent = await prisma.$transaction(async (tx) => {
     // 1. Get Student Scores filtering by Assignment -> Course
@@ -16,14 +19,13 @@ export async function getCloScorePerStudentPerCourse(
       where: {
         student_id: Number(studentId),
         assignment: {
-          semester: {
-            course_id: Number(courseId),
-          },
+            semester_id: Number(CsemesterId),
         },
       },
       select: {
         student_id: true,
         score: true,
+        section_id: true, // ✅ ดึง section_id มาด้วย
         assignment_id: true,
         assignment: {
           select: {
@@ -56,6 +58,7 @@ export async function getCloScorePerStudentPerCourse(
             maxScore: row.assignment.maxScore,
             assignmentWeight: row.assignment.weight,
             weight: mapping.weight, // ✅ mappingWeight
+            sectionId: row.section_id, // ✅ เก็บ sectionId ตั้งแต่ตรงนี้
           });
         });
         return acc;
@@ -77,7 +80,10 @@ export async function getCloScorePerStudentPerCourse(
           cloTotal += realScore * weighted;
         });
 
-        return { cloCode, cloScore: cloTotal.toFixed(2) };
+        // ✅ ดึง sectionId จาก assignment ตัวแรกในกลุ่ม
+        const sectionId = assignments[0].sectionId;
+
+        return { cloCode, cloScore: cloTotal.toFixed(2), sectionId };
       },
     );
 
@@ -240,16 +246,14 @@ export async function getCloScorePerCourse(tx: any, courseId: number) {
 /////////////////////////////////////////////////////////////////////////
 export async function getCloScoreAllStudentPerCourse(
   tx: any,
-  courseId: number,
+  CsemesterId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1) ดึงคะแนนนักศึกษา + mapping CLO
     const studentClo = await tx.studentScore.findMany({
       where: {
         assignment: {
-          semester: {
-            course_id: Number(courseId),
-          },
+            semester_id: Number(CsemesterId),
         },
       },
       select: {
@@ -369,16 +373,16 @@ export async function getCloScoreAllStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 export async function getCloPercentageAllStudentPerCourse(
   tx: any,
-  courseId: number,
+  CsemesterId: number
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1) ดึง cloScore ของนักเรียนแต่ละคน
-    const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
+    const perStudent = await getCloScoreAllStudentPerCourse(tx, CsemesterId);
     const cloScoresPerStudent = perStudent.cloScoresPerStudent;
 
     // 2) ดึง highestPossible ของแต่ละ CLO
     const assignments = await tx.assignment.findMany({
-      where: { semester: { course_id: Number(courseId) } },
+      where: { semester: { id: Number(CsemesterId) } },
       select: {
         weight: true,
         assignment_clo_mappings: {
@@ -436,12 +440,12 @@ export async function getCloPercentageAllStudentPerCourse(
 // คำนวณ min, max, mean, median, highestPossible ของ clo แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////////////////
 
-export async function getCloStatsPerCourse(tx: any, courseId: number) {
+export async function getCloStatsPerCourse(tx: any, CsemesterId: number) {
   const result = await prisma.$transaction(async (tx) => {
     // -----------------------------
     // 1) คำนวณ min, max, mean จาก student scores (โค้ดเดิม)
     // -----------------------------
-    const perStudent = await getCloScoreAllStudentPerCourse(tx, courseId);
+    const perStudent = await getCloScoreAllStudentPerCourse(tx, CsemesterId);
     const cloScoresPerStudent = perStudent.cloScoresPerStudent;
 
     const cloGroups: Record<string, number[]> = {};
@@ -480,7 +484,7 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
     // 2) เพิ่มการหา highest clo possible จาก assignment weight
     // -----------------------------
     const assignments = await tx.assignment.findMany({
-      where: { semester: { course_id: Number(courseId) } },
+      where: { semester: { id: Number(CsemesterId) } },
       select: {
         weight: true,
         assignment_clo_mappings: {
@@ -556,11 +560,8 @@ export async function getCloStatsPerCourse(tx: any, courseId: number) {
 // แปลง cloStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
 /////////////////////////////////////////////////////////////////////////
 
-export async function getCloStatsPercentagePerCourse(
-  tx: any,
-  courseId: number,
-) {
-  const { cloStats } = await getCloStatsPerCourse(tx, courseId);
+export async function getCloStatsPercentagePerCourse(tx: any, semesterId: number) {
+  const { cloStats } = await getCloStatsPerCourse(tx, semesterId);
 
   const cloStatsPercentage = cloStats.map((stat) => {
     const highest = stat.highestPossible || 1; // กัน division by zero
@@ -583,17 +584,17 @@ export async function getCloStatsPercentagePerCourse(
 /////////////////////////////////////////////////////////////////////////
 // สรุปจำนวน student ต่อเกรด + ค่าเฉลี่ย CLO ต่อเกรด + ค่าเฉลี่ยรวม
 /////////////////////////////////////////////////////////////////////////
-export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
+export async function getCloGradeSummaryPerCourse(tx: any, CsemesterId: number) {
   const result = await prisma.$transaction(async (tx) => {
     // 1) ใช้ผลลัพธ์จากฟังก์ชัน clo เดิม
     const { cloScoresPerStudent } = await getCloScoreAllStudentPerCourse(
       tx,
-      courseId,
+      CsemesterId,
     );
 
     // 2) ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { semester_id: Number(courseId) },
+      where: { semester_id: Number(CsemesterId)  },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -654,11 +655,22 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
       summary.totalAverage = summary.totalAverage / summary.count;
     }
 
-    return gradeSummary;
+    // 5) เรียงผลลัพธ์ตามตัวอักษรของ grade
+    const gradeSummarySorted = Object.keys(gradeSummary)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, key) => {
+        acc[key] = gradeSummary[key];
+        return acc;
+      }, {} as typeof gradeSummary);
+
+    return gradeSummarySorted;
   });
 
   return result;
 }
+
+// realScore
+//--------------------------------------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ realScore ของ student 1 คน ใน 1 course แยกตาม category
@@ -666,7 +678,7 @@ export async function getCloGradeSummaryPerCourse(tx: any, courseId: number) {
 export async function getRealScorePerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number,
+  CsemesterId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. Get Student Scores filtering by Assignment -> Course
@@ -675,7 +687,7 @@ export async function getRealScorePerStudentPerCourse(
         student_id: Number(studentId),
         assignment: {
           semester: {
-            course_id: Number(courseId),
+            id: Number(CsemesterId),
           },
         },
       },
@@ -725,7 +737,7 @@ export async function getRealScorePerStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 export async function getRealScoreAllStudentPerCourse(
   tx: any,
-  courseId: number,
+  CsemesterId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. Get Student Scores filtering by Assignment -> Course
@@ -733,7 +745,7 @@ export async function getRealScoreAllStudentPerCourse(
       where: {
         assignment: {
           semester: {
-            course_id: Number(courseId),
+            id: Number(CsemesterId),
           },
         },
       },
@@ -799,16 +811,16 @@ export async function getRealScoreAllStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 export async function getRealScorePercentageAllStudentPerCourse(
   tx: any,
-  courseId: number,
+  CsemesterId: number
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1) ดึง realScore ของนักเรียนแต่ละคน
-    const perStudent = await getRealScoreAllStudentPerCourse(tx, courseId);
+    const perStudent = await getRealScoreAllStudentPerCourse(tx, CsemesterId);
     const realScoresPerStudent = perStudent.realScoresPerStudent;
 
     // 2) ดึง highestPossible ต่อ category
     const assignments = await tx.assignment.findMany({
-      where: { semester: { course_id: Number(courseId) } },
+      where: { semester: { id: Number(CsemesterId) } },
       select: {
         weight: true,
         category: true,
@@ -861,14 +873,14 @@ export async function getRealScorePercentageAllStudentPerCourse(
 export async function getTotalScoreAndGradePerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number,
+  CsemesterId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category
     const { categoryScores } = await getRealScorePerStudentPerCourse(
       tx,
       studentId,
-      courseId,
+      CsemesterId,
     );
 
     // 2. รวมคะแนนทุก category
@@ -876,7 +888,7 @@ export async function getTotalScoreAndGradePerStudentPerCourse(
 
     // 3. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { semester_id: Number(courseId) },
+      where: { semester_id: Number(CsemesterId) },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -900,18 +912,18 @@ export async function getTotalScoreAndGradePerStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 export async function getTotalScoreAndGradeAllStudentPerCourse(
   tx: any,
-  courseId: number,
+  CsemesterId: number,
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. ใช้ function เดิมเพื่อดึงคะแนนแยกตาม category ของนักเรียนทุกคน
     const { realScoresPerStudent } = await getRealScoreAllStudentPerCourse(
       tx,
-      courseId,
+      CsemesterId,
     );
 
     // 2. ดึง grade setting ของ course
     const gradeSettings = await tx.gradeSetting.findMany({
-      where: { semester_id: Number(courseId) },
+      where: { semester_id: Number(CsemesterId) },
       orderBy: { score: "desc" }, // เรียงจากคะแนนสูงไปต่ำ
     });
 
@@ -951,12 +963,12 @@ export async function getTotalScoreAndGradeAllStudentPerCourse(
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ min, max, mean, median, highestPossible ของแต่ละ category ใน 1 course
 /////////////////////////////////////////////////////////////////////////
-export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
+export async function getRealScoreStatsPerCourse(tx: any, CsemesterId: number) {
   const result = await prisma.$transaction(async (tx) => {
     // -----------------------------
     // 1) คำนวณ min, max, mean จาก student scores (ใช้ getRealScoreAllStudentPerCourse)
     // -----------------------------
-    const perStudent = await getRealScoreAllStudentPerCourse(tx, courseId);
+    const perStudent = await getRealScoreAllStudentPerCourse(tx, CsemesterId);
     const categoryScoresPerStudent = perStudent.realScoresPerStudent;
 
     const categoryGroups: Record<string, number[]> = {};
@@ -997,7 +1009,7 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
     // 2) หา highestPossible ต่อ category จาก assignment weight
     // -----------------------------
     const assignments = await tx.assignment.findMany({
-      where: { semester: { course_id: Number(courseId) } },
+      where: { semester: { id: Number(CsemesterId) } },
       select: {
         weight: true,
         category: true,
@@ -1030,11 +1042,8 @@ export async function getRealScoreStatsPerCourse(tx: any, courseId: number) {
 // แปลง realScoreStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
 /////////////////////////////////////////////////////////////////////////
 
-export async function getRealScoreStatsPercentagePerCourse(
-  tx: any,
-  courseId: number,
-) {
-  const { categoryStats } = await getRealScoreStatsPerCourse(tx, courseId);
+export async function getRealScoreStatsPercentagePerCourse(tx: any, CsemesterId: number) {
+  const { categoryStats } = await getRealScoreStatsPerCourse(tx, CsemesterId);
 
   const categoryStatsPercentage = categoryStats.map((stat) => {
     const highest = stat.highestPossible || 1; // กัน division by zero
@@ -1058,10 +1067,10 @@ export async function getRealScoreStatsPercentagePerCourse(
 // สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน category ต่อเกรด, ผลรวมของค่าเฉลี่ย
 // ตารางเหลืองใน TABEE
 /////////////////////////////////////////////////////////////////////////
-export async function getGradeSummaryPerCourse(tx: any, courseId: number) {
+export async function getGradeSummaryPerCourse(tx: any, CsemesterId: number) {
   const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(
     tx,
-    courseId,
+    CsemesterId,
   );
 
   const gradeSummary: Record<
@@ -1109,7 +1118,16 @@ export async function getGradeSummaryPerCourse(tx: any, courseId: number) {
     summary.totalAverage = summary.totalAverage / summary.count;
   }
 
-  return gradeSummary;
+  // 5) เรียงผลลัพธ์ตามตัวอักษรของ grade
+    const gradeSummarySorted = Object.keys(gradeSummary)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, key) => {
+        acc[key] = gradeSummary[key];
+        return acc;
+      }, {} as typeof gradeSummary);
+
+return gradeSummarySorted;
+
 }
 
 // PLO
@@ -1118,15 +1136,86 @@ export async function getGradeSummaryPerCourse(tx: any, courseId: number) {
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ของ student 1 คนใน 1 course
 /////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////
+// คำนวณ PLO ของ student 1 คน ใน 1 course (ไม่ normalize)
+/////////////////////////////////////////////////////////////////////////
+
+
 export async function getPloScorePerStudentPerCourse(
   tx: any,
   studentId: number,
-  courseId: number,
+  CsemesterId: number,
+) {
+  // 1. ดึง CLO scores ของ student ใน course_semester ที่เลือก
+  const cloResult = await getCloScorePerStudentPerCourse(
+    tx,
+    studentId,
+    CsemesterId,
+  );
+
+  // 2. ดึง section ที่ student อยู่ใน course_semester นี้
+  const studentSections = await tx.studentOnSection.findMany({
+    where: {
+      student_id: studentId,
+      section: { course_semester_id: Number(CsemesterId) },
+    },
+    select: { section_id: true },
+  });
+  const validSectionIds = studentSections.map((s: { section_id: number }) => s.section_id);
+
+  // 3. กรอง cloScores ให้เหลือเฉพาะ section ที่ student อยู่
+  const filteredCloScores = cloResult.cloScores.filter((c) =>
+    validSectionIds.includes(c.sectionId),
+  );
+
+  // 4. ดึง CLO → PLO mapping ของ course_semester นี้
+  type CloMapping = {
+    clo: { code: string };
+    plo: { code: string };
+    weight: number;
+  };
+
+  const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
+    where: { clo: { course_semester_id: Number(CsemesterId) } },
+    distinct: ["cloId", "ploId"], // กันแถวซ้ำตามคู่ clo-plo
+    select: {
+      clo: { select: { code: true } },
+      plo: { select: { code: true } },
+      weight: true,
+    },
+  });
+
+  // 5. คำนวณ PLO score โดยใช้ cloScores ที่กรองแล้ว
+  const ploGroups: Record<string, number> = {};
+  cloMappings.forEach((map: CloMapping) => {
+    const cloScoreArray = filteredCloScores.find(
+      (c) => String(c.cloCode) === String(map.clo.code),
+    );
+    if (!cloScoreArray) return;
+
+    const contribution = Number(cloScoreArray.cloScore) * (map.weight / 100);
+    ploGroups[map.plo.code] = (ploGroups[map.plo.code] ?? 0) + contribution;
+  });
+
+  const ploScores = Object.entries(ploGroups).map(([ploCode, ploScore]) => ({
+    ploCode,
+    ploScore,
+  }));
+
+  return { ploScores };
+}
+
+/*
+export async function getPloScorePerStudentPerCourse(
+  tx: any,
+  studentId: number,
+  CsemesterId: number,
 ) {
   const cloResult = await getCloScorePerStudentPerCourse(
     tx,
     studentId,
-    courseId,
+    CsemesterId,
   );
 
   type CloMapping = {
@@ -1136,13 +1225,39 @@ export async function getPloScorePerStudentPerCourse(
   };
 
   const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
-    where: { clo: { course_id: Number(courseId) } },
+    where: {
+      clo: {
+        course_semester_id: Number(CsemesterId),
+        course_semester: {
+          sections: {
+            some: {
+              students: {
+                some: { student_id: studentId }
+              }
+            }
+          }
+        }
+      }
+    },
+    distinct: ["cloId", "ploId"], // กันแถวซ้ำตามคู่ clo-plo
     select: {
       clo: { select: { code: true } },
       plo: { select: { code: true } },
       weight: true,
     },
   });
+
+  
+  const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
+    where: { clo: { course_semester_id: Number(CsemesterId) } },
+    distinct: ["cloId", "ploId"], // 🟢 กันแถวซ้ำตามคู่ clo-plo
+    select: {
+      clo: { select: { code: true } },
+      plo: { select: { code: true } },
+      weight: true,
+    },
+  });
+
 
   const ploGroups: Record<string, number> = {};
   cloMappings.forEach((map: CloMapping) => {
@@ -1162,12 +1277,13 @@ export async function getPloScorePerStudentPerCourse(
 
   return { ploScores };
 }
+*/
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 course
 /////////////////////////////////////////////////////////////////////////
-export async function getPloScorePerCourse(tx: any, courseId: number) {
-  const cloResult = await getCloScorePerCourse(tx, courseId);
+export async function getPloScorePerCourse(tx: any, CsemesterId: number) {
+  const cloResult = await getCloScorePerCourse(tx, CsemesterId);
 
   type CloMapping = {
     clo: { code: any };
@@ -1176,7 +1292,7 @@ export async function getPloScorePerCourse(tx: any, courseId: number) {
   };
 
   const cloMappings: CloMapping[] = await tx.cloPloMapping.findMany({
-    where: { clo: { course_id: Number(courseId) } },
+    where: { clo: { course: { semester_id: Number(CsemesterId) } } },
     select: {
       clo: { select: { code: true } },
       plo: { select: { code: true } },
@@ -1226,40 +1342,31 @@ export async function getPloScorePerCourse(tx: any, courseId: number) {
 /////////////////////////////////////////////////////////////////////////
 export async function getPloScoreAllStudentPerCourse(
   tx: any,
-  courseId: number,
+  CsemesterId: number,
 ) {
   // 1) ดึงรายชื่อนิสิตทั้งหมดที่ลงทะเบียนในวิชานี้ (กวาดจากทุก Semester)
   const students = await tx.studentScore.findMany({
     where: {
       assignment: {
-        semester: {
-          // 🟢 ปรับให้ตรงกับโครงสร้างจริงที่ Assignment ผูกกับ Semester
-          course_id: Number(courseId),
-        },
+        semesterId: Number(CsemesterId),
       },
     },
     distinct: ["student_id"],
     select: { student_id: true },
   });
 
-  if (students.length === 0) return [];
-
-  // 2) ใช้ Promise.all เพื่อรันฟังก์ชัน getPloScore ของทุกคนขนานกันไป (Parallel)
-  // วิธีนี้จะเร็วกว่าการใช้ for loop ที่ต้องรอทีละคน
-  const results = await Promise.all(
-    students.map(async (s: { student_id: number }) => {
-      const ploResult = await getPloScorePerStudentPerCourse(
-        tx,
-        s.student_id,
-        courseId,
-      );
-
-      return {
-        student_id: s.student_id,
-        ploScores: ploResult.ploScores,
-      };
-    }),
-  );
+  const results = [];
+  for (const s of students) {
+    const ploResult = await getPloScorePerStudentPerCourse(
+      tx,
+      s.student_id,
+      CsemesterId,
+    );
+    results.push({
+      student_id: s.student_id,
+      ploScores: ploResult.ploScores,
+    });
+  }
 
   return results;
 }
@@ -1288,18 +1395,18 @@ interface PloStat {
 
 export async function getPloPercentageAllStudentPerCourse(
   tx: any,
-  courseId: number,
+  CsemesterId: number
 ) {
-  // 🟢 ลบ prisma.$transaction ซ้อนออกถ้ามี tx ส่งมาแล้ว เพื่อป้องกัน deadlock
-  // 1) ดึงคะแนน PLO ของนักเรียนแต่ละคน (Cast type ให้ชัดเจน)
-  const perStudent = (await getPloScoreAllStudentPerCourse(
-    tx,
-    courseId,
-  )) as StudentPloScore[];
+  const result = await prisma.$transaction(async (tx) => {
+    // 1) ดึงคะแนน PLO ของนักเรียนแต่ละคน
+    const perStudent = await getPloScoreAllStudentPerCourse(tx, CsemesterId);
 
-  // 2) ดึงค่า highestPossible ของแต่ละ PLO
-  const { ploStats } = await getPloStatsPerCourse(tx, courseId);
-  const highestPloMap: Record<string, number> = {};
+    // 2) ดึงค่า highestPossible ของแต่ละ PLO
+    const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId);
+    const highestPloMap: Record<string, number> = {};
+    ploStats.forEach((stat) => {
+      highestPloMap[stat.ploCode] = stat.highestPossible;
+    });
 
   // ระบุ type ให้ stat เพื่อป้องกัน any
   ploStats.forEach((stat: PloStat) => {
@@ -1325,7 +1432,7 @@ export async function getPloPercentageAllStudentPerCourse(
   });
 
   return { ploPercentagePerStudent: results };
-}
+})}
 
 /////////////////////////////////////////////////////////////////////////
 // คำนวณ plo ใน 1 program
@@ -1374,14 +1481,14 @@ export async function getPloScorePerStudentFromAllCourse(
         some: { student_id: Number(studentId) },
       },
     },
-    distinct: ["course_id"], // ✅ ทำให้ course_id ไม่ซ้ำ
+    distinct: ['course_semester_id'],   // ✅ ทำให้ course_id ไม่ซ้ำ
     select: {
       course_id: true,
     },
   });
 
   // Explicitly type 'courseIds' as 'number[]'
-  const courseIds: number[] = Array.from(
+  const semesterIds: number[] = Array.from(
     new Set(
       courseRefs
         .map((ref: any) => ref.course_id) // ✅ ใช้ course_id ตรง ๆ
@@ -1391,11 +1498,11 @@ export async function getPloScorePerStudentFromAllCourse(
 
   const ploGroups: Record<string, number> = {};
 
-  for (const courseId of courseIds) {
+  for (const semesterId of semesterIds) {
     const { ploScores } = await getPloScorePerStudentPerCourse(
       tx,
       studentId,
-      courseId,
+      semesterId,
     );
 
     ploScores.forEach(({ ploCode, ploScore }) => {
@@ -1420,9 +1527,11 @@ export async function getPloProgramWhereScoreComeFrom(
   tx: any,
   programId: number,
 ) {
-  const courses = await tx.course.findMany({
-    where: { program_id: Number(programId) },
-    select: { id: true, code: true, name: true },
+  const coursesSemesters = await tx.courseSemester.findMany({
+    where: { course: { program_id: Number(programId) } },
+    select: { id: true, semester: true, year: true,
+     course: { select: { id: true, code: true, name: true, name_th: true, credits: true } },
+     },
   });
 
   const ploGroups: Record<
@@ -1430,15 +1539,18 @@ export async function getPloProgramWhereScoreComeFrom(
     {
       ploCode: string;
       contributions: {
-        courseId: number;
+        courseSemesterId: number;
+        year: number;
+        semester: number;
         courseCode: string;
         courseName: string;
+        courseNameTh: string;
         ploScore: number;
       }[];
     }
   > = {};
 
-  for (const course of courses) {
+  for (const course of coursesSemesters) {
     const { ploScores } = await getPloScorePerCourse(tx, course.id);
 
     ploScores.forEach(({ ploCode, ploScore }) => {
@@ -1446,9 +1558,12 @@ export async function getPloProgramWhereScoreComeFrom(
         ploGroups[ploCode] = { ploCode, contributions: [] };
       }
       ploGroups[ploCode].contributions.push({
-        courseId: course.id,
+        courseSemesterId: course.id,
+        year: course.year,
+        semester: course.semester,
         courseCode: course.code,
         courseName: course.name,
+        courseNameTh: course.name_th,
         ploScore,
       });
     });
@@ -1462,14 +1577,12 @@ export async function getPloProgramWhereScoreComeFrom(
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 course
 /////////////////////////////////////////////////////////////
-export async function getPloStatsPerCourse(tx: any, courseId: number) {
-  // 1) ดึงรายชื่อนิสิตทั้งหมด (ปรับเป็นเจาะผ่าน semester)
+export async function getPloStatsPerCourse(tx: any, CsemesterId: number) {
   const students = await tx.studentScore.findMany({
     where: {
       assignment: {
-        semester: {
-          // 🟢 เปลี่ยนจาก section เป็น semester ตามที่ตกลงกันไว้
-          course_id: Number(courseId),
+        section: {
+          course_id: Number(CsemesterId),
         },
       },
     },
@@ -1481,24 +1594,13 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
 
   const ploScoresByStudent: Record<string, number[]> = {};
 
-  // 2) 🟢 ใช้ Promise.all แทน for loop เพื่อความรวดเร็ว (Parallel Fetching)
-  const allStudentPloResults = await Promise.all(
-    students.map((s: { student_id: number }) =>
-      getPloScorePerStudentPerCourse(tx, s.student_id, courseId),
-    ),
-  );
-
-  // 3) นำผลลัพธ์ที่ได้มาจัดกลุ่ม (Grouping)
-  allStudentPloResults.forEach((result) => {
-    result.ploScores.forEach(
-      ({ ploCode, ploScore }: { ploCode: string; ploScore: number }) => {
-        if (!ploScoresByStudent[ploCode]) {
-          ploScoresByStudent[ploCode] = [];
-        }
-        ploScoresByStudent[ploCode].push(ploScore);
-      },
+  for (const s of students) {
+    const { ploScores } = await getPloScorePerStudentPerCourse(
+      tx,
+      s.student_id,
+      CsemesterId,
     );
-  });
+  };
 
   // 4) คำนวณสถิติ (Min, Max, Mean, Median)
   const ploStats = Object.entries(ploScoresByStudent).map(
@@ -1521,11 +1623,13 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
     },
   );
 
-  // 5) ดึงข้อมูล CLO Stats และ Mapping
-  const { cloStats } = await getCloStatsPerCourse(tx, courseId);
+  // 1) ดึง CLO highestPossible จาก function เดิม
+  const { cloStats } = await getCloStatsPerCourse(tx, CsemesterId);
+
+  // 2) ดึง CloPloMapping ของ course นี้
   const cloPloMappings = await tx.cloPloMapping.findMany({
     where: {
-      clo: { course_id: Number(courseId) },
+      clo: { course_id: Number(CsemesterId) },
     },
     select: {
       clo: { select: { code: true } },
@@ -1571,11 +1675,8 @@ export async function getPloStatsPerCourse(tx: any, courseId: number) {
 // แปลง ploStats ให้เป็นเปอร์เซ็นต์ โดยที่ highestPossible = 100%
 /////////////////////////////////////////////////////////////////////////
 
-export async function getPloStatsPercentagePerCourse(
-  tx: any,
-  courseId: number,
-) {
-  const { ploStats } = await getPloStatsPerCourse(tx, courseId);
+export async function getPloStatsPercentagePerCourse(tx: any, CsemesterId: number) {
+  const { ploStats } = await getPloStatsPerCourse(tx, CsemesterId);
 
   const ploStatsPercentage = ploStats.map((stat) => {
     const highest = stat.highestPossible || 1; // กัน division by zero

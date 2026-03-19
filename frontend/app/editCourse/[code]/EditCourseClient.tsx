@@ -35,6 +35,7 @@ import AssignmentCateWeight from "../assignmentCateWeight";
 
 interface formDataType {
   id: number;
+  course_id: number;
   program_id: number | string;
   semester_id: number | string;
   faculty_id: number | string;
@@ -221,6 +222,11 @@ export default function EditCourseClient({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    console.log(formData);
+    
+  })
 
   if (error)
     return (
@@ -419,14 +425,14 @@ export default function EditCourseClient({
           <div className="p-8 md:p-12">
             {/* Master Course Data (ID ระดับวิชา) */}
             {activeTab === "clo" && (
-              <CLOManagement courseId={String(formData.id)} />
+              <CLOManagement courseId={String(formData.course_id)} />
             )}
             {activeTab === "grade-setting" && (
               <GradeSetting semesterId={String(formData.semester_id)} />
             )}
             {activeTab === "mapping" && (
               <CloPloMapping
-                masterCourseId={String(formData.id)}
+                masterCourseId={String(formData.course_id)}
                 semesterId={String(formData.semester_id)}
               />
             )}
@@ -441,7 +447,7 @@ export default function EditCourseClient({
             {activeTab === "assignment-clo-mapping" && (
               <AssignmentCloMapping
                 semesterId={String(formData.semester_id)}
-                courseId={String(formData.id)}
+                courseId={String(formData.course_id)}
               />
             )}
 

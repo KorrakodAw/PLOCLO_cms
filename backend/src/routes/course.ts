@@ -118,7 +118,7 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
   }
 });
 
-// GET /paginate - กรองข้อมูลข้าม Program (ผ่าน Semester) และ Faculty
+// GET /paginate/SectionId
 router.get(
   "/paginate",
   authenticateToken,
@@ -188,6 +188,7 @@ router.get(
       res.json({
         data: sections.map((s) => ({
           id: s.id,
+          course_id: s.semester_config.course.id,
           code: s.semester_config.course.code,
           name: s.semester_config.course.name,
           name_th: s.semester_config.course.name_th,

@@ -3,6 +3,7 @@ import { apiClient } from "./apiClient";
 export interface Course {
   id: number;
   code: string;
+  course_id: number; // 🟢 เพิ่ม course_id เพื่อใช้ในการอ้างอิงข้อมูลในตาราง Section
   name: string;
   name_th: string;
   credits: number;
