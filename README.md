@@ -109,3 +109,18 @@ Start Docker:
 bash
 docker-compose up -d --build
 The backend will automatically push the Prisma schema to the database.
+
+
+```
+////// Fix Critical ///////
+-------------Fix frontend Next.js-----------------------------------------------------
+cd frontend
+npm install next@latest
+rmdir /s /q node_modules >>> ลบของเก่า
+npm install
+type node_modules\next\package.json | findstr "\"version\"" หรือ npx next --version ตรวจเวอร์ชัน
+
+---------- Fix untgz ------------
+อpath root
+npm install
+--------------------------------------------------------------------------------------
