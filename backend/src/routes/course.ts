@@ -247,7 +247,7 @@ router.get(
             program_code: targetProgramCode,
           },
           // คุณสามารถเพิ่ม type: "core" ตรงนี้ได้ถ้าต้องการกรองเฉพาะวิชาบังคับในหลักสูตร
-          // type: "core"
+          type: "core"
         };
 
         const [total, items] = await prisma.$transaction([
@@ -260,11 +260,7 @@ router.get(
             },
             skip,
             take: limit,
-            orderBy: [
-              { program: { program_year: "desc" } },
-              { semester: { year: "asc" } },
-              { semester: { semester: "asc" } },
-            ],
+            orderBy: [{ program: { program_year: "desc" } }],
           }),
         ]);
 
@@ -279,9 +275,6 @@ router.get(
             name: item.semester.course.name,
             name_th: item.semester.course.name_th,
             credits: item.semester.course.credits,
-            year: item.semester.year,
-            semester: item.semester.semester,
-            type: item.type, // คืนค่า type ตามจริงที่เก็บใน DB (core/elective/etc.)
           })),
           pagination: {
             total,
@@ -320,9 +313,6 @@ router.get(
           name: c.name,
           name_th: c.name_th,
           credits: c.credits,
-          year: null,
-          semester: null,
-          program_id: null,
           // 🟢 กำหนดเป็น "core" ตามที่คุณต้องการเมื่อเป็นการดึงจากตารางหลัก
           type: "core",
         })),
@@ -350,13 +340,157 @@ router.delete(
     }
 
     try {
-      await prisma.courseSection.delete({ where: { id } });
-      res.json({ message: "Course section deleted successfully" });
-    } catch (err) {
-      console.error("Delete Course Section Error:", err);
-      res.status(500).json({ error: "Failed to delete course section" });
+      await prisma.$transaction(async (tx) => {
+        // 1. ค้นหาข้อมูล Section นี้ก่อนเพื่อเอา semester_id มาตรวจสอบต่อ
+        const section = await tx.courseSection.findUnique({
+          where: { id },
+          include: { semester_config: true }, // ดึงข้อมูล Semester มาด้วย
+        });
+
+        if (!section) throw new Error("Section not found");
+
+        const semesterId = section.course_semester_id;
+        const courseId = section.semester_config.course_id;
+
+        // 2. ลบ Section ปัจจุบัน
+        await tx.courseSection.delete({ where: { id } });
+
+        // 3. ตรวจสอบว่าใน Semester นี้ยังมี Section อื่นเหลืออยู่ไหม
+        const remainingSections = await tx.courseSection.count({
+          where: { course_semester_id: semesterId },
+        });
+
+        if (remainingSections === 0) {
+          // ถ้าไม่เหลือ Section แล้ว ให้ลบ Semester ออก
+          await tx.courseSemester.delete({ where: { id: semesterId } });
+
+          // 4. ตรวจสอบต่อว่าใน Course นี้ยังมี Semester อื่น (ปี/เทอมอื่น) เหลืออยู่ไหม
+          const remainingSemesters = await tx.courseSemester.count({
+            where: { course_id: courseId },
+          });
+
+          if (remainingSemesters === 0) {
+            // ถ้าไม่เหลือ Semester ไหนเปิดสอนวิชานี้เลย ให้ลบวิชา (Master Course) ออก
+            await tx.course.delete({ where: { id: courseId } });
+          }
+        }
+      });
+
+      res.json({
+        message: "Course section and empty hierarchies deleted successfully",
+      });
+    } catch (err: any) {
+      console.error("Delete Error:", err);
+      res.status(500).json({ error: err.message || "Failed to delete" });
     }
   },
 );
+
+router.get(
+  "/unique/:year",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { year } = req.params;
+      const { programId } = req.query; // รับจาก Query string เช่น ?programId=1
+
+      if (!year) {
+        return res.status(400).json({ error: "Year is required" });
+      }
+
+      // สร้าง Filter object
+      const whereClause: any = {
+        year: Number(year),
+      };
+
+      // 🟢 ถ้ามีการส่ง programId มา ให้เพิ่มเข้าไปในเงื่อนไขด้วย
+      if (programId) {
+        whereClause.program_id = Number(programId);
+      }
+
+      const semesters = await prisma.courseSemester.findMany({
+        where: whereClause,
+        distinct: ["semester"], // 👈 พระเอก: ยุบ 1, 1, 1 ให้เหลือ 1
+        select: {
+          semester: true,
+        },
+        orderBy: {
+          semester: "asc",
+        },
+      });
+
+      // แปลงจาก [{semester: 1}, {semester: 2}] เป็น [1, 2]
+      const result = semesters.map((s) => s.semester);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching unique semesters:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
+
+router.get("/list", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { year, semester, programId } = req.query;
+
+    if (!year || !semester || !programId) {
+      return res.status(400).json({
+        error:
+          "Missing required query parameters: year, semester, or programId",
+      });
+    }
+
+    // 🟢 ดึงข้อมูลผ่าน ProgramOnCourse เพราะมีทั้ง program_id และ semester_id อยู่แล้ว
+    const results = await prisma.programOnCourse.findMany({
+      where: {
+        program_id: Number(programId),
+        semester: {
+          // กรองเงื่อนไข ปี และ เทอม ผ่าน Relation 'semester' (CourseSemester)
+          year: Number(year),
+          semester: Number(semester),
+        },
+      },
+      select: {
+        semester_id: true, // นี่คือค่าที่คุณต้องการ (CourseSemester ID)
+        type: true, // ประเภทวิชา (ถ้าต้องการใช้)
+        semester: {
+          select: {
+            course_id: true,
+            course: {
+              select: {
+                name: true,
+                name_th: true,
+                code: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        semester: {
+          course: {
+            code: "asc",
+          },
+        },
+      },
+    });
+
+    // ปรับโครงสร้างข้อมูลให้ใช้ง่ายขึ้นก่อนส่งกลับ (Flatten data)
+    const formattedCourses = results.map((item) => ({
+      semesterId: item.semester_id,
+      courseId: item.semester.course_id,
+      courseName: item.semester.course.name,
+      courseNameTh: item.semester.course.name_th,
+      courseCode: item.semester.course.code,
+      type: item.type,
+    }));
+
+    res.json(formattedCourses);
+  } catch (error) {
+    console.error("Error fetching courses via ProgramOnCourse:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 export default router;

@@ -223,10 +223,7 @@ export default function EditCourseClient({
     }
   };
 
-  useEffect(() => {
-    console.log(formData);
-    
-  })
+
 
   if (error)
     return (

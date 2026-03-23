@@ -152,19 +152,42 @@ router.delete("/bulk-delete", authenticateToken, async (req, res) => {
     return res.status(400).json({ error: "Invalid sectionId or studentIds" });
   }
 
+  const studentIdNums = studentIds.map((id) => Number(id));
+  const sectionIdNum = Number(sectionId);
+
   try {
-    const deleted = await prisma.studentOnSection.deleteMany({
-      where: {
-        student_id: { in: studentIds.map((id) => Number(id)) },
-        section_id: Number(sectionId),
-      },
+    // ใช้ $transaction เพื่อรันคำสั่งลบพร้อมกัน
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. ลบคะแนนของนักศึกษาเหล่านั้นใน Section นี้ออกก่อน (เพื่อป้องกันปัญหา Foreign Key ถ้ามี)
+      const deletedScores = await tx.studentScore.deleteMany({
+        where: {
+          student_id: { in: studentIdNums },
+          section_id: sectionIdNum,
+        },
+      });
+
+      // 2. ลบชื่อนักศึกษาออกจาก Section
+      const deletedStudents = await tx.studentOnSection.deleteMany({
+        where: {
+          student_id: { in: studentIdNums },
+          section_id: sectionIdNum,
+        },
+      });
+
+      return {
+        studentCount: deletedStudents.count,
+        scoreCount: deletedScores.count,
+      };
     });
 
     res.json({
-      message: `Successfully removed ${deleted.count} students from the section.`,
+      message: `Successfully removed ${result.studentCount} students and cleared ${result.scoreCount} score entries.`,
     });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to remove students" });
+  } catch (err: any) {
+    console.error("Bulk Delete Error:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to remove students and their scores" });
   }
 });
 

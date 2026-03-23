@@ -187,8 +187,8 @@ model CloPloMapping {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
-  clos            Clo            @relation(fields: [cloId], references: [id], onDelete: Cascade)
-  plos            Plo            @relation(fields: [ploId], references: [id], onDelete: Cascade)
+  clo            Clo            @relation(fields: [cloId], references: [id], onDelete: Cascade)
+  plo            Plo            @relation(fields: [ploId], references: [id], onDelete: Cascade)
   course_semester CourseSemester @relation(fields: [semester_id], references: [id], onDelete: Cascade)
   program         Program        @relation(fields: [program_id], references: [id], onDelete: Cascade)
 

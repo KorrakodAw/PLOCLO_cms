@@ -64,6 +64,8 @@ export default function AssignmentMapping({
     null,
   );
 
+
+ 
   // --- 1. Fetch Data ---
   const fetchData = useCallback(async () => {
     if (!semesterId || !token) return; // 🟢 ตรวจสอบ semesterId
@@ -337,6 +339,11 @@ export default function AssignmentMapping({
     });
   }, [assignments]);
 
+  const filteredAssignments = sortedAssignments.filter((assignment) => {
+    if (activeFilter === "all") return true;
+    return assignment.category === activeFilter;
+  });
+
   return (
     <div className="max-w-7xl mx-auto p-2 space-y-6">
       {loading && <LoadingOverlay />}
@@ -464,7 +471,7 @@ export default function AssignmentMapping({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {sortedAssignments.map((a, idx) => (
+            {filteredAssignments.map((a, idx) => (
               <tr
                 key={a.id}
                 className="group hover:bg-slate-50/80 transition-all"
@@ -525,9 +532,7 @@ export default function AssignmentMapping({
 
             {
               label: "Max Score (Affects Proportional Weight)",
-
               key: "maxScore",
-
               type: "number",
             },
           ]}

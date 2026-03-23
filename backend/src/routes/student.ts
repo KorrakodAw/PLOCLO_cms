@@ -255,4 +255,79 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   }
 });
 
+router.get(
+  "/semester-students/:courseSemesterId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { courseSemesterId } = req.params;
+
+      if (!courseSemesterId) {
+        return res.status(400).json({ error: "courseSemesterId is required" });
+      }
+
+      // Query หาข้อมูลนักศึกษาผ่านความสัมพันธ์แบบ Nested
+      const courseWithStudents = await prisma.courseSemester.findUnique({
+        where: {
+          id: Number(courseSemesterId),
+        },
+        select: {
+          // 1. เข้าไปที่ Sections ของ CourseSemester นี้
+          sections: {
+            select: {
+              id: true,
+              section: true,
+              // 2. เข้าไปที่ StudentOnSection ของแต่ละ Section
+              students: {
+                select: {
+                  // 3. ดึงข้อมูล Student ออกมา
+                  student: {
+                    select: {
+                      id: true,
+                      student_code: true,
+                      first_name: true,
+                      last_name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!courseWithStudents) {
+        return res.status(404).json({ error: "Course Semester not found" });
+      }
+
+      // 4. Flatten ข้อมูลเพื่อให้ Frontend ใช้ง่ายขึ้น (รวมนักศึกษาจากทุก Section)
+      const allStudents = courseWithStudents.sections.flatMap((section) =>
+        section.students.map((s) => ({
+          ...s.student,
+          sectionNo: section.section, // เลข Section เช่น 1, 2, 3
+          sectionId: section.id,
+        })),
+      );
+
+      // 2. เรียงลำดับ (Multi-level Sort)
+      const sortedStudents = allStudents.sort((a, b) => {
+        // ชั้นที่ 1: เรียงตาม Section (น้อยไปมาก)
+        if (a.sectionNo !== b.sectionNo) {
+          return Number(a.sectionNo) - Number(b.sectionNo);
+        }
+
+        // ชั้นที่ 2: ถ้า Section เดียวกัน ให้เรียงตาม Student Code (น้อยไปมาก)
+        const codeA = a.student_code || "";
+        const codeB = b.student_code || "";
+        return codeA.localeCompare(codeB, undefined, { numeric: true });
+      });
+
+      res.json(sortedStudents);
+    } catch (error) {
+      console.error("Error fetching students in course semester:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
+
 export default router;

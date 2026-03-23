@@ -147,6 +147,40 @@ export default function FormPopup<T>({
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+
+    // 🟢 ถ้าเป็นช่อง 'code' ให้กรองอักขระพิเศษออกทันที
+    if (name === "code") {
+      // อนุญาตเฉพาะ ภาษาอังกฤษ (A-Z), ภาษาไทย, ตัวเลข (0-9) และขีดกลาง (-)
+      // ถ้าต้องการห้ามทุกอย่างรวมถึงเครื่องหมาย : ให้ใช้ regex นี้ครับ
+      const cleanValue = value.replace(
+        /[^a-zA-Z0-9ก-ฮะ-าิ-ืุ-ูเ-็โ-์\s-]/g,
+        "",
+      );
+
+      setFormData((prev) => ({ ...prev, [name]: cleanValue }));
+    } else {
+      // ช่องอื่นๆ ปล่อยให้พิมพ์ปกติ
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const Codevalidate = () => {
+    const newErrors: Record<string, string> = {};
+
+    // เช็คอักขระพิเศษใน code
+    const specialCharRegex = /[^a-zA-Z0-9ก-ฮ-]/; // ค้นหาตัวที่ไม่ใช่ตัวอักษร/ตัวเลข
+
+    if (specialCharRegex.test(formData.code)) {
+      newErrors.code =
+        "Course code cannot contain special characters (like : / @ #)";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
     requiredFields.forEach((internalKey) => {
@@ -162,6 +196,10 @@ export default function FormPopup<T>({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors = validate();
+    const isCodeValid = Codevalidate();
+    if (!isCodeValid) {
+      newErrors.code = "Course code cannot contain special characters (like : / @ #)";
+    }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -282,7 +320,7 @@ export default function FormPopup<T>({
                 onChange={onSemesterChange}
                 options={semesterOptions}
                 // 🟢 แก้ไข: ให้เปิดใช้งานได้ทันทีเมื่อเลือกคณะ (ไม่ต้องรอเลือก Program)
-                disabled={!selectedYear}
+                disabled={!selectedProgram}
                 // label="Semester"
               />
             )}
@@ -310,7 +348,7 @@ export default function FormPopup<T>({
                       name={name}
                       placeholder={placeholder}
                       value={formData[name]}
-                      onChange={handleChange}
+                      onChange={handleCodeChange}
                       className={`w-full px-4 py-2.5 rounded-lg border font-light ${
                         errors[name] ? "border-red-500" : "border-gray-300"
                       } focus:outline-none focus:ring-2 focus:ring-blue-400`}

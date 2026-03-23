@@ -141,9 +141,7 @@ export default function GradeSetting({
     }
   };
 
-  useEffect(() => {
-    console.log(fMaxScore);
-  });
+
 
   // คำนวณคะแนนสูงสุดของเกรด F (คะแนนต่ำสุดที่มีในระบบ)
  const fMaxScore = gradeSettings.reduce((min, item) => {

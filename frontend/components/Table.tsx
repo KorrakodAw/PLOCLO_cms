@@ -163,9 +163,14 @@ export function Table<T>({ columns, data, className = "" }: TableProps<T>) {
                       key={colIndex}
                       className={`${cellClasses} text-gray-700 font-light`}
                     >
-                      {col.render
-                        ? col.render(row)
-                        : String((row as any)[col.accessor]) || "-"}
+                      <div
+                        className="max-w-[200px] truncate"
+                        title={String((row as any)[col.accessor])}
+                      >
+                        {col.render
+                          ? col.render(row)
+                          : String((row as any)[col.accessor] ?? "-")}
+                      </div>
                     </td>
                   );
                 })}

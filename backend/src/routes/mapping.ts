@@ -50,27 +50,81 @@ const router = Router();
 //     res.status(500).json({ error: "Failed to save mappings" });
 //   }
 // });
+router.get(
+  "/clo-plo/:courseId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const courseId = parseInt(req.params.courseId as string);
+      const { semesterId, programId } = req.query;
+
+      if (isNaN(courseId)) {
+        return res.status(400).json({ error: "Invalid Course ID" });
+      }
+
+      // 1. จัดการ programId (รองรับทั้ง "8" และ "8,7")
+      let idArray: number[] = [];
+      if (programId) {
+        idArray = String(programId)
+          .split(",")
+          .map((id) => parseInt(id.trim()))
+          .filter((id) => !isNaN(id));
+      }
+
+      // 2. ตรวจสอบ semesterId
+      const sId = parseInt(String(semesterId));
+
+      const mappings = await prisma.cloPloMapping.findMany({
+        where: {
+          // ถ้าไม่มี semesterId ให้ข้ามเงื่อนไขนี้ หรือใส่ค่าที่ถูกต้อง
+          semester_id: isNaN(sId) ? undefined : sId,
+          // ใช้ 'in' เฉพาะเมื่อมี id ใน array
+          program_id: idArray.length > 0 ? { in: idArray } : undefined,
+          clo: { course_id: courseId },
+        },
+        select: {
+          cloId: true,
+          ploId: true,
+          program_id: true,
+          weight: true,
+        },
+      });
+
+      res.json(
+        mappings.map((m) => ({
+          clo_id: m.cloId,
+          plo_id: m.ploId,
+          program_id: m.program_id,
+          weight: Number(m.weight),
+        })),
+      );
+    } catch (err) {
+      console.error("Fetch CLO-PLO Error:", err);
+      res.status(500).json({ error: "Failed to fetch mappings" });
+    }
+  },
+);
 
 // --- 1. CLO to PLO Mapping (ยังคงผูกกับ Course เป็นหลัก) ---
 
-router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
-  try {
-    const courseId = parseInt(req.params.courseId as string );
-    if (isNaN(courseId))
-      return res.status(400).json({ error: "Invalid Course ID" });
+// router.get("/clo-plo/:courseId", authenticateToken, async (req, res) => {
+//   try {
+//     const courseId = parseInt(req.params.courseId as string );
+//     if (isNaN(courseId))
+//       return res.status(400).json({ error: "Invalid Course ID" });
 
-    const result = await pool.query(
-      `SELECT m.clo_id, m.plo_id, m.weight 
-       FROM clo_plo_mapping m
-       JOIN clo c ON m.clo_id = c.id
-       WHERE c.course_id = $1`,
-      [courseId],
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch CLO-PLO mappings" });
-  }
-});
+//     const result = await pool.query(
+//       `SELECT m.clo_id, m.plo_id, m.weight 
+//        FROM clo_plo_mapping m
+//        JOIN clo c ON m.clo_id = c.id
+//        WHERE c.course_id = $1`,
+//       [courseId],
+//     );
+//     res.json(result.rows);
+//   } catch (err) {
+//     res.status(500).json({ error: "Failed to fetch CLO-PLO mappings" });
+//   }
+// });
 
 // --- 2. Assignment to CLO Mapping (ปรับตามโครงสร้าง Semester) ---
 
@@ -99,12 +153,12 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
 
         if (!assignment || !clo) throw new Error("ASSIGNMENT_OR_CLO_NOT_FOUND");
 
-        /*
+        
         // 2. Validation: ต้องเป็นวิชาเดียวกัน (แม้จะคนละเทอมแต่ CLO ต้องตรงกับวิชา)
-        if (assignment.semester.course_semester_id !== clo.course_semester_id) {
+        if (assignment.semester.course_id !== clo.course_id) {
           throw new Error("COURSE_MISMATCH");
         }
-        */
+        
 
         // 3. Save Logic
         if (weight > 0 && weight <= 100) {
@@ -130,94 +184,67 @@ router.post("/assignment-clo", authenticateToken, async (req, res) => {
 });
 
 // GET /api/mapping/assignment-clo/:sectionId
-router.get(
-  "/clo-plo/:courseId",
-  authenticateToken,
-  async (req: Request, res: Response) => {
-    try {
-      const courseId = parseInt(req.params.courseId as string);
-      const { semesterId, programId } = req.query; // รับ "8,7"
 
-      if (isNaN(courseId)) {
-        return res
-          .status(400)
-          .json({ error: "Course ID are required" });
-      }
-
-      // 🟢 แปลง "8,7" เป็น [8, 7]
-      const idArray = String(programId)
-        .split(",")
-        .map((id) => parseInt(id.trim()))
-        .filter((id) => !isNaN(id));
-
-      const mappings = await prisma.cloPloMapping.findMany({
-        where: {
-          semester_id: Number(semesterId),
-          program_id: { in: idArray }, // 🟢 ดึง Mapping ของทุกหลักสูตรในคราวเดียว
-          clos: { course_id: courseId },
-        },
-        select: {
-          cloId: true,
-          ploId: true,
-          program_id: true, // เพิ่มเพื่อให้ Frontend แยกได้ว่าอันไหนของใคร
-          weight: true,
-        },
-      });
-
-      res.json(
-        mappings.map((m) => ({
-          clo_id: m.cloId,
-          plo_id: m.ploId,
-          program_id: m.program_id,
-          weight: Number(m.weight),
-        })),
-      );
-    } catch (err) {
-      console.error("Fetch CLO-PLO Error:", err);
-      res.status(500).json({ error: "Failed to fetch mappings" });
-    }
-  },
-);
 
 router.post(
   "/clo-plo",
   authenticateToken,
   async (req: Request, res: Response) => {
     const { updates } = req.body;
+
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({ error: "Updates must be an array" });
+    }
+
     try {
-      await prisma.$transaction(
-        updates.map((item: any) => {
-          const { clo_id, plo_id, program_id, semester_id, weight } = item;
+      // 🟢 ใช้ Interactive Transaction เพื่อความแม่นยำของ Data Type
+      await prisma.$transaction(async (tx) => {
+        for (const item of updates) {
+          // 1. สกัดค่าและแปลงเป็น Number ให้ชัวร์
+          const cloId = Number(item.clo_id);
+          const ploId = Number(item.plo_id);
+          const program_id = Number(item.program_id);
+          const semester_id = Number(item.semester_id);
+          const weight = Number(item.weight);
+
+          // 2. สร้าง Filter สำหรับหา Record
+          const filter = {
+            cloId,
+            ploId,
+            program_id,
+            semester_id,
+          };
+
+          // 3. สร้าง Composite Key สำหรับ Upsert
+          // (ชื่อ cloId_ploId_program_id_semester_id ต้องตรงตาม schema.prisma)
           const whereClause = {
-            cloId_ploId_program_id_semester_id: {
-              // ⚠️ ชื่อนี้ต้องตรงตามที่ Prisma generate
-              cloId: Number(clo_id),
-              ploId: Number(plo_id),
-              program_id: Number(program_id),
-              semester_id: Number(semester_id),
-            },
+            cloId_ploId_program_id_semester_id: filter,
           };
 
           if (weight > 0) {
-            return prisma.cloPloMapping.upsert({
+            // กรณีมีน้ำหนัก => บันทึกหรืออัปเดต
+            await tx.cloPloMapping.upsert({
               where: whereClause,
               update: { weight, updatedAt: new Date() },
-              create: {
-                cloId: Number(clo_id),
-                ploId: Number(plo_id),
-                program_id: Number(program_id),
-                semester_id: Number(semester_id),
-                weight,
-              },
+              create: { ...filter, weight },
             });
           } else {
-            return prisma.cloPloMapping.deleteMany({ where: item });
+            // 🟢 กรณี weight เป็น 0 หรือลบ => ใช้ deleteMany พร้อม filter ที่ชื่อฟิลด์ถูกต้อง
+            // การใช้ deleteMany จะไม่ error ถ้าไม่เจอ record
+            await tx.cloPloMapping.deleteMany({
+              where: filter,
+            });
           }
-        }),
-      );
-      res.json({ success: true });
-    } catch (err) {
-      res.status(500).json({ error: "Save failed" });
+        }
+      });
+
+      res.json({ success: true, message: "Mapping updated successfully" });
+    } catch (err: any) {
+      console.error("Save CLO-PLO Error:", err);
+      res.status(500).json({
+        error: "Save failed",
+        details: err.message, // ส่ง error ไปดูว่าติดที่ฟิลด์ไหน
+      });
     }
   },
 );

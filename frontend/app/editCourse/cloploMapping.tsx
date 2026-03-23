@@ -8,7 +8,7 @@ import { useGlobalToast } from "@/app/context/ToastContext";
 import { useTranslation } from "next-i18next";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { AlertCircle, AlertTriangle, Save, Search } from "lucide-react";
-
+import AlertPopup from "@/components/AlertPopup";
 // --- Types ---
 interface PLO {
   id: number;
@@ -112,8 +112,8 @@ export default function CloPloMapping({
 
   // B. Fetch CLOs AND Existing Mappings
   useEffect(() => {
-    // 🟢 ตรวจสอบเงื่อนไข: ต้องมีทั้ง Course และ Semester ถึงจะโหลดข้อมูล
-    if (!masterCourseId || !semesterId || !token) {
+    // 1. ตรวจสอบเงื่อนไข: ต้องมีครบถึงจะเริ่มโหลด
+    if (!masterCourseId || !semesterId || !token || !programs) {
       setClos([]);
       setMappingGrid({});
       return;
@@ -121,19 +121,21 @@ export default function CloPloMapping({
 
     setLoading(true);
 
-    // เตรียม list ของ program_id (สมมติว่าคุณมีตัวแปร programIds เป็น array หรือ string "7,8")
-    const pIds = Array.isArray(programs) ? programs.map((p) => p.program_id).join(",") : "";
+    // 2. เตรียมรายการ program_id (แปลงจาก Array Objects เป็น String "7,8")
+    const pIds = Array.isArray(programs)
+      ? programs.map((p) => p.program_id).join(",")
+      : "";
 
     Promise.all([
-      // 1. ดึงข้อมูล CLO ของวิชานี้
+      // ดึง CLO
       apiClient.get(`/clo?courseId=${masterCourseId}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
-      // 2. ดึง Mapping โดยส่ง semesterId และ programId ไปด้วย
+      // ดึง Mapping (ส่งทั้ง semesterId และ pIds)
       apiClient.get(`/mapping/clo-plo/${masterCourseId}`, {
         params: {
           semesterId: semesterId,
-          programId: pIds, // ส่งเพื่อให้ Backend กรองเฉพาะหลักสูตรที่เกี่ยวข้อง
+          programId: pIds,
         },
         headers: { Authorization: `Bearer ${token}` },
       }),
@@ -141,18 +143,18 @@ export default function CloPloMapping({
       .then(([cloRes, mappingRes]) => {
         setClos(cloRes.data);
 
-        const newGrid: Record<number, number> = {};
+        const newGrid: Record<string, number> = {}; // 🟢 ใช้ string key
         const mappings = Array.isArray(mappingRes.data) ? mappingRes.data : [];
 
         mappings.forEach((m: any) => {
-          // 🟢 สำคัญ: สร้าง Key ให้ตรงกับตอน Save (4 มิติ)
-          // เพื่อให้ข้อมูลไม่ปนกันระหว่าง Program และ Semester
-          const key = `${m.clo_id}_${m.plo_id}_${m.program_id}_${m.semester_id}`;
+          // 🟢 สร้าง Key 4 มิติให้ตรงกับ Backend Logic
+          // ใช้ semesterId จากตัวแปรภายนอกได้เลย เพราะ API กรองมาให้แล้ว
+          const key = `${m.clo_id}_${m.plo_id}_${m.program_id}_${semesterId}`;
           newGrid[key] = Number(m.weight);
         });
 
         setMappingGrid(newGrid);
-        setChangedKeys(new Set()); // ล้างรายการที่ค้างไว้
+        setChangedKeys(new Set());
       })
       .catch((err) => {
         console.error("Error loading matrix:", err);
@@ -162,8 +164,8 @@ export default function CloPloMapping({
         setLoading(false);
       });
 
-    // 🟢 เพิ่ม semesterId เข้าไปใน deps เพื่อให้โหลดใหม่ทุกครั้งที่เปลี่ยนเทอม
-  }, [masterCourseId, semesterId, token, showToast, t]);
+    // 🟢 เพิ่ม programs เข้าไปใน deps เพื่อให้โหลดใหม่ถ้าหลักสูตรที่เลือกเปลี่ยนไป
+  }, [masterCourseId, semesterId, token, programs, showToast, t]);
 
   // --------------------------------------------------------
   // 3. VALIDATION & HANDLERS
@@ -243,28 +245,23 @@ export default function CloPloMapping({
   }, [plos, activeProgramId]);
 
   const isValidationSuccess = useMemo(() => {
-    // 1. ป้องกัน Error: ถ้าไม่มี ID หรือข้อมูลยังไม่มา ให้ถือว่ายังไม่ต้อง Validate (คืนค่า true)
     if (!activeProgramId || !groupedPlos || !groupedPlos[activeProgramId]) {
       return true;
     }
 
-    // 2. ดึง PLOs ของ Program ปัจจุบันออกมา (ใส่ Type Casting ถ้าจำเป็น)
     const currentProgramPlos = groupedPlos[activeProgramId]?.plos || [];
     if (currentProgramPlos.length === 0) return true;
 
-    // 3. ตรวจสอบแต่ละแถว (CLO)
     return clos.every((clo) => {
-      // หาผลรวมเฉพาะใน Grid ของ Program ที่เลือกอยู่
       const rowTotal = currentProgramPlos.reduce((sum, plo) => {
-        const key = `${clo.id}_${plo.id}_${activeProgramId}`;
+        // 🟢 แก้ไขตรงนี้ให้เป็น 4 มิติ
+        const key = `${clo.id}_${plo.id}_${activeProgramId}_${semesterId}`;
         return sum + (Number(mappingGrid[key]) || 0);
       }, 0);
 
-      // เงื่อนไข: ถ้าแถวนั้นมีการกรอก (Total > 0) ต้องรวมได้ 100%
-      // หรือถ้ายังไม่กรอกเลย (Total === 0) ก็ให้ผ่าน
       return rowTotal === 0 || Math.abs(rowTotal - 100) < 0.01;
     });
-  }, [mappingGrid, activeProgramId, clos, groupedPlos]);
+  }, [mappingGrid, activeProgramId, clos, groupedPlos, semesterId]); // 🟢 อย่าลืมใส่ semesterId ใน deps
 
   const handleSave = async () => {
     if (!token) return;
@@ -312,6 +309,43 @@ export default function CloPloMapping({
     }
   };
 
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
+
+  const handleClearOnlyActive = () => {
+    if (!activeProgramId || !filteredPlos.length) return;
+
+    setMappingGrid((prev) => {
+      const newGrid = { ...prev };
+      const newChangedKeys = new Set(changedKeys);
+      let hasCleared = false;
+
+      clos.forEach((clo) => {
+        filteredPlos.forEach((plo) => {
+          const key = `${clo.id}_${plo.id}_${activeProgramId}_${semesterId}`;
+
+          // 🟢 ตรวจสอบ: ถ้าช่องนี้มีข้อมูล (weight > 0) ให้เคลียร์เป็น 0
+          if (Number(prev[key]) > 0) {
+            newGrid[key] = 0;
+            newChangedKeys.add(key); // แจ้งเตือนว่ามีการเปลี่ยนแปลงเพื่อรอ Save
+            hasCleared = true;
+          }
+        });
+      });
+
+      if (!hasCleared) {
+        showToast(t("No data to clear in this table"), "info");
+        return prev; // ไม่ต้อง Update State ถ้าไม่มีอะไรให้เคลียร์
+      }
+
+      setChangedKeys(newChangedKeys);
+      showToast(
+        t("Cleared active cells (Click Save to update database)"),
+        "success",
+      );
+      return newGrid;
+    });
+  };
+
   // --------------------------------------------------------
   // 4. UI RENDER
   // --------------------------------------------------------
@@ -320,39 +354,62 @@ export default function CloPloMapping({
       {loading && <LoadingOverlay />}
 
       {/* Header & Save Action */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
-        <div>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 px-2 mb-6">
+        {/* Left Side: Title & Info */}
+        <div className="space-y-1">
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-[0.2em]">
             {t("CLO to PLO Mapping Matrix")}
           </h3>
-          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-            Distribute weight percentage for each outcome
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">
+              {t("Distribute weight percentage for each outcome")}
+            </p>
+          </div>
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={loading || !isValidationSuccess || changedKeys.size === 0}
-          className={`px-8 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center gap-2 shadow-xl active:scale-95 
-  ${
-    // กรณีที่แก้แล้วแต่กรอกไม่ครบ 100%
-    !isValidationSuccess
-      ? "bg-rose-100 text-rose-500 cursor-not-allowed opacity-70 border-2 border-rose-200"
-      : changedKeys.size === 0
-        ? "bg-slate-100 text-slate-400 cursor-not-allowed" // ยังไม่มีการแก้
-        : "bg-slate-900 text-white hover:bg-emerald-600 shadow-emerald-200" // พร้อม Save
-  }`}
-        >
-          {loading ? (
-            t("Syncing...")
-          ) : (
-            <>
-              <Save size={16} />
-              {t("Save Changes")}{" "}
-              {changedKeys.size > 0 && `(${changedKeys.size})`}
-            </>
-          )}
-        </button>
+        {/* Right Side: Action Buttons Group */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {/* Clear Button: ปรับให้ดูนุ่มนวลขึ้น ไม่แข่งกับปุ่ม Save */}
+          <button
+            onClick={() => setShowConfirmClear(true)}
+            className="flex-1 lg:flex-none px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2 border-2 border-slate-100 text-slate-400 hover:border-rose-100 hover:text-rose-500 hover:bg-rose-50/50 active:scale-95"
+          >
+            <AlertTriangle size={14} className="opacity-70" />
+            {t("Clear Current")}
+          </button>
+
+          {/* Save Button: ปุ่มหลักที่โดดเด่น */}
+          <button
+            onClick={handleSave}
+            disabled={loading || !isValidationSuccess || changedKeys.size === 0}
+            className={`flex-[2] lg:flex-none px-8 py-3 rounded-2xl font-black text-[11px] uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2 shadow-xl active:scale-95 
+        ${
+          !isValidationSuccess
+            ? "bg-rose-50 text-rose-400 cursor-not-allowed border-2 border-rose-100 shadow-none"
+            : changedKeys.size === 0
+              ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+              : "bg-slate-900 text-white hover:bg-emerald-600 shadow-emerald-200/50 hover:shadow-emerald-500/20"
+        }`}
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                {t("Syncing...")}
+              </div>
+            ) : (
+              <>
+                <Save size={16} />
+                <span>{t("Save Changes")}</span>
+                {changedKeys.size > 0 && (
+                  <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-lg text-[9px]">
+                    {changedKeys.size}
+                  </span>
+                )}
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Main Content Container */}
@@ -431,7 +488,8 @@ export default function CloPloMapping({
                     // 🟢 แก้ไข: คำนวณ Total เฉพาะของ Program ที่เลือกอยู่
                     const currentProgramTotal = filteredPlos.reduce(
                       (sum, plo) => {
-                        const key = `${clo.id}_${plo.id}_${activeProgramId}`;
+                        // แก้ไข: เพิ่ม _${semesterId} เข้าไปให้ครบ 4 มิติตามที่เก็บใน State
+                        const key = `${clo.id}_${plo.id}_${activeProgramId}_${semesterId}`;
                         return sum + (Number(mappingGrid[key]) || 0);
                       },
                       0,
@@ -535,6 +593,21 @@ export default function CloPloMapping({
                 )}
               </span>
             </div>
+          )}
+          {showConfirmClear && (
+            <AlertPopup
+              title={t("Confirm Clear")}
+              type="confirm"
+              message={t(
+                "Are you sure you want to clear the current table? This action cannot be undone.",
+              )}
+              isOpen={showConfirmClear}
+              onConfirm={() => {
+                handleClearOnlyActive();
+                setShowConfirmClear(false);
+              }}
+              onCancel={() => setShowConfirmClear(false)}
+            />
           )}
         </div>
       </div>

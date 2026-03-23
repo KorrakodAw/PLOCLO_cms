@@ -15,20 +15,46 @@ router.post("/", authenticateToken, async (req, res) => {
     }
 
     const results = await prisma.$transaction(async (tx) => {
-      const res: any[] = [];
+      const processedResults: any[] = [];
 
       for (const item of updates) {
-        const scoreValue =
-          item.score === null || item.score === undefined || item.score === ""
-            ? 0
-            : Number(item.score);
+        // 1. ตรวจสอบว่าค่าที่ส่งมาคือ "ค่าว่าง" หรือไม่
+        const isScoreEmpty =
+          item.score === null ||
+          item.score === undefined ||
+          String(item.score).trim() === "";
 
+        const studentId = Number(item.student_id);
+        const assignmentId = Number(item.assignment_id);
         const currentSectionId = Number(item.section_id || sectionId);
-        if (isNaN(currentSectionId)) {
-          throw new Error("Missing section_id for one or more entries");
+
+        if (isNaN(studentId) || isNaN(assignmentId)) {
+          throw new Error("Invalid student_id or assignment_id");
         }
 
-        // 🟢 ตรวจสอบว่า assignment อยู่ใน semester เดียวกับ section
+        // 🟢 กรณีที่ 1: ถ้าคะแนนเป็นค่าว่าง -> ให้ลบออกจาก Database
+        if (isScoreEmpty) {
+          try {
+            const deleteResult = await tx.studentScore.delete({
+              where: {
+                student_id_assignment_id: {
+                  student_id: studentId,
+                  assignment_id: assignmentId,
+                },
+              },
+            });
+            processedResults.push({ ...deleteResult, action: "deleted" });
+          } catch (err: any) {
+            // ถ้าพยายามลบตัวที่ไม่มีอยู่แล้ว (P2025) ให้ข้ามไป ไม่ต้อง Throw Error
+            if (err.code !== "P2025") throw err;
+          }
+          continue; // ทำตัวถัดไปใน loop
+        }
+
+        // 🟢 กรณีที่ 2: ถ้ามีคะแนนส่งมา -> ทำการตรวจสอบและ Upsert (เหมือนเดิม)
+        const scoreValue = Number(item.score);
+
+        // ตรวจสอบความสัมพันธ์ของ Section และ Assignment
         const section = await tx.courseSection.findUnique({
           where: { id: currentSectionId },
           select: { course_semester_id: true },
@@ -36,24 +62,23 @@ router.post("/", authenticateToken, async (req, res) => {
         if (!section) throw new Error(`Section ${currentSectionId} not found`);
 
         const assignment = await tx.assignment.findUnique({
-          where: { id: Number(item.assignment_id) },
+          where: { id: assignmentId },
           select: { semester_id: true },
         });
         if (!assignment)
-          throw new Error(`Assignment ${item.assignment_id} not found`);
+          throw new Error(`Assignment ${assignmentId} not found`);
 
         if (assignment.semester_id !== section.course_semester_id) {
           throw new Error(
-            `Assignment ${item.assignment_id} does not belong to the same semester as Section ${currentSectionId}`,
+            `Assignment ${assignmentId} mismatch with Section ${currentSectionId}`,
           );
         }
 
-        // 🟢 ผ่านการตรวจสอบแล้ว ค่อย upsert
-        const result = await tx.studentScore.upsert({
+        const upsertResult = await tx.studentScore.upsert({
           where: {
             student_id_assignment_id: {
-              student_id: Number(item.student_id),
-              assignment_id: Number(item.assignment_id),
+              student_id: studentId,
+              assignment_id: assignmentId,
             },
           },
           update: {
@@ -62,23 +87,26 @@ router.post("/", authenticateToken, async (req, res) => {
             updatedAt: new Date(),
           },
           create: {
-            student_id: Number(item.student_id),
-            assignment_id: Number(item.assignment_id),
+            student_id: studentId,
+            assignment_id: assignmentId,
             section_id: currentSectionId,
             score: scoreValue,
           },
         });
 
-        res.push(result);
+        processedResults.push({ ...upsertResult, action: "upserted" });
       }
 
-      return res;
+      return processedResults;
     });
 
-    res.json({ message: "Scores updated successfully", count: results.length });
+    res.json({
+      message: "Scores processed successfully",
+      count: results.length,
+    });
   } catch (err: any) {
-    console.error("Error saving scores:", err);
-    res.status(500).json({ error: "Failed to save scores: " + err.message });
+    console.error("Error processing scores:", err);
+    res.status(500).json({ error: "Failed to process scores: " + err.message });
   }
 });
 

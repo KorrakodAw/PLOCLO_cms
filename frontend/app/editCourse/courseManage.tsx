@@ -210,40 +210,40 @@ export default function CourseManagement({
   }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
 
   // // 4. Fetch Programs (Filtered by Year)
-  // useEffect(() => {
-  //   if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
-  //     setProgramOptions([{ label: t("please select a program"), value: "" }]);
-  //     setSelectedProgram("");
-  //     return;
-  //   }
+  useEffect(() => {
+    if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
+      setProgramOptions([{ label: t("please select a program"), value: "" }]);
+      setSelectedProgram("");
+      return;
+    }
 
-  //   getPrograms(token, selectedFaculty)
-  //     .then((data) => {
-  //       const programs = data.filter(
-  //         (p: Program) => String(p.program_year) === selectedYear,
-  //       );
+    getPrograms(token, selectedFaculty)
+      .then((data) => {
+        const programs = data.filter(
+          (p: Program) => String(p.program_year) === selectedYear,
+        );
 
-  //       if (programs.length === 0) {
-  //         setProgramOptions([{ label: t("no programs available"), value: "" }]);
-  //       } else {
-  //         setProgramOptions([
-  //           { label: t("please select a program"), value: "" },
-  //           ...programs.map((p: Program) => ({
-  //             label:
-  //               lang === "th"
-  //                 ? `${p.program_code} - ${p.program_shortname_th}`
-  //                 : `${p.program_code} - ${p.program_shortname_en}`,
-  //             value: String(p.id),
-  //           })),
-  //         ]);
-  //       }
-  //     })
-  //     .catch((err: unknown) => {
-  //       if (err instanceof Error) {
-  //         showToast("API program error: " + err.message, "error");
-  //       }
-  //     });
-  // }, [isLoggedIn, token, selectedFaculty, selectedYear, t, lang, showToast]);
+        if (programs.length === 0) {
+          setProgramOptions([{ label: t("no programs available"), value: "" }]);
+        } else {
+          setProgramOptions([
+            { label: t("please select a program"), value: "" },
+            ...programs.map((p: Program) => ({
+              label:
+                lang === "th"
+                  ? `${p.program_code} - ${p.program_shortname_th}`
+                  : `${p.program_code} - ${p.program_shortname_en}`,
+              value: String(p.id),
+            })),
+          ]);
+        }
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error) {
+          showToast("API program error: " + err.message, "error");
+        }
+      });
+  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, lang, showToast]);
 
   // --- Fetch List Logic ---
   const fetchCourses = useCallback(async () => {
@@ -252,8 +252,8 @@ export default function CourseManagement({
     try {
       const data = await getCoursePaginate(token, page, limit, {
         universityId,
-        facultyId: facultyId || selectedFaculty,
-        programCode: programId || selectedProgram,
+        facultyId: facultyId,
+        programCode: programId,
       });
       setCourses(data.data || []);
     } catch {
@@ -261,17 +261,7 @@ export default function CourseManagement({
     } finally {
       setLoadingCourse(false);
     }
-  }, [
-    isLoggedIn,
-    token,
-    page,
-    universityId,
-    facultyId,
-    selectedFaculty,
-    programId,
-    selectedProgram,
-    showToast,
-  ]);
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, showToast]);
 
   useEffect(() => {
     fetchCourses();
@@ -385,9 +375,7 @@ export default function CourseManagement({
     }
   };
 
-  useEffect(() => {
-    console.log(courses);
-  });
+
 
   // --- Table Configuration ---
   const courseColumns: Column<Course>[] = [

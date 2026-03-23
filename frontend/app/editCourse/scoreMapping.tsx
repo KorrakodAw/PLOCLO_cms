@@ -45,7 +45,7 @@ export default function ScoreMapping({
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
   const [scoreGrid, setScoreGrid] = useState<
-    Record<string, number | undefined>
+    Record<number, number | undefined>
   >({});
 
   const [changedKeys, setChangedKeys] = useState<Set<string>>(new Set());
@@ -167,52 +167,66 @@ export default function ScoreMapping({
   const handleScoreChange = (
     studentId: number,
     assignId: number,
-    val: string,
+    val: string, // รับค่าจาก e.target.value
     maxScore: number,
   ) => {
-    // 🟢 FIX: Define the key here (combining studentId and assignId)
     const key = `${studentId}_${assignId}`;
 
-    if (val !== "" && isNaN(Number(val))) return;
+    // 1. ถ้าว่าง ให้เก็บเป็นค่าว่าง (เพื่ออนุญาตให้ลบตัวเลขจนหมดได้)
+    if (val === "") {
+      setScoreGrid((prev) => ({ ...prev, [key]: "" }));
+      setChangedKeys((prev) => new Set(prev).add(key));
+      return;
+    }
 
-    if (val !== "" && Number(val) > maxScore) {
+    // 2. ตรวจสอบว่าเป็นรูปแบบตัวเลขหรือไม่ (อนุญาตให้มีจุดทศนิยมค้างไว้ได้ เช่น "1.")
+    // ใช้ Regex เพื่อเช็คว่าเป็นตัวเลขหรือจุดทศนิยม
+    if (!/^\d*\.?\d*$/.test(val)) return;
+
+    // 3. ตรวจสอบคะแนนเกิน (แปลงเป็น Number เฉพาะตอนเช็คเงื่อนไข)
+    const numericVal = Number(val);
+    if (numericVal > maxScore) {
       showToast(`Score cannot exceed ${Number(maxScore).toFixed(2)}`, "error");
       return;
     }
 
+    // 4. 🟢 เก็บเป็น string ใน State เพื่อให้พิมพ์ "." ค้างไว้ได้
     setScoreGrid((prev) => ({
       ...prev,
-      [key]: val === "" ? undefined : Number(val),
+      [key]: val,
     }));
 
     setChangedKeys((prev) => new Set(prev).add(key));
   };
-
   const handleSave = async () => {
     if (!token || changedKeys.size === 0) return;
 
     setLoading(true);
 
-    // 🟢 ดึงข้อมูลการอัปเดต โดยแนบ sectionId เข้าไปด้วย
     const updates = Array.from(changedKeys).map((key) => {
       const [studentId, assignId] = key.split("_");
+
+      // 🟢 แก้ไขจุดนี้: ส่งค่าตรงๆ จาก Grid ไปเลย (ถ้าว่างจะเป็น undefined/null)
+      // ไม่ต้องใส่ ?? 0 แล้ว
+      const currentScore = scoreGrid[key];
+
       return {
         student_id: Number(studentId),
         assignment_id: Number(assignId),
-        score: scoreGrid[key] ?? 0,
-        section_id: Number(sectionId), // 👈 เพิ่มฟิลด์นี้เพื่อให้ Backend นำไปสร้าง/อัปเดต
+        score: currentScore, // จะส่งเป็น number หรือ undefined ไปยัง Backend
+        section_id: Number(sectionId),
       };
     });
 
     try {
       await apiClient.post(
-        "/score", // แก้ไข URL ตามที่คุณตั้งค่าไว้ใน Backend
-        { updates, sectionId: Number(sectionId) }, // แนบไปทั้งในรายตัวและเป็นส่วนกลาง
+        "/score",
+        { updates, sectionId: Number(sectionId) },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      showToast("Scores saved successfully!", "success");
-      setChangedKeys(new Set()); // ล้างรายการที่เปลี่ยนแปลง
+      showToast("Scores processed successfully!", "success");
+      setChangedKeys(new Set());
     } catch (err) {
       console.error("Save error:", err);
       showToast("Failed to save scores", "error");

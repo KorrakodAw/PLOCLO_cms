@@ -3,6 +3,10 @@ import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { authorizeRoles } from "../middleware/roleMiddleware";
 import { duplicateProgram } from "../controllers/programController";
+import { Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 const router = Router();
 
 router.post("/duplicate", authenticateToken, duplicateProgram);
@@ -48,6 +52,102 @@ router.get("/", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch programs" });
   }
 });
+
+router.get(
+  "/ByFaculty/:facultyId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const facultyId = parseInt(req.params.facultyId as string);
+
+      if (isNaN(facultyId)) {
+        return res.status(400).json({ error: "Invalid Faculty ID" });
+      }
+
+      const programs = await prisma.program.findMany({
+        where: {
+          // สมมติว่าใน Model Program มีฟิลด์ faculty_id หรือเชื่อมผ่าน relation
+          faculty_id: facultyId,
+        },
+        distinct: ["program_code"], // 🟢 หัวใจสำคัญ: เอาเฉพาะค่าที่ไม่ซ้ำกันในคอลัมน์นี้
+        select: {
+          id: true,
+          program_code: true,
+          program_name_en: true,
+          program_name_th: true,
+          program_shortname_en: true,
+          program_shortname_th: true,
+          program_year: true,
+          // เลือกฟิลด์อื่นๆ ที่จำเป็น
+        },
+        orderBy: {
+          program_code: "asc",
+        },
+      });
+
+      res.json(programs);
+    } catch (err) {
+      console.error("Fetch Programs By Faculty Error:", err);
+      res.status(500).json({ error: "Failed to fetch programs" });
+    }
+  },
+);
+
+router.get(
+  "/ByCodeForViewChart",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      // รับค่าจาก Query: ?id=... หรือ ?programCode=...
+      const { programId, programCode } = req.query;
+
+      let targetCode = programCode;
+
+      // 1. ถ้าส่ง id มา ให้ไปหา program_code ของ id นั้นก่อน
+      if (programId) {
+        const findCodeResult = await pool.query(
+          `SELECT program_code FROM program WHERE id = $1`,
+          [programId],
+        );
+
+        if (findCodeResult.rows.length === 0) {
+          return res.status(404).json({ error: "Program ID not found" });
+        }
+
+        targetCode = findCodeResult.rows[0].program_code;
+      }
+
+      // 2. ตรวจสอบว่ามี Code ให้ค้นหาหรือไม่
+      if (!targetCode) {
+        return res
+          .status(400)
+          .json({ error: "programId or programCode is required" });
+      }
+
+      // 3. ดึงทุก id และ program_year ที่มี program_code เดียวกัน
+      const result = await pool.query(
+        `
+      SELECT 
+          id,
+          program_code,
+          program_year,
+          program_name_en,
+          program_name_th
+      FROM program 
+      WHERE program_code = $1
+      ORDER BY program_year DESC
+      `,
+        [targetCode],
+      );
+
+      // 4. ส่งคืนข้อมูลทั้งหมด
+      res.json(result.rows);
+    } catch (err: any) {
+      console.error("Fetch By Code Error:", err);
+      res.status(500).json({ error: "Failed to fetch program details" });
+    }
+  },
+);
 
 router.get("/ByCode", authenticateToken, async (req, res) => {
   try {

@@ -39,7 +39,7 @@ export const PerformanceBalanceChart = ({
   individualStudentData,
 }: PerformanceBalanceChartProps) => {
   // Extract unique grades to show individual grade radars if toggled
-  const { t } =useTranslation("common");
+  const { t } = useTranslation("common");
   // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
   const uniqueGrades = useMemo(() => {
     if (!balanceData) return [];
@@ -100,7 +100,6 @@ export const PerformanceBalanceChart = ({
           stroke="#94a3b8"
           fill="#cbd5e1"
           fillOpacity={0.1}
-          isAnimationActive={false}
         />
 
         {/* Dynamic Radars based on Visibility */}
