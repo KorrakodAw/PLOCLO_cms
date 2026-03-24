@@ -1,25 +1,38 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { apiClient } from "@/utils/apiClient";
 import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useAuth } from "../../context/AuthContext";
 import { PerformanceBalanceChart } from "../viewChartComponent/PerformanceBalanceChart";
 import { PerformanceTrendChart } from "../viewChartComponent/PerformanceTrendChart";
-import { GradeDistributionChart } from "../viewChartComponent/gradeDistributionChart";
-import { ToggleButton } from "../viewChartComponent/ToggleButton";
+
 import StudentPerformanceTable from "../viewChartComponent/StudentDataTable";
+import * as XLSX from "xlsx";
+import { toPng } from "html-to-image";
+
+import { DashboardLoading } from "./courseComponents/DashboardLoading";
+import { NoDataAvailable } from "./courseComponents/NoDataAvailable";
+import { DashboardHeader } from "./courseComponents/DashboardHeader";
+import { DashboardControls } from "./courseComponents/DashboardControls";
 
 interface CloStatsDashboardProps {
-  CsemesterId: any;
-  program_id: any;
+  CsemesterId: string;
+  program_id: string;
 }
 
 export default function CloStatsDashboard({
   CsemesterId,
   program_id,
 }: CloStatsDashboardProps) {
+  const graphRef = useRef<HTMLDivElement>(null);
   const { user, token } = useAuth();
   const { showToast } = useGlobalToast();
   const [loading, setLoading] = useState(false);
@@ -38,8 +51,6 @@ export default function CloStatsDashboard({
     studentStatPercent: null,
     studentName: null,
   });
-
-
 
   const fetchData = useCallback(async () => {
     if (!CsemesterId || !token) return;
@@ -90,7 +101,8 @@ export default function CloStatsDashboard({
         scoreCloStat: cloStats,
         scoreCloStatPercent: statsPercent.data.cloStatsPercentage || null,
         studentStat: studentData,
-        studentStatPercent: studentStatsPercent.data.cloScoresPerStudent || [],
+        studentStatPercent:
+          studentStatsPercent.data.cloPercentagePerStudent || [],
         studentName: studentName.data || [],
       });
     } catch (err) {
@@ -141,6 +153,43 @@ export default function CloStatsDashboard({
       };
     });
   }, [data.studentStat, data.studentName]);
+
+  const flattenedTableDataPercent = useMemo(() => {
+    const scores = data.studentStatPercent || [];
+    const names = data.studentName || [];
+
+    if (scores.length === 0) return [];
+
+    const studentInfoMap = new Map(
+      names.map((s: any) => [
+        s.id,
+        {
+          code: s.student_code || s.student_id,
+          fullName: `${s.first_name} ${s.last_name}`.trim(),
+          section: s.sectionNo,
+        },
+      ]),
+    );
+
+    return scores.map((scoreEntry: any) => {
+      const info = studentInfoMap.get(scoreEntry.student_id);
+
+      // สร้าง Object พื้นฐานพร้อมกับ "ยกก้อน" ขแนนมาทั้งหมด
+      return {
+        student_code: info?.code || "N/A",
+        Name: info?.fullName || "Unknown Student",
+        section: info?.section || "-",
+
+        // 🟢 ส่งก้อน Array ไปตรงๆ ไม่ต้องวน Loop แผ่ Property ออกมา
+        cloPercentages: scoreEntry.cloPercentages || [],
+        // ploScores: scoreEntry.ploScores || [],
+        // categoryScores: scoreEntry.categoryScores || [],
+
+        // หากต้องการค่าสรุปบางตัวไว้โชว์ในตารางหลักด้วย ก็ดึงออกมาได้
+        // totalScore: scoreEntry.totalScore || 0,
+      };
+    });
+  }, [data.studentStatPercent, data.studentName]);
 
   const formattedChartData = useMemo(() => {
     // 1. เช็คว่ามีข้อมูล cloStats หรือไม่ (อ้างอิงตาม JSON ที่คุณส่งมา)
@@ -194,93 +243,178 @@ export default function CloStatsDashboard({
     );
   }, [data.scoreCloStatPercent]);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-20 space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p className="text-slate-500 animate-pulse">
-          Loading Dashboard Data...
-        </p>
-      </div>
-    );
-  }
+  const [displayMode, setDisplayMode] = useState<"chart" | "radar">("chart");
+
+  const handleCaptureGraph = async () => {
+    if (!graphRef.current) return;
+
+    try {
+      // 🟢 เพิ่มการรอเล็กน้อยเพื่อให้ DOM นิ่ง
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const dataUrl = await toPng(graphRef.current, {
+        cacheBust: true,
+        // 🟢 บังคับขนาดที่แน่นอนตอน capture เพื่อช่วย ResponsiveContainer
+        width: graphRef.current.offsetWidth,
+        height: graphRef.current.offsetHeight,
+        style: {
+          visibility: "visible",
+        },
+      });
+
+      const link = document.createElement("a");
+      link.download = `performance-chart-${new Date().getTime()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Capture Error:", err);
+    } finally {
+      setLoading(false);
+      showToast("Graph image captured!", "success");
+    }
+  };
+
+  const handleExportAllExcel = () => {
+    try {
+      const workbook = XLSX.utils.book_new();
+
+      const dataToExport = flattenedTableData.map((item) => {
+        const row: { [key: string]: string | number } = {
+          "Student Code": item.student_code,
+          "Student Name": item.Name,
+        };
+
+        if (item.cloScores && Array.isArray(item.cloScores)) {
+          item.cloScores.forEach(
+            (clo: { cloCode: string; cloScore: number }) => {
+              row[clo.cloCode] = clo.cloScore;
+            },
+          );
+        }
+        return row;
+      });
+
+      const sheets = [{ data: dataToExport, name: "CLO_Scores" }];
+
+      sheets.forEach((s) => {
+        if (s.data.length > 0) {
+          const ws = XLSX.utils.json_to_sheet(s.data);
+          XLSX.utils.book_append_sheet(workbook, ws, s.name);
+        }
+      });
+
+      XLSX.writeFile(
+        workbook,
+        `Academic_Report_${new Date().getFullYear()}.xlsx`,
+      );
+      showToast("Exported all data to Excel!", "success");
+    } catch (error) {
+      console.error(error);
+      showToast("Export failed", "error");
+    }
+  };
+
+  const [dataMode, setDataMode] = useState<"score" | "percent">("score");
+
+  const [individualStudentData, setIndividualStudentData] = useState<any>(null);
+
+  const handleStudentView = (id: string) => {
+    setIndividualStudentData(id);
+  };
+
+  useEffect(() => {
+    setIndividualStudentData(null);
+  }, [dataMode, displayMode, token]);
+
+  const activeTableData =
+    dataMode === "score" ? flattenedTableData : flattenedTableDataPercent;
+
+  const activeChartData =
+    dataMode === "score" ? formattedChartData : formattedChartDataPercent;
 
   // 2. ถ้าโหลดเสร็จแล้ว แต่ไม่มีข้อมูล (Check จากหลายๆ จุดเพื่อให้มั่นใจ)
   const hasNoData =
     !data.scoreCloStat ||
     Object.keys(data.scoreCloStat).length === 0 ||
     !data.studentStat ||
-    (Array.isArray(data.studentStat) && data.studentStat.length === 0);
+    (Array.isArray(data.studentStat) && flattenedTableData.length === 0);
 
   if (hasNoData) {
     return (
-      <div className="mt-8 bg-white p-12 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
-        <div className="bg-slate-50 p-4 rounded-full mb-4">
-          <svg
-            className="w-12 h-12 text-slate-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-        </div>
-        <h3 className="text-xl font-bold text-slate-800">No Data Available</h3>
-        <p className="text-slate-500 max-w-xs mt-2">
-          There is no CLO performance data recorded for the{" "}
-          <span className="font-semibold text-blue-600">{CsemesterId}</span>{" "}
-          yet.
-        </p>
-      </div>
+      <NoDataAvailable alertMessage="There is no CLO performance data recorded yet." />
     );
   }
 
   return (
-    <div className="mt-8 space-y-8">
-      {loading && <LoadingOverlay />}
-
+    <div className="mt-8 space-y-8 ">
       {/* Header Section */}
+      <DashboardHeader
+        title={`CLO Performance Dashboard`}
+        onSaveImage={handleCaptureGraph}
+        onExportExcel={handleExportAllExcel}
+      />
       {/* <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">
-            Dashboard for {CsemesterId}
-          </h2> 
+            Dashboard for CLO Performance
+          </h2>
           <p className="text-slate-500 text-sm mt-1">
                  Analyzing CLO performance based on{" "}
                  {displayMode === "score" ? "raw points" : "percentage metrics"}
-               </p>
+               </p> 
         </div>
 
-        
-        <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
-               <button
-                 onClick={() => setDisplayMode("score")}
-                 className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
-                   displayMode === "score"
-                     ? "bg-white text-blue-600 shadow-md"
-                     : "text-slate-500 hover:text-slate-700"
-                 }`}
-               >
-                 Raw Score
-               </button>
-               <button
-                 onClick={() => setDisplayMode("percent")}
-                 className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
-                   displayMode === "percent"
-                     ? "bg-white text-blue-600 shadow-md"
-                     : "text-slate-500 hover:text-slate-700"
-                 }`}
-               >
-                 Percentage (%)
-               </button>
-             </div> 
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+          <button
+            onClick={handleCaptureGraph}
+            className="group flex items-center gap-2.5 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-[11px] tracking-wider font-bold rounded-xl shadow-lg shadow-blue-200/50 transition-all duration-300 active:scale-95"
+          >
+            <FaCamera className="text-sm group-hover:-rotate-12 transition-transform duration-300" />
+            <span>SAVE IMAGE</span>
+          </button>
+
+          <button
+            onClick={handleExportAllExcel}
+            className="group flex items-center gap-2.5 px-6 py-3 bg-white border border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white text-[11px] tracking-wider font-bold rounded-xl shadow-sm hover:shadow-emerald-200 transition-all duration-300 active:scale-95"
+          >
+            <FaFileExcel className="text-sm group-hover:bounce transition-transform duration-300" />
+            <span>EXPORT REPORT</span>
+          </button>
+        </div>
+        <div>
+          <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
+            <button
+              onClick={() => setDisplayMode("chart")}
+              className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
+                displayMode === "chart"
+                  ? "bg-white text-blue-600 shadow-md"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Bar Chart
+            </button>
+            <button
+              onClick={() => setDisplayMode("radar")}
+              className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
+                displayMode === "radar"
+                  ? "bg-white text-blue-600 shadow-md"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Radar Chart
+            </button>
+          </div>
+        </div>
       </div> */}
-      <div className="flex items-center gap-1.5 p-1 rounded-[1.25rem]">
+      <DashboardControls
+        displayMode={displayMode}
+        setDisplayMode={setDisplayMode}
+        visibleLines={visibleLines}
+        setVisibleLines={setVisibleLines}
+        dataMode={dataMode}
+        setDataMode={setDataMode}
+      />
+      {/* <div className="flex items-center gap-1.5 p-1 rounded-[1.25rem]">
         <ToggleButton
           label="MAX"
           active={visibleLines.maxScore}
@@ -320,62 +454,81 @@ export default function CloStatsDashboard({
           }
           color="#f59e0b"
         />
-      </div>
+      </div> */}
 
       {/* Charts Grid Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Card 1: Performance Trend */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-slate-800">
-              Performance Trend
-            </h3>
-            <p className="text-sm text-slate-500">
-              Comparison of Min, Max, and Average Scores
-            </p>
-          </div>
-          <div className="h-[400px] w-full">
-            <PerformanceTrendChart
-              chartData={formattedChartData}
-              xAxisKey="cloLabel"
-              allAvgKey="avgScore"
-              maxScoreKey="maxScore"
-              minScoreKey="minScore"
-              midScoreKey="midScore"
-              maxScorePosKey="fullScore"
-              visibleLines={visibleLines}
-            />
-          </div>
-        </div>
+      <div
+        ref={graphRef}
+        className="w-full grid grid-cols-1 gap-8 "
+        style={{
+          minHeight: "500px",
+          maxWidth: "1500px",
+          backgroundColor: "white",
+        }}
+      >
+        {/* Card 1: Bar Chart */}
+        {displayMode === "chart" && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col animate-in slide-in-from-left duration-500">
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                Performance Trend
+              </h3>
+              <p className="text-sm text-slate-500">
+                Showing {dataMode === "score" ? "Raw Scores" : "Percentages"}{" "}
+                for PLO Performance
+              </p>
+            </div>
 
-        {/* Card 2: Performance Balance (Radar/Spider Chart) */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-slate-800">
-              Competency Balance
-            </h3>
-            <p className="text-sm text-slate-500">
-              Overview of all PLOs in a single view
-            </p>
+            <div className="h-[450px] w-full">
+              <PerformanceTrendChart
+                chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือก
+                individualStudentData={individualStudentData}
+                xAxisKey="cloLabel"
+                allAvgKey="avgScore"
+                maxScoreKey="maxScore"
+                minScoreKey="minScore"
+                midScoreKey="midScore"
+                maxScorePosKey="fullScore"
+                visibleLines={visibleLines}
+              />
+            </div>
           </div>
-          <div className="h-[400px] w-full">
-            <PerformanceBalanceChart
-              chartData={formattedChartDataPercent}
-              xAxisKey="cloLabel"
-              allAvgKey="avgScore"
-              maxScoreKey="maxScore"
-              minScoreKey="minScore"
-              midScoreKey="midScore"
-              maxScorePosKey="fullScore"
-              visibleLines={visibleLines}
-            />
+        )}
+
+        {/* Card 2: Radar Chart */}
+        {displayMode === "radar" && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col animate-in slide-in-from-right duration-500">
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                Competency Balance
+              </h3>
+              <p className="text-sm text-slate-500">
+                Overview of{" "}
+                {dataMode === "score" ? "Raw Scores" : "Percentages"} in Radar
+                View
+              </p>
+            </div>
+            <div className="h-[450px] w-full">
+              <PerformanceBalanceChart
+                chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
+                individualStudentData={individualStudentData}
+                xAxisKey="cloLabel"
+                allAvgKey="avgScore"
+                maxScoreKey="maxScore"
+                minScoreKey="minScore"
+                midScoreKey="midScore"
+                maxScorePosKey="fullScore"
+                visibleLines={visibleLines}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
-      <div>
+      <div className="w-full max-w-375 mx-auto">
         <StudentPerformanceTable
-          studentsData={flattenedTableData}
+          studentsData={activeTableData}
           title="Individual Student Performance"
+          onViewDetails={handleStudentView}
         />
       </div>
     </div>

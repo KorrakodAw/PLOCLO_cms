@@ -71,6 +71,12 @@ export const PerformanceBalanceChart = ({
     });
   }, [chartData, balanceData, uniqueGrades, xAxisKey]);
 
+  const dataMax = useMemo(() => {
+    if (!finalChartData.length) return 100;
+    return Math.max(...finalChartData.map((d) => d[maxScorePosKey] || 0));
+  }, [finalChartData, maxScorePosKey]);
+
+  const isPercent = dataMax === 100;
   return (
     <ResponsiveContainer width="100%" height="100%">
       <RadarChart cx="50%" cy="50%" outerRadius="80%" data={finalChartData}>
@@ -90,7 +96,16 @@ export const PerformanceBalanceChart = ({
             border: "none",
             boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
           }}
-          formatter={(value: number) => value.toFixed(2)}
+          itemStyle={{ color: "#0f172a" }}
+          formatter={(value: number, name: string) => {
+            // 🟢 ถ้าเป็นโหมด Percent และชื่อคือ Full Score ให้ซ่อน (return null)
+            if (isPercent && name === t("fullScore")) {
+              return [null, null];
+            }
+
+            // ข้อมูลปกติที่ต้องการแสดง
+            return [`${value.toFixed(2)}${isPercent ? "%" : ""}`, name];
+          }}
         />
 
         {/* Background Radar: Total Possible Score */}
@@ -185,7 +200,28 @@ export const PerformanceBalanceChart = ({
             animationDuration={1000}
           />
         )}
-        <Legend verticalAlign="bottom" height={36} iconType="circle" />
+        <Legend
+          verticalAlign="top"
+          align="right"
+          height={50}
+          iconType="circle"
+          formatter={(value) => {
+            // 🟢 ถ้าชื่อตรงกับ "Full Score" (หรือค่าที่ t("fullScore") คืนมา) ให้เป็นสีดำ
+            // ถ้าไม่ใช่ ให้ปล่อยเป็นสีปกติของ Recharts
+            const isFullScore = value === t("fullScore");
+
+            return (
+              <span
+                className={
+                  isFullScore ? "text-black font-medium" : "font-medium"
+                }
+                style={{ color: isFullScore ? "#000000" : undefined }}
+              >
+                {value}
+              </span>
+            );
+          }}
+        />
       </RadarChart>
     </ResponsiveContainer>
   );

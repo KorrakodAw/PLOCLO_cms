@@ -294,6 +294,7 @@ export default function EditCourseClient({
 
                   <button
                     onClick={() => {
+                      setLoading(true);
                       router.push(
                         `/editCourse/${courseCode}/link-program?semesterId=${formData.semester_id}&year=${formData.year}&semester=${formData.semester}&facultyId=${formData.faculty_id}`,
                       );

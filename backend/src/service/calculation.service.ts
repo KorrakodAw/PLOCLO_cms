@@ -1749,6 +1749,32 @@ export async function getPloScoreAllStudentPerSemesterPercentage(
     },
   });
 
+  const students = await tx.studentScore.findMany({
+    where: {
+      assignment: { semester: { semester, year } },
+      student: { program_id: programId }, // กรอง programId ตั้งแต่ query
+    },
+    distinct: ["student_id"],
+    select: { student_id: true },
+  });
+
+  const studentsInProgram = await tx.student.findMany({
+    where: { program_id: programId },
+    select: {
+      id: true,
+      student_code: true,
+      first_name: true,
+      last_name: true,
+    },
+  });
+
+  const studentNameMap: Record<number, string> = {};
+  const studentCodeMap: Record<number, string> = {};
+  studentsInProgram.forEach((s: any) => {
+    studentNameMap[s.id] = `${s.first_name} ${s.last_name}`;
+    studentCodeMap[s.id] = s.student_code;
+  });
+
   const semesterPloHighest: Record<string, number> = {};
 
   for (const cs of courseSemesters) {
@@ -1792,6 +1818,8 @@ export async function getPloScoreAllStudentPerSemesterPercentage(
     });
 
     return {
+      student_code: studentCodeMap[student.student_id] || null,
+      student_name: studentNameMap[student.student_id] || null,
       student_id: student.student_id,
       programId: student.programId,
       ploScores: percentageScores,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { apiClient } from "@/utils/apiClient";
 import DropdownSelect from "@/components/DropdownSelect";
 import { useAuth } from "../context/AuthContext";
@@ -14,7 +14,7 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import YearStatsDashboard from "./YearStatsDashboard";
 import SemesterStatsDashboard from "./SemesterStatsDashboard";
 import CourseStatsDashboard from "./CourseStatsDashboard";
-import { University } from "lucide-react";
+
 
 export default function ViewChartPage() {
   const { token } = useAuth();
@@ -330,8 +330,8 @@ export default function ViewChartPage() {
       <div
         className="bg-white/50 
               min-[768px]:grid-cols-3 
-              min-[1400px]:grid-cols-6 
-              items-endbg-white/50 backdrop-blur-sm p-4 rounded-[2.5rem] border border-slate-200/60 shadow-sm grid grid-cols-2  gap-4 items-end"
+              min-[1500px]:grid-cols-6 
+              items-endbg-white/50 backdrop-blur-sm p-4 rounded-[2.5rem] border border-slate-200/60 shadow-sm grid grid-cols-2  gap-4 items-end max-w-[1500px] aliign-middle mx-auto"
       >
         <DropdownSelect
           label="University"
@@ -469,8 +469,6 @@ export default function ViewChartPage() {
       {chartCourseParams && (
         <CourseStatsDashboard
           CsemesterId={chartCourseParams.Csemester_id}
-          year={chartCourseParams.year}
-          semester={chartCourseParams.semester}
           courseId={chartCourseParams.courseId}
           program_id={chartCourseParams.program_id}
         />

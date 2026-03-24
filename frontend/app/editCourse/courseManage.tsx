@@ -283,10 +283,10 @@ export default function CourseManagement({
           name: String(data.nameEn),
           name_th: String(data.nameTh),
           faculty_id: Number(selectedFaculty), // 🟢 ระบุเจ้าของวิชา
-          // program_id: Number(selectedProgram), // 🟢 ระบุหลักสูตรที่ใช้
-          // year: Number(selectedYear),
-          // semester: Number(selectedSemester),
-          // section: Number(selectedSection),
+          program_id: Number(selectedProgram), // 🟢 ระบุหลักสูตรที่ใช้
+          year: Number(selectedYear),
+          semester: Number(selectedSemester),
+          section: Number(selectedSection),
           credits: 3,
         },
         token,
@@ -341,7 +341,7 @@ export default function CourseManagement({
         code: String(code),
         name_th: String(nameTh),
         name: String(nameEn),
-        // program_id: selectedProgram,
+        program_id: Number(selectedProgram), // 🟢 ระบุหลักสูตรที่ใช้
         faculty_id: selectedFaculty || "1", // Fallback to 1 if not selected
         year: selectedYear,
         semester: selectedSemester || "1",
@@ -375,8 +375,6 @@ export default function CourseManagement({
     }
   };
 
-
-
   // --- Table Configuration ---
   const courseColumns: Column<Course>[] = [
     { header: t("course id"), accessor: "code" },
@@ -408,6 +406,7 @@ export default function CourseManagement({
           label: t("view details"),
           color: "blue",
           onClick: (row: Course) => {
+            setLoadingCourse(true);
             router.push(`/editCourse/${row.code}`); // ไปจัดการ Sections ภายใต้รหัสนี้
           },
         },

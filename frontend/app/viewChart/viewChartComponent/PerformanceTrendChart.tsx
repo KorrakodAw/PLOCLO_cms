@@ -72,6 +72,13 @@ export const PerformanceTrendChart = ({
     });
   }, [chartData, balanceData, uniqueGrades, xAxisKey]);
 
+  const dataMax = useMemo(() => {
+    if (!finalChartData.length) return 100;
+    return Math.max(...finalChartData.map((d) => d[maxScorePosKey] || 0));
+  }, [finalChartData, maxScorePosKey]);
+
+  const isPercent = dataMax === 100;
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart
@@ -102,26 +109,46 @@ export const PerformanceTrendChart = ({
             border: "none",
             boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
           }}
-          cursor={{
-            stroke: "#e2e8f0",
-            strokeWidth: 2,
-            strokeDasharray: "5 5",
-            fill: "transparent", // เปลี่ยนจาก fill เป็นเส้น stroke แทนจะดูสะอาดกว่า
+          itemStyle={{ color: "#0f172a" }}
+          formatter={(value: number, name: string) => {
+            // 🟢 ถ้าเป็นโหมด Percent และชื่อคือ Full Score ให้ซ่อน (return null)
+            if (isPercent && name === t("fullScore")) {
+              return [null, null];
+            }
+
+            // ข้อมูลปกติที่ต้องการแสดง
+            return [`${value.toFixed(2)}${isPercent ? "%" : ""}`, name];
           }}
-          formatter={(value: number) => value.toFixed(2)}
         />
         <Legend
           verticalAlign="top"
           align="right"
-          height={40}
+          height={50}
           iconType="circle"
+          formatter={(value) => {
+            // 🟢 ถ้าชื่อตรงกับ "Full Score" (หรือค่าที่ t("fullScore") คืนมา) ให้เป็นสีดำ
+            // ถ้าไม่ใช่ ให้ปล่อยเป็นสีปกติของ Recharts
+            const isFullScore = value === t("fullScore");
+
+            return (
+              <span
+                className={
+                  isFullScore ? "text-black font-medium" : "font-medium"
+                }
+                style={{ color: isFullScore ? "#000000" : undefined }}
+              >
+                {value}
+              </span>
+            );
+          }}
         />
         <Bar
           dataKey={maxScorePosKey}
           name={t("fullScore")}
-          fill="#93e3f5"
+          fill={isPercent ? "#f1f5f9" : "#93e3f5"}
           radius={[6, 6, 0, 0]}
-          barSize={300}
+          barSize={isPercent ? 300 : 300}
+          fillOpacity={isPercent ? 1 : 0.8}
         />
         {visibleLines?.maxScore && (
           <Line

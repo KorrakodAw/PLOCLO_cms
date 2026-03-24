@@ -325,6 +325,19 @@ export default function AssignmentCloMapping({
     }
   };
 
+  // ตรวจสอบว่ามีแถวไหนที่กรอกแล้ว (total > 0) แต่ยังไม่ครบ 100% หรือไม่
+  const isAnyRowInvalid = filteredAssignments.some((assign) => {
+    const rowTotal = clos.reduce(
+      (sum, clo) => sum + (mappingGrid[`${assign.id}_${clo.id}`] || 0),
+      0,
+    );
+
+    // ถ้า rowTotal เป็น 0 ถือว่ายังไม่เริ่มกรอก (ยอมรับได้)
+    // แต่ถ้า > 0 และไม่เท่ากับ 100 (isTotalValid เป็นเท็จ) ถือว่า Invalid
+    const isTotalValid = Math.abs(rowTotal - 100) < 0.1;
+    return rowTotal > 0 && !isTotalValid;
+  });
+
   return (
     <div className="flex flex-col gap-6">
       {/* Weight Breakdown Summary */}
@@ -406,9 +419,10 @@ export default function AssignmentCloMapping({
             {/* Save Button: ปรับให้ดูเป็นปุ่มหลัก (Primary Action) */}
             <button
               onClick={handleSave}
-              disabled={loading || changedKeys.size === 0}
+              // 🟢 ปิดปุ่มถ้า: กำลังโหลด OR ไม่มีอะไรเปลี่ยน OR มีแถวที่คะแนนไม่ครบ 100%
+              disabled={loading || changedKeys.size === 0 || isAnyRowInvalid}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all shadow-lg active:scale-95 ${
-                changedKeys.size === 0
+                changedKeys.size === 0 || isAnyRowInvalid // 🟢 เปลี่ยนสีปุ่มถ้า Invalid
                   ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200"
                   : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200"
               }`}
@@ -416,9 +430,13 @@ export default function AssignmentCloMapping({
               {loading ? (
                 <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
               ) : (
-                <Save size={14} /> // แนะนำให้ import Save จาก lucide-react
+                <Save size={14} />
               )}
-              {loading ? "SAVING..." : "SAVE CHANGES"}
+              {loading
+                ? "SAVING..."
+                : isAnyRowInvalid
+                  ? "TOTAL MUST BE 100%" // 🟢 เพิ่มข้อความเตือนบนปุ่ม (Optional)
+                  : "SAVE CHANGES"}
             </button>
           </div>
         </div>
@@ -601,6 +619,7 @@ export default function AssignmentCloMapping({
             </div>
           )}
         </div>
+        
       </div>
     </div>
   );

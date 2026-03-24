@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { apiClient } from "@/utils/apiClient";
 import LoadingOverlay from "@/components/LoadingOverlay";
-import { useToast } from "@/components/Toast";
+import { useGlobalToast } from "@/app/context/ToastContext";
 import { Calculator } from "lucide-react";
 import { GradeDistributionChart } from "../viewChart/viewChartComponent/gradeDistributionChart";
 
@@ -26,7 +26,7 @@ export default function ScoreCalculated({
   sectionId: string | number;
 }) {
   const [loading, setLoading] = useState(true);
-  const { ToastElement, showToast } = useToast();
+  const { showToast } = useGlobalToast();
   const [processedData, setProcessedData] = useState<StudentResult[]>([]);
 
   // 1. Fetch Summary Data
@@ -88,7 +88,6 @@ export default function ScoreCalculated({
     return "bg-red-100 text-red-700";
   };
 
-
   const formattedGradeData = useMemo(() => {
     const students = Array.isArray(processedData) ? processedData : [];
 
@@ -114,7 +113,7 @@ export default function ScoreCalculated({
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-8 relative min-h-[400px]">
       {loading && <LoadingOverlay />}
-      <ToastElement />
+     
 
       <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
         <div className="flex items-center gap-2">

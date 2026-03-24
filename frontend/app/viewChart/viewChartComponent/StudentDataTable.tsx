@@ -3,14 +3,18 @@
 import React, { useMemo } from "react";
 import Table from "@/components/Table";
 
+
+
 interface StudentPerformanceTableProps {
   studentsData: any[];
   title?: string;
+  onViewDetails?: (studentId: string) => void;
 }
 
 export default function StudentPerformanceTable({
   studentsData,
   title,
+  onViewDetails,
 }: StudentPerformanceTableProps) {
   const flattenedData = useMemo(() => {
     // 1. เช็คว่ามีข้อมูลและเป็น Array หรือไม่
@@ -19,18 +23,46 @@ export default function StudentPerformanceTable({
     return studentsData.map((student) => {
       // 2. ดึง ID นักศึกษา (ใช้ student_id ตาม API)
       const row: any = {
-        // Code: student.student_id || student.id || "-",
         Name: student.student_name || student.Name || "Unknown",
         student_code: student.student_code || "Unknown",
       };
 
       // 3. 🟢 จัดการ ploScores ที่เป็น Array [ { plo_name: '...', score: ... } ]
+       if (Array.isArray(student.ploPercentages)) {
+         student.ploPercentages.forEach((item: any) => {
+           // ใช้ clo_name เป็นชื่อคอลัมน์ (Header)
+           const key = item.plo_name || item.ploCode || "Unknown";
+           // เก็บค่าคะแนน
+           const scoreValue = item.percentage || item.percentage || 0;
+
+           row[key] =
+             typeof scoreValue === "number"
+               ? scoreValue.toFixed(2)
+               : (scoreValue ?? "0.00");
+         });
+       }
+
+
       if (Array.isArray(student.ploScores)) {
         student.ploScores.forEach((item: any) => {
           // ใช้ plo_name เป็นชื่อคอลัมน์ (Header)
           const key = item.plo_name || item.ploCode || "Unknown";
           // เก็บค่าคะแนน
           const scoreValue = item.score || item.ploScore || 0;
+
+          row[key] =
+            typeof scoreValue === "number"
+              ? scoreValue.toFixed(2)
+              : (scoreValue ?? "0.00");
+        });
+      }
+
+      if (Array.isArray(student.cloPercentages)) {
+        student.cloPercentages.forEach((item: any) => {
+          // ใช้ clo_name เป็นชื่อคอลัมน์ (Header)
+          const key = item.clo_name || item.cloCode || "Unknown";
+          // เก็บค่าคะแนน
+          const scoreValue = item.percentage || item.percentage || 0;
 
           row[key] =
             typeof scoreValue === "number"
@@ -67,6 +99,20 @@ export default function StudentPerformanceTable({
         });
       }
 
+       if (Array.isArray(student.categoryPercentages)) {
+         student.categoryPercentages.forEach((item: any) => {
+           // ใช้ category เป็นชื่อคอลัมน์ (Header)
+           const key = item.category || "Unknown";
+           // เก็บค่าคะแนน
+           const scoreValue = item.percentage || 0;
+
+           row[key] =
+             typeof scoreValue === "number"
+               ? scoreValue.toFixed(2)
+               : (scoreValue ?? "0.00");
+         });
+       }
+
       return row;
     });
   }, [studentsData]);
@@ -76,6 +122,23 @@ export default function StudentPerformanceTable({
     if (flattenedData.length === 0) return [];
 
     const baseCols = [
+      {
+        header: "Actions",
+        accessor: "Id",
+        actions: [
+          {
+            label: "Show Student Graph",
+
+            color: "blue",
+            onClick: (data: any) => {
+              // 🟢 ถ้ามีการส่งฟังก์ชันมาจาก Parent ให้เรียกใช้งานพร้อมส่ง id
+              if (onViewDetails) {
+                onViewDetails(data);
+              }
+            },
+          },
+        ],
+      },
       { header: "Student Code", accessor: "student_code" },
       { header: "Student Name", accessor: "Name" },
     ];
@@ -90,7 +153,7 @@ export default function StudentPerformanceTable({
       }));
 
     return [...baseCols, ...dynamicCols];
-  }, [flattenedData]);
+  }, [flattenedData, onViewDetails]);
 
   if (!studentsData || flattenedData.length === 0) return null;
 

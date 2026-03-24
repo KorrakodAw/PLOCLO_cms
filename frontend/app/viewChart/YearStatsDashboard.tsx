@@ -13,11 +13,14 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import { useAuth } from "../context/AuthContext";
 import { PerformanceBalanceChart } from "./viewChartComponent/PerformanceBalanceChart";
 import { PerformanceTrendChart } from "./viewChartComponent/PerformanceTrendChart";
-import { GradeDistributionChart } from "./viewChartComponent/gradeDistributionChart";
+
 import { ToggleButton } from "./viewChartComponent/ToggleButton";
 import StudentPerformanceTable from "./viewChartComponent/StudentDataTable";
 import { toPng } from "html-to-image";
-import { FaCamera } from "react-icons/fa";
+import { FaCamera, FaFileExcel } from "react-icons/fa";
+import * as XLSX from "xlsx";
+import { DashboardHeader } from "./CourseStats/courseComponents/DashboardHeader";
+import { DashboardControls } from "./CourseStats/courseComponents/DashboardControls";
 
 interface YearStatsDashboardProps {
   programId: string | number;
@@ -104,7 +107,45 @@ export default function YearStatsDashboard({
     fetchData();
   }, [fetchData]);
 
-  // เพิ่มไว้ด้านบนกับ State อื่นๆ
+  interface PLOScoreItem {
+    ploCode: string; // เช่น 'PLO1', 'PLO2'
+    ploScore: number; // เช่น 10.95, 20.25
+  }
+  const flattenedStudentData = useMemo(() => {
+    const mappedData = (data.studentStat || []).map(
+      (student: {
+        student_id: string;
+        student_code: string;
+        student_name: string;
+        ploScores: PLOScoreItem[];
+      }) => ({
+        student_id: student.student_id,
+        student_code: student.student_code,
+        student_name: student.student_name,
+        ploScores: student.ploScores || [],
+      }),
+    );
+    return mappedData;
+  }, [data.studentStat]); // เพิ่มไว้ด้านบนกับ State อื่นๆ
+
+  const flattenedStudentDataPercent = useMemo(() => {
+    const mappedData = (data.studentStatPercent || []).map(
+      (student: {
+        student_id: string;
+        student_code: string;
+        student_name: string;
+        ploScores: PLOScoreItem[];
+      }) => ({
+        student_id: student.student_id,
+        student_code: student.student_code,
+        student_name: student.student_name,
+        ploScores: student.ploScores || [],
+      }),
+    );
+    return mappedData;
+  }, [data.studentStatPercent]); // เพิ่มไว้ด้านบนกับ State อื่นๆ
+
+ 
 
   const formattedChartData = useMemo(() => {
     if (!data.scoreYearStat) return [];
@@ -152,16 +193,94 @@ export default function YearStatsDashboard({
     );
   }, [data.scoreYearStatPercent]);
 
-  // useEffect(() => {
-  //   console.log(data.studentStat);
-  // }, [data.studentStat]);
+  const [displayMode, setDisplayMode] = useState<"chart" | "radar">("chart");
 
-  // const [displayMode, setDisplayMode] = useState<"score" | "percent">("score");
-  // const currentChartData = useMemo(() => {
-  //   return displayMode === "score"
-  //     ? formattedChartData
-  //     : formattedChartDataPercent;
-  // }, [displayMode, formattedChartData, formattedChartDataPercent]);
+  const handleCaptureGraph = async () => {
+    if (!graphRef.current) return;
+
+    try {
+      // 🟢 เพิ่มการรอเล็กน้อยเพื่อให้ DOM นิ่ง
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const dataUrl = await toPng(graphRef.current, {
+        cacheBust: true,
+        // 🟢 บังคับขนาดที่แน่นอนตอน capture เพื่อช่วย ResponsiveContainer
+        width: graphRef.current.offsetWidth,
+        height: graphRef.current.offsetHeight,
+        style: {
+          visibility: "visible",
+        },
+      });
+
+      const link = document.createElement("a");
+      link.download = `performance-chart-${new Date().getTime()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Capture Error:", err);
+    } finally {
+      setLoading(false);
+      showToast("Graph image captured!", "success");
+    }
+  };
+
+  const handleExportAllExcel = () => {
+    try {
+      const workbook = XLSX.utils.book_new();
+
+      const dataToExport = flattenedStudentData.map((item) => {
+        const row: { [key: string]: string | number } = {
+          "Student Code": item.student_code,
+          "Student Name": item.student_name,
+        };
+
+        if (item.ploScores && Array.isArray(item.ploScores)) {
+          item.ploScores.forEach(
+            (plo: { ploCode: string; ploScore: number }) => {
+              row[plo.ploCode] = plo.ploScore;
+            },
+          );
+        }
+        return row;
+      });
+
+      const sheets = [{ data: dataToExport, name: "PLO_Scores" }];
+
+      sheets.forEach((s) => {
+        if (s.data.length > 0) {
+          const ws = XLSX.utils.json_to_sheet(s.data);
+          XLSX.utils.book_append_sheet(workbook, ws, s.name);
+        }
+      });
+
+      XLSX.writeFile(
+        workbook,
+        `Academic_Report_${new Date().getFullYear()}.xlsx`,
+      );
+      showToast("Exported all data to Excel!", "success");
+    } catch (error) {
+      console.error(error);
+      showToast("Export failed", "error");
+    }
+  };
+
+  const [dataMode, setDataMode] = useState<"score" | "percent">("score");
+
+   const [individualStudentData, setIndividualStudentData] = useState<any>(null);
+
+  const handleStudentView = (id: string) => {
+    setIndividualStudentData(id);
+  };
+
+  useEffect(() => {
+    setIndividualStudentData(null);
+  }, [dataMode, displayMode, token]);
+
+  const activeTableData =
+    dataMode === "score" ? flattenedStudentData : flattenedStudentDataPercent;
+
+  const activeChartData =
+    dataMode === "score" ? formattedChartData : formattedChartDataPercent;
 
   if (loading) {
     return (
@@ -174,12 +293,11 @@ export default function YearStatsDashboard({
     );
   }
 
-  // 2. ถ้าโหลดเสร็จแล้ว แต่ไม่มีข้อมูล (Check จากหลายๆ จุดเพื่อให้มั่นใจ)
   const hasNoData =
     !data.scoreYearStat ||
     Object.keys(data.scoreYearStat).length === 0 ||
     !data.studentStat ||
-    (Array.isArray(data.studentStat) && data.studentStat.length === 0);
+    (Array.isArray(data.studentStat) && flattenedStudentData.length === 0);
 
   if (hasNoData) {
     return (
@@ -208,165 +326,52 @@ export default function YearStatsDashboard({
     );
   }
 
-  const handleCaptureGraph = async () => {
-    if (!graphRef.current) return;
-
-    try {
-      setLoading(true);
-      // 1. รอให้ Animation นิ่ง (Firefox อาจต้องการเวลามากกว่าปกติเล็กน้อย)
-      await new Promise((r) => setTimeout(r, 1000));
-
-      const dataUrl = await toPng(graphRef.current, {
-        cacheBust: true,
-        backgroundColor: "#ffffff",
-        skipFonts: false,
-        includeQueryParams: true,
-        style: {
-          borderRadius: "0",
-          padding: "40px",
-          margin: "0",
-        },
-        filter: (node) => {
-          // ใช้ optional chaining เพื่อความปลอดภัยใน Firefox
-          const exclusionClasses = ["button", "toggle-btn", "no-export"];
-          if (node instanceof HTMLElement && node.classList) {
-            return !exclusionClasses.some((cls) =>
-              node.classList.contains(cls),
-            );
-          }
-          return true;
-        },
-      });
-
-      // 2. ตรวจสอบว่าได้ Data URL จริงหรือไม่ (Firefox บางครั้งคืนค่าเป็น String เปล่าถ้า Error)
-      if (!dataUrl || dataUrl === "data:,") {
-        throw new Error("Generated image is empty");
-      }
-
-      const link = document.createElement("a");
-      link.download = `CLO_Analysis_${new Date().toISOString().split("T")[0]}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link); // 🟢 Firefox ต้องการสิ่งนี้เพื่อให้ Click ได้
-      link.click();
-      document.body.removeChild(link); // Clean up
-
-      showToast("บันทึกรูปภาพสำเร็จ!", "success");
-    } catch (error) {
-      console.error("Capture Error:", error);
-      showToast("ไม่สามารถบันทึกภาพได้ (รองรับได้ดีที่สุดบน Chrome)", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="mt-8 space-y-8">
+    <div className="mt-8 space-y-8 align-middle flex flex-col items-center">
       {loading && <LoadingOverlay />}
 
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">
-            Dashboard for Year {year}
-          </h2>
-          {/* <p className="text-slate-500 text-sm mt-1">
-            Analyzing PLO performance based on{" "}
-            {displayMode === "score" ? "raw points" : "percentage metrics"}
-          </p> */}
-        </div>
-
-        <div>
-          <button
-            onClick={handleCaptureGraph}
-            className="group flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-100 transition-all active:scale-95"
-          >
-            <FaCamera className="text-sm group-hover:rotate-12 transition-transform" />{" "}
-            SAVE IMAGE
-          </button>
-        </div>
-
-        {/* Toggle Switch */}
-        {/* <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
-          <button
-            onClick={() => setDisplayMode("score")}
-            className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
-              displayMode === "score"`
-                ? "bg-white text-blue-600 shadow-md"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Raw Score
-          </button>
-          <button
-            onClick={() => setDisplayMode("percent")}
-            className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
-              displayMode === "percent"
-                ? "bg-white text-blue-600 shadow-md"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Percentage (%)
-          </button>
-        </div> */}
-      </div>
-      <div className="flex items-center gap-1.5 p-1 rounded-[1.25rem]">
-        <ToggleButton
-          label="MAX"
-          active={visibleLines.maxScore}
-          onClick={() =>
-            setVisibleLines((p) => ({
-              ...p,
-              maxScore: !p.maxScore,
-            }))
-          }
-          color="#22c55e"
-        />
-        <ToggleButton
-          label="MIN"
-          active={visibleLines.minScore}
-          onClick={() =>
-            setVisibleLines((p) => ({
-              ...p,
-              minScore: !p.minScore,
-            }))
-          }
-          color="#ef4444"
-        />
-        <ToggleButton
-          label="AVG"
-          active={visibleLines.allAvg}
-          onClick={() => setVisibleLines((p) => ({ ...p, allAvg: !p.allAvg }))}
-          color="#6366f1"
-        />
-        <ToggleButton
-          label="MED"
-          active={visibleLines.midScore}
-          onClick={() =>
-            setVisibleLines((p) => ({
-              ...p,
-              midScore: !p.midScore,
-            }))
-          }
-          color="#f59e0b"
-        />
-      </div>
+      <DashboardHeader
+        title={`Yearly PLO Performance Dashboard - ${year}`}
+        onSaveImage={handleCaptureGraph}
+        onExportExcel={handleExportAllExcel}
+      />
+      <DashboardControls
+        displayMode={displayMode}
+        setDisplayMode={setDisplayMode}
+        visibleLines={visibleLines}
+        setVisibleLines={setVisibleLines}
+        dataMode={dataMode}
+        setDataMode={setDataMode}
+      />
 
       {/* Charts Grid Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Card 1: Performance Trend */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-slate-800">
-              Performance Trend
-            </h3>
-            <p className="text-sm text-slate-500">
-              Comparison of Min, Max, and Average Scores
-            </p>
-          </div>
-          <div ref={graphRef} className="p-6">
-            <div className="h-[400px] w-full">
+      <div
+        ref={graphRef}
+        className="w-full grid grid-cols-1 gap-8 "
+        style={{
+          minHeight: "500px",
+          maxWidth: "1500px",
+          backgroundColor: "white",
+        }}
+      >
+        {/* Card 1: Bar Chart */}
+        {displayMode === "chart" && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col animate-in slide-in-from-left duration-500 ">
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                Performance Trend
+              </h3>
+              <p className="text-sm text-slate-500">
+                Showing {dataMode === "score" ? "Raw Scores" : "Percentages"}{" "}
+                for PLO Performance
+              </p>
+            </div>
+
+            <div className="h-[450px] w-full">
               <PerformanceTrendChart
-                chartData={formattedChartData}
+                chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือก
+                individualStudentData={individualStudentData} // 🟢 ส่งข้อมูลนักเรียนที่เลือกไปยังกราฟ
                 xAxisKey="ploLabel"
                 allAvgKey="avgScore"
                 maxScoreKey="maxScore"
@@ -377,36 +382,42 @@ export default function YearStatsDashboard({
               />
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Card 2: Performance Balance (Radar/Spider Chart) */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-slate-800">
-              Competency Balance
-            </h3>
-            <p className="text-sm text-slate-500">
-              Overview of all PLOs in a single view
-            </p>
+        {/* Card 2: Radar Chart */}
+        {displayMode === "radar" && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col animate-in slide-in-from-right duration-500">
+            <div className="mb-6">
+              <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                Competency Balance
+              </h3>
+              <p className="text-sm text-slate-500">
+                Overview of{" "}
+                {dataMode === "score" ? "Raw Scores" : "Percentages"} in Radar
+                View
+              </p>
+            </div>
+            <div className="h-[450px] w-full">
+              <PerformanceBalanceChart
+                chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
+                individualStudentData={individualStudentData}
+                xAxisKey="ploLabel"
+                allAvgKey="avgScore"
+                maxScoreKey="maxScore"
+                minScoreKey="minScore"
+                midScoreKey="midScore"
+                maxScorePosKey="fullScore"
+                visibleLines={visibleLines}
+              />
+            </div>
           </div>
-          <div className="h-[400px] w-full">
-            <PerformanceBalanceChart
-              chartData={formattedChartDataPercent}
-              xAxisKey="ploLabel"
-              allAvgKey="avgScore"
-              maxScoreKey="maxScore"
-              minScoreKey="minScore"
-              midScoreKey="midScore"
-              maxScorePosKey="fullScore"
-              visibleLines={visibleLines}
-            />
-          </div>
-        </div>
+        )}
       </div>
-      <div>
+      <div className="w-full max-w-375 mx-auto">
         <StudentPerformanceTable
-          studentsData={data.studentStat}
+          studentsData={activeTableData}
           title="Individual Student Performance"
+          onViewDetails={handleStudentView}
         />
       </div>
     </div>
