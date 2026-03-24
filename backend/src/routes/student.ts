@@ -18,7 +18,8 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Program ID is required" });
     }
 
-    // แปลง "8,7" เป็น [8, 7]
+    // 1. จัดการแปลง Query String ให้เป็น Array ของตัวเลขที่สะอาด
+    // รองรับทั้ง "7" และ "7,8" หรือแม้แต่ ["7", "8"]
     const idArray = String(programId)
       .split(",")
       .map((id) => parseInt(id.trim()))
@@ -28,26 +29,54 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid Program ID format" });
     }
 
+    // 2. ใช้ ANY($1::int[]) เพื่อให้ SQL หาข้อมูลจากทุก ID ใน Array
     const result = await pool.query(
       `SELECT 
-        student.id,
-        student.student_code,
-        student.first_name,
-        student.last_name,
-        student.email,
-        student.program_id,
-        p.program_shortname_en,
-        p.program_shortname_th,
+        s.id,
+        s.student_code,
+        s.first_name,
+        s.last_name,
+        s.email,
+        s.program_id,
         p.program_name_en,
-        p.program_name_th
-      FROM student 
-      JOIN program p ON student.program_id = p.id
-      WHERE student.program_id = ANY($1::int[])
-      ORDER BY student.id DESC`,
+        p.program_shortname_en
+      FROM student s
+      JOIN program p ON s.program_id = p.id
+      WHERE s.program_id = ANY($1::int[])
+      ORDER BY p.id ASC, s.student_code ASC`,
       [idArray],
     );
 
-    res.json(result.rows);
+    // 3. จัดกลุ่มข้อมูล (Group by program_id) ให้เป็น Array ของ Object
+    const groupedData = result.rows.reduce((acc: any[], student: any) => {
+      // ค้นหาว่าใน acc มีกลุ่มของ program_id นี้หรือยัง
+      let group = acc.find((g) => g.programId === student.program_id);
+
+      if (!group) {
+        // ถ้ายังไม่มี ให้สร้างกลุ่มใหม่
+        group = {
+          programId: student.program_id,
+          programName: student.program_name_en,
+          shortName: student.program_shortname_en,
+          students: [],
+        };
+        acc.push(group);
+      }
+
+      // เพิ่มนักเรียนเข้าไปในกลุ่มนั้นๆ
+      group.students.push({
+        id: student.id,
+        student_code: student.student_code,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        email: student.email,
+      });
+
+      return acc;
+    }, []);
+
+    // คืนค่าเป็น Array [ { programId: 7, students: [...] }, { programId: 8, ... } ]
+    res.json(groupedData);
   } catch (err) {
     console.error("Error fetching students:", err);
     res.status(500).json({ error: "Failed to fetch students" });

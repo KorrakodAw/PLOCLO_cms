@@ -15,6 +15,8 @@ interface Student {
   student_code: string;
   first_name: string;
   last_name: string;
+  students: Student[];
+  programId: number;
 }
 
 interface StudentCourse {
@@ -120,18 +122,30 @@ export default function AddStudentCourse({
   }, [isLoggedIn, token, sectionId]); // รันใหม่เมื่อเปลี่ยน Section เท่านั้น
   // Filter Logic
   const availableStudents = allProgramStudents
-    .filter((student) => {
-      const isAlreadyInCourse = studentsInAnySection.some(
-        (enrolled) => enrolled.id === student.id,
-      );
-      return !isAlreadyInCourse;
+    .map((group) => {
+      // 1. กรองนักเรียนในแต่ละกลุ่มที่ยังไม่ได้ลงทะเบียนใน Section ใดๆ
+      const filteredStudents = group.students
+        .filter((student) => {
+          const isAlreadyInCourse = studentsInAnySection.some(
+            (enrolled) => enrolled.id === student.id,
+          );
+          return !isAlreadyInCourse;
+        })
+        // 2. Sort ตามรหัสนิสิตภายในกลุ่มนั้นๆ
+        .sort((a, b) =>
+          a.student_code.localeCompare(b.student_code, undefined, {
+            numeric: true,
+          }),
+        );
+
+      // 3. คืนค่ากลุ่มเดิมกลับไป แต่เปลี่ยนรายการนักเรียนเป็นตัวที่ Filter/Sort แล้ว
+      return {
+        ...group,
+        students: filteredStudents,
+      };
     })
-    // 🟢 เพิ่มการ Sort ตามรหัสนิสิต (student_code)
-    .sort((a, b) =>
-      a.student_code.localeCompare(b.student_code, undefined, {
-        numeric: true,
-      }),
-    );
+    // 4. (Optional) กรองกลุ่มที่ไม่มีนักเรียนเหลืออยู่เลยออกไป เพื่อไม่ให้ Tab ว่างเปล่า
+    .filter((group) => group.students.length > 0);
 
   // --- BULK ADD ---
   const handleAddSelected = async () => {
@@ -156,6 +170,28 @@ export default function AddStudentCourse({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isModalOpen && availableStudents.length > 0 && activeTab === "all") {
+      setActiveTab(availableStudents[0].programId);
+    }
+  }, [isModalOpen, availableStudents]);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      // 🛑 ปิดการ Scroll ของหน้าหลัก
+      document.body.style.overflow = "hidden";
+    } else {
+      // ✅ เปิดการ Scroll เมื่อปิด Modal
+      document.body.style.overflow = "unset";
+    }
+
+    // Cleanup function: เผื่อกรณี Component ถูกถอดออก (Unmount) กระทันหัน
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isModalOpen]);
+  
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [invalidCodes, setInvalidCodes] = useState<string[]>([]);
@@ -272,6 +308,8 @@ export default function AddStudentCourse({
       setLoading(false);
     }
   };
+
+  const [activeTab, setActiveTab] = useState<number | "all">("all");
 
   // --- TABLE COLUMNS ---
   const StudentColumns: Column<StudentCourse>[] = [
@@ -393,92 +431,155 @@ export default function AddStudentCourse({
       {/* MODAL POPUP (Same as before, just mapped to selectedCandidates) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h3 className="text-xl font-bold">Select Students to Add</h3>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b flex justify-between items-center bg-white">
+              <h3 className="text-xl font-bold text-[#1e293b]">
+                Select Students
+              </h3>
               <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 text-2xl"
+                onClick={() => {
+                  setSelectedCandidates([]);
+                  setIsModalOpen(false);
+                }}
+                className="text-gray-400 text-2xl hover:text-slate-600"
               >
                 &times;
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
-              <table className="w-full text-left">
-                <thead className="sticky top-0 bg-white border-b z-10">
-                  <tr>
-                    <th className="p-2 w-10">
-                      <input
-                        type="checkbox"
-                        checked={
-                          availableStudents.length > 0 &&
-                          selectedCandidates.length === availableStudents.length
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked)
-                            setSelectedCandidates(
-                              availableStudents.map((s) => s.id),
-                            );
-                          else setSelectedCandidates([]);
-                        }}
-                      />
-                    </th>
-                    <th className="p-2 text-sm font-semibold text-gray-600">
-                      ID
-                    </th>
-                    <th className="p-2 text-sm font-semibold text-gray-600">
-                      Name
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {availableStudents.map((s) => (
-                    <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="p-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedCandidates.includes(s.id)}
-                          onChange={() => {
-                            setSelectedCandidates((prev) =>
-                              prev.includes(s.id)
-                                ? prev.filter((id) => id !== s.id)
-                                : [...prev, s.id],
-                            );
-                          }}
-                        />
-                      </td>
-                      <td className="p-2 text-sm">{s.student_code}</td>
-                      <td className="p-2 text-sm">
-                        {s.first_name} {s.last_name}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {availableStudents.length === 0 && (
-                <div className="text-center py-10 text-gray-500 italic">
-                  No available students found.
-                </div>
-              )}
+            {/* 🟢 ส่วนของ Tabs ด้านบน (Navigation) */}
+            <div className="flex border-b overflow-x-auto bg-slate-50 px-4 gap-2 min-h-[50px] max-h-[100px]">
+              {availableStudents.map((group: any) => (
+                <button
+                  key={group.programId}
+                  onClick={() => setActiveTab(group.programId)}
+                  className={`px-4 py-3 text-[10px] font-black tracking-widest uppercase transition-all border-b-2 whitespace-nowrap ${
+                    activeTab === group.programId
+                      ? "border-blue-600 text-blue-600 bg-white"
+                      : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  {group.shortName || "Program " + group.programId}
+                </button>
+              ))}
             </div>
 
-            <div className="p-6 border-t flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 text-gray-600 font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddSelected}
-                disabled={loading || selectedCandidates.length === 0}
-                className="bg-orange-600 text-white px-6 py-2 rounded-lg font-bold disabled:bg-gray-300"
-              >
-                {loading
-                  ? "Adding..."
-                  : `Add ${selectedCandidates.length} Students`}
-              </button>
+            {/* 🟢 Body: แสดงเฉพาะกลุ่มที่เลือกใน Tab */}
+            <div className="flex-1 overflow-y-auto p-4 bg-white min-h-[400px]">
+              {availableStudents.map((group: any) => {
+                // 🔍 แสดงเฉพาะ Program ที่ตรงกับ Tab ที่เลือกเท่านั้น
+                if (activeTab !== group.programId) return null;
+
+                return (
+                  <div
+                    key={group.programId}
+                    className="animate-in fade-in duration-300"
+                  >
+                    {/* ส่วนหัวสำหรับ Select All ภายในโปรแกรมนั้น */}
+                    <div className="bg-slate-50 px-4 py-2 border border-b-0 rounded-t-xl flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                        {group.programName}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold text-slate-400">
+                          SELECT ALL IN PROGRAM
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={
+                            group.students.length > 0 &&
+                            group.students.every((s: any) =>
+                              selectedCandidates.includes(s.id),
+                            )
+                          }
+                          onChange={(e) => {
+                            const ids = group.students.map((s: any) => s.id);
+                            if (e.target.checked)
+                              setSelectedCandidates((prev) =>
+                                Array.from(new Set([...prev, ...ids])),
+                              );
+                            else
+                              setSelectedCandidates((prev) =>
+                                prev.filter((id) => !ids.includes(id)),
+                              );
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* ตารางรายชื่อ (แบบ Rounded สวยงาม) */}
+                    <div className="overflow-hidden border rounded-b-xl">
+                      <table className="w-full text-left">
+                        <tbody className="divide-y divide-slate-50">
+                          {group.students.map((s: any) => (
+                            <tr
+                              key={s.id}
+                              className="hover:bg-blue-50/30 transition-colors"
+                            >
+                              <td className="p-3 w-10 text-center">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                  checked={selectedCandidates.includes(s.id)}
+                                  onChange={() => {
+                                    setSelectedCandidates((prev) =>
+                                      prev.includes(s.id)
+                                        ? prev.filter((id) => id !== s.id)
+                                        : [...prev, s.id],
+                                    );
+                                  }}
+                                />
+                              </td>
+                              <td className="p-3 text-xs font-mono text-slate-400 w-24">
+                                {s.student_code}
+                              </td>
+                              <td className="p-3 text-sm font-medium text-slate-700">
+                                {s.first_name} {s.last_name}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer (เหมือนเดิม) */}
+            <div className="p-6 border-t flex justify-between items-center bg-white sticky bottom-0">
+              <div className="text-sm">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">
+                  Selected:
+                </span>
+                <span className="ml-2 text-orange-600 font-black text-lg">
+                  {selectedCandidates.length}
+                </span>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setSelectedCandidates([]);
+                  }}
+                  className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddSelected}
+                  disabled={loading || selectedCandidates.length === 0}
+                  className="bg-[#d1d5db] text-white px-8 py-2 rounded-lg font-bold disabled:bg-slate-200"
+                  style={{
+                    backgroundColor:
+                      selectedCandidates.length > 0 ? "#3b82f6" : "",
+                  }} // ปรับสีปุ่มตามรูป
+                >
+                  {loading ? "Adding..." : "Add Students"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
