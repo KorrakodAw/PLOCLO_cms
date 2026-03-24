@@ -124,3 +124,21 @@ type node_modules\next\package.json | findstr "\"version\"" หรือ npx nex
     Fix untgz
 อยู่ path root
 npm install
+
+
+```
+## Git Action
+```
+////////////  Run sonarqube //////////// 
+docker run -d --name sonarqube -p 9000:9000 sonarqube:lts
+ip -a ดู ip เครื่องตัวเอง
+เข้า sonarqube >>>>> ip:9000
+
+/////////////// Create TOKEN and Settings Secrets ///////////////////
+    ---------------- Create TOKEN ------------------
+🌍 SonarQube 
+    My Account → Security → Generate Token
+/////////////// Settings Secrets ///////////////////
+Settings → Secrets → Secrets and Variables
+1.SONAR_TOKEN ex.f5a1b37f9b5d76d01661385e4fbaf7f644a0c3a6
+2.SONAR_HOST_URL (http://ip:9000) ex.http://104.197.255.217:9000
