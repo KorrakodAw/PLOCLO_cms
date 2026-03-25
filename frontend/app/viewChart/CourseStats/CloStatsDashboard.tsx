@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { apiClient } from "@/utils/apiClient";
 import { useGlobalToast } from "@/app/context/ToastContext";
-import LoadingOverlay from "@/components/LoadingOverlay";
+
 import { useAuth } from "../../context/AuthContext";
 import { PerformanceBalanceChart } from "../viewChartComponent/PerformanceBalanceChart";
 import { PerformanceTrendChart } from "../viewChartComponent/PerformanceTrendChart";
@@ -18,7 +18,7 @@ import StudentPerformanceTable from "../viewChartComponent/StudentDataTable";
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
 
-import { DashboardLoading } from "./courseComponents/DashboardLoading";
+
 import { NoDataAvailable } from "./courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./courseComponents/DashboardHeader";
 import { DashboardControls } from "./courseComponents/DashboardControls";
@@ -318,13 +318,14 @@ export default function CloStatsDashboard({
 
   const [individualStudentData, setIndividualStudentData] = useState<any>(null);
 
-  const handleStudentView = (id: string) => {
-    setIndividualStudentData(id);
+  const handleStudentView = (data: any | null) => {
+    setIndividualStudentData(data);
   };
 
   useEffect(() => {
     setIndividualStudentData(null);
   }, [dataMode, displayMode, token]);
+
 
   const activeTableData =
     dataMode === "score" ? flattenedTableData : flattenedTableDataPercent;
@@ -525,11 +526,21 @@ export default function CloStatsDashboard({
         )}
       </div>
       <div className="w-full max-w-375 mx-auto">
-        <StudentPerformanceTable
-          studentsData={activeTableData}
-          title="Individual Student Performance"
-          onViewDetails={handleStudentView}
-        />
+         <StudentPerformanceTable
+                  studentsData={activeTableData}
+                  title="Individual Student Performance"
+                  onViewDetails={handleStudentView}
+                  // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
+                  selectedId={
+                    individualStudentData
+                      ? String(
+                          individualStudentData.student_id ||
+                            individualStudentData.id ||
+                            individualStudentData.student_code,
+                        )
+                      : null
+                  }
+                />
       </div>
     </div>
   );

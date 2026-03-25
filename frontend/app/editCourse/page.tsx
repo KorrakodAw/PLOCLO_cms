@@ -74,7 +74,7 @@ export default function EditCourse() {
   const handleClear = () => {
     localStorage.removeItem("edit_fix_filters");
     if (isInstructor) {
-      setSelections((prev) => ({ ...prev })); 
+      setSelections((prev) => ({ ...prev }));
       setSearchTerm("");
     } else {
       setSelections({ university: "", faculty: "", program: "" });
@@ -208,7 +208,7 @@ export default function EditCourse() {
     <ProtectedRoute
       roles={["system_admin", "Super_admin", "instructor", "course_admin"]}
     >
-      <div className="max-w-[1400px] min-h-screen flex flex-col mx-auto p-6 space-y-6 bg-[#fcfcfd]">
+      <div className="max-w-[1400px] min-h-screen flex flex-col mx-auto p-6 space-y-6 ">
         <header className="space-y-1">
           <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
             {t("course information")}

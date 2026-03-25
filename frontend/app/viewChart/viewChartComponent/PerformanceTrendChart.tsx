@@ -210,33 +210,65 @@ export const PerformanceTrendChart = ({
         {individualStudentData && (
           <Line
             type="monotone"
+            // 🛠️ Refactor: ใช้ Helper Function เพื่อความสะอาด
             dataKey={(dataPoint) => {
-              const key = dataPoint[xAxisKey];
-              const value = individualStudentData[key];
-              return value ? Number(value) : 0;
+              const currentLabel = dataPoint[xAxisKey];
+
+              // 1. รวมทุก Array ที่อาจจะมีข้อมูลเข้าด้วยกัน (Flat search)
+              // ใช้ Optional Chaining (?.) เพื่อป้องกัน Error กรณี Property ไม่มีอยู่จริง
+              const allScores = [
+                ...(individualStudentData.ploScores || []),
+                ...(individualStudentData.ploPercentages || []),
+                ...(individualStudentData.cloScores || []),
+                ...(individualStudentData.cloPercentages || []),
+                ...(individualStudentData.categoryScores || []),
+                ...(individualStudentData.categoryPercentages || []),
+              ];
+
+              // 2. ค้นหาข้อมูลที่ตรงกับ Label บนแกน X
+              const target = allScores.find(
+                (item) =>
+                  item.ploCode === currentLabel ||
+                  item.plo_name === currentLabel ||
+                  item.cloCode === currentLabel ||
+                  item.category === currentLabel,
+              );
+
+              if (!target) return null;
+
+              // 3. ดึงค่าตัวเลขตัวแรกที่เจอ (Priority Mapping)
+              const val =
+                target.ploScore ??
+                target.percentage ??
+                target.score ??
+                target.cloScore ??
+                target.realScore ??
+                target.realScorePercentages;
+
+              return val !== undefined ? Number(val) : null;
             }}
-            name={`${individualStudentData.Name}`}
-            // 🎨 ปรับสไตล์ให้ Minimal และดู Premium (Slate Dark)
-            stroke="#0f172a" // Slate 900 (สีน้ำเงินเกือบดำ)
-            strokeWidth={4} // ปรับความหนาให้พอดี (หนากว่าเส้นเฉลี่ยเล็กน้อย)
+            // --- Configuration ---
+            name={`คะแนนของ: ${individualStudentData.student_name || individualStudentData.Name || "นักเรียนคนนี้"}`}
+            stroke="#0f172a"
+            strokeWidth={4}
             strokeLinecap="round"
-            // ✨ ปรับ Dot ให้ดูสะอาดตาด้วยขอบขาวหนา
+            connectNulls // เชื่อมเส้นกรณีข้อมูลขาดช่วง
+            // --- Styles (Slate Dark Theme) ---
             dot={{
               r: 6,
               fill: "#0f172a",
               stroke: "#fff",
               strokeWidth: 2.5,
             }}
-            // 🔥 ขยายเมื่อ Hover
             activeDot={{
               r: 8,
-              strokeWidth: 0,
               fill: "#1e293b",
+              strokeWidth: 0,
             }}
-            // 🪄 Drop Shadow แบบเบาๆ (Subtle) เพื่อให้เส้นดูมีมิติ
             style={{
               filter: "drop-shadow(0px 3px 4px rgba(15, 23, 42, 0.2))",
             }}
+            // --- Animation ---
             animationDuration={1000}
             animationEasing="ease-in-out"
           />

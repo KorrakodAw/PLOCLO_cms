@@ -13,12 +13,12 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import { useAuth } from "../context/AuthContext";
 import { PerformanceBalanceChart } from "./viewChartComponent/PerformanceBalanceChart";
 import { PerformanceTrendChart } from "./viewChartComponent/PerformanceTrendChart";
-import { ToggleButton } from "./viewChartComponent/ToggleButton";
+
 import StudentPerformanceTable from "./viewChartComponent/StudentDataTable";
 
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
-import { FaCamera, FaFileExcel } from "react-icons/fa";
+
 import { DashboardLoading } from "./CourseStats/courseComponents/DashboardLoading";
 import { NoDataAvailable } from "./CourseStats/courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./CourseStats/courseComponents/DashboardHeader";
@@ -267,13 +267,13 @@ export default function SemesterStatsDashboard({
 
   const [individualStudentData, setIndividualStudentData] = useState<any>(null);
 
-  const handleStudentView = (id: string) => {
-    setIndividualStudentData(id);
+  const handleStudentView = (data: any | null) => {
+    setIndividualStudentData(data);
   };
 
-  useEffect(() => {
-    setIndividualStudentData(null);
-  }, [dataMode, displayMode, token]);
+    useEffect(() => {
+      setIndividualStudentData(null);
+    }, [dataMode, displayMode, token]);
 
   const activeTableData =
     dataMode === "score" ? flattenedStudentData : flattenedStudentDataPercent;
@@ -392,6 +392,16 @@ export default function SemesterStatsDashboard({
           studentsData={activeTableData}
           title="Individual Student Performance"
           onViewDetails={handleStudentView}
+          // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
+          selectedId={
+            individualStudentData
+              ? String(
+                  individualStudentData.student_id ||
+                    individualStudentData.id ||
+                    individualStudentData.student_code,
+                )
+              : null
+          }
         />
       </div>
     </div>

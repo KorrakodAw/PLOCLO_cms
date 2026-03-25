@@ -14,10 +14,9 @@ import { useAuth } from "../context/AuthContext";
 import { PerformanceBalanceChart } from "./viewChartComponent/PerformanceBalanceChart";
 import { PerformanceTrendChart } from "./viewChartComponent/PerformanceTrendChart";
 
-import { ToggleButton } from "./viewChartComponent/ToggleButton";
 import StudentPerformanceTable from "./viewChartComponent/StudentDataTable";
 import { toPng } from "html-to-image";
-import { FaCamera, FaFileExcel } from "react-icons/fa";
+
 import * as XLSX from "xlsx";
 import { DashboardHeader } from "./CourseStats/courseComponents/DashboardHeader";
 import { DashboardControls } from "./CourseStats/courseComponents/DashboardControls";
@@ -145,8 +144,6 @@ export default function YearStatsDashboard({
     return mappedData;
   }, [data.studentStatPercent]); // เพิ่มไว้ด้านบนกับ State อื่นๆ
 
- 
-
   const formattedChartData = useMemo(() => {
     if (!data.scoreYearStat) return [];
 
@@ -266,10 +263,10 @@ export default function YearStatsDashboard({
 
   const [dataMode, setDataMode] = useState<"score" | "percent">("score");
 
-   const [individualStudentData, setIndividualStudentData] = useState<any>(null);
+  const [individualStudentData, setIndividualStudentData] = useState<any>(null);
 
-  const handleStudentView = (id: string) => {
-    setIndividualStudentData(id);
+  const handleStudentView = (data: any | null) => {
+    setIndividualStudentData(data);
   };
 
   useEffect(() => {
@@ -418,6 +415,16 @@ export default function YearStatsDashboard({
           studentsData={activeTableData}
           title="Individual Student Performance"
           onViewDetails={handleStudentView}
+          // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
+          selectedId={
+            individualStudentData
+              ? String(
+                  individualStudentData.student_id ||
+                    individualStudentData.id ||
+                    individualStudentData.student_code,
+                )
+              : null
+          }
         />
       </div>
     </div>

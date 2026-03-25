@@ -223,8 +223,6 @@ export default function EditCourseClient({
     }
   };
 
-
-
   if (error)
     return (
       <div className="p-20 text-center font-bold text-rose-500">{error}</div>
@@ -232,7 +230,7 @@ export default function EditCourseClient({
   if (!formData) return <LoadingOverlay />;
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="min-h-screen pb-20">
       {loading && <LoadingOverlay />}
 
       <div className="px-6 py-6 max-w-[1600px] mx-auto">
@@ -308,7 +306,7 @@ export default function EditCourseClient({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-fit bg-white p-2 sm:p-3 rounded-[1.5rem] sm:rounded-full shadow-md border-2 border-slate-100">
+            <div className="flex flex-col min-[600px]:flex-row items-stretch min-[600px]:items-center gap-3 w-full lg:w-fit bg-white p-2 min-[600px]:p-3 rounded-[1.5rem] min-[600px]:rounded-full shadow-md border-2 border-slate-100">
               {/* 1. Semester / Year Selector */}
               <div className="flex-1 min-w-[200px] px-3 py-1 transition-colors group">
                 <label className="flex items-center gap-2 text-[11px] font-black text-indigo-600 uppercase tracking-widest mb-1 ml-1">
