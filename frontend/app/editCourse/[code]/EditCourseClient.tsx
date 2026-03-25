@@ -233,7 +233,7 @@ export default function EditCourseClient({
     <div className="min-h-screen pb-20">
       {loading && <LoadingOverlay />}
 
-      <div className="px-6 py-6 max-w-[1600px] mx-auto">
+      <div className="px-6 py-6 max-w-400 mx-auto">
         <BreadCrumb
           items={[
             { label: t("course management"), href: "/editCourse" },
@@ -245,7 +245,7 @@ export default function EditCourseClient({
         />
       </div>
 
-      <div className="px-6 max-w-[1600px] mx-auto space-y-6">
+      <div className="px-6 max-w-400 mx-auto space-y-6">
         {/* --- HEADER CARD --- */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-8 md:p-10 flex flex-col lg:flex-row justify-between items-start gap-8">
@@ -306,9 +306,9 @@ export default function EditCourseClient({
               </div>
             </div>
 
-            <div className="flex flex-col min-[600px]:flex-row items-stretch min-[600px]:items-center gap-3 w-full lg:w-fit bg-white p-2 min-[600px]:p-3 rounded-[1.5rem] min-[600px]:rounded-full shadow-md border-2 border-slate-100">
+            <div className="flex flex-col min-[600px]:flex-row items-stretch min-[600px]:items-center gap-3 w-full lg:w-fit bg-white p-2 min-[600px]:p-3 rounded-3xl min-[600px]:rounded-full shadow-md border-2 border-slate-100">
               {/* 1. Semester / Year Selector */}
-              <div className="flex-1 min-w-[200px] px-3 py-1 transition-colors group">
+              <div className="flex-1 min-w-50 px-3 py-1 transition-colors group">
                 <label className="flex items-center gap-2 text-[11px] font-black text-indigo-600 uppercase tracking-widest mb-1 ml-1">
                   <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                   {t("Semester / Year")}
@@ -327,7 +327,7 @@ export default function EditCourseClient({
               <div className="h-px w-full sm:h-10 sm:w-0.5 bg-slate-100 self-center mx-1" />
 
               {/* 2. Section Group Selector */}
-              <div className="flex-1 min-w-[180px] px-3 py-1 transition-colors group">
+              <div className="flex-1 min-w-45 px-3 py-1 transition-colors group">
                 <label className="flex items-center gap-2 text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1 ml-1 group-hover:text-blue-600">
                   <div className="w-2 h-2 rounded-full bg-slate-300 group-hover:bg-blue-500 transition-colors" />
                   {t("Section Group")}
@@ -361,7 +361,7 @@ export default function EditCourseClient({
         </div>
 
         {/* --- NAVIGATION TABS --- */}
-        <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4 sticky top-6 z-[40]">
+        <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4 sticky top-6 z-40">
           <div className="p-1.5 bg-white shadow-xl shadow-slate-200/50 rounded-[1.8rem] border border-slate-200 flex flex-1 xl:flex-none">
             <button
               onClick={() => {
@@ -417,7 +417,7 @@ export default function EditCourseClient({
         </div>
 
         {/* --- DYNAMIC CONTENT AREA --- */}
-        <div className="bg-white rounded-[3rem] shadow-sm border border-slate-200 overflow-hidden min-h-[500px] animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-white rounded-[3rem] shadow-sm border border-slate-200 overflow-hidden min-h-125 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="p-8 md:p-12">
             {/* Master Course Data (ID ระดับวิชา) */}
             {activeTab === "clo" && (

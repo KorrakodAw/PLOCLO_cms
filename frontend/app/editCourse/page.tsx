@@ -208,7 +208,7 @@ export default function EditCourse() {
     <ProtectedRoute
       roles={["system_admin", "Super_admin", "instructor", "course_admin"]}
     >
-      <div className="max-w-[1400px] min-h-screen flex flex-col mx-auto p-6 space-y-6 ">
+      <div className="max-w-350 min-h-screen flex flex-col mx-auto p-6 space-y-6 ">
         <header className="space-y-1">
           <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
             {t("course information")}
@@ -231,7 +231,7 @@ export default function EditCourse() {
 
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="flex flex-wrap gap-4 items-end">
-              <div className="min-w-[220px]">
+              <div className="min-w-55">
                 <DropdownSelect
                   label={t("university")}
                   value={selections.university}
@@ -247,7 +247,7 @@ export default function EditCourse() {
                 />
               </div>
 
-              <div className="min-w-[220px]">
+              <div className="min-w-55">
                 <DropdownSelect
                   label={t("faculty")}
                   value={selections.faculty}
@@ -259,7 +259,7 @@ export default function EditCourse() {
                 />
               </div>
 
-              <div className="min-w-[220px]">
+              <div className="min-w-55">
                 <DropdownSelect
                   label={t("program")}
                   value={selections.program}
@@ -272,7 +272,7 @@ export default function EditCourse() {
 
             <button
               onClick={handleClear}
-              className="h-[42px] flex items-center justify-center gap-2 px-6 text-sm font-bold text-slate-400 hover:text-orange-600 bg-white border border-slate-200 rounded-xl transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:shadow-md active:scale-95"
+              className="h-10.5 flex items-center justify-center gap-2 px-6 text-sm font-bold text-slate-400 hover:text-orange-600 bg-white border border-slate-200 rounded-xl transition-all duration-200 hover:border-orange-200 hover:bg-orange-50 hover:shadow-md active:scale-95"
             >
               <span className="text-lg">↺</span>
               {t("clear")}

@@ -18,10 +18,10 @@ import StudentPerformanceTable from "../viewChartComponent/StudentDataTable";
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
 
-
 import { NoDataAvailable } from "./courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./courseComponents/DashboardHeader";
 import { DashboardControls } from "./courseComponents/DashboardControls";
+import { GradeFilterGroup } from "./courseComponents/GradeFilterGroup";
 
 interface CloStatsDashboardProps {
   CsemesterId: string;
@@ -50,6 +50,7 @@ export default function CloStatsDashboard({
     studentStat: null,
     studentStatPercent: null,
     studentName: null,
+    GradeSummary: null,
   });
 
   const fetchData = useCallback(async () => {
@@ -63,6 +64,7 @@ export default function CloStatsDashboard({
       studentStat: null,
       studentStatPercent: null,
       studentName: null,
+      GradeSummary: null,
     });
     try {
       // 🚀 ใช้ Promise.all เพื่อดึงข้อมูลพร้อมกันทั้ง 4 APIs (เร็วขึ้นมาก)
@@ -72,6 +74,7 @@ export default function CloStatsDashboard({
         studentStats,
         studentStatsPercent,
         studentName,
+        GradeSummary,
       ] = await Promise.all([
         apiClient.get(`/calculation/ass-clo/course/stats`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -92,6 +95,10 @@ export default function CloStatsDashboard({
         apiClient.get(`/student/semester-students/${CsemesterId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        apiClient.get(`/calculation/ass-clo/gradeSummary`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { CsemesterId },
+        }),
       ]);
 
       const cloStats = stats.data.cloStats || null;
@@ -104,6 +111,7 @@ export default function CloStatsDashboard({
         studentStatPercent:
           studentStatsPercent.data.cloPercentagePerStudent || [],
         studentName: studentName.data || [],
+        GradeSummary: GradeSummary.data || null,
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -139,6 +147,7 @@ export default function CloStatsDashboard({
 
       // สร้าง Object พื้นฐานพร้อมกับ "ยกก้อน" ขแนนมาทั้งหมด
       return {
+        student_id: scoreEntry.student_id, // 🟢 เพิ่ม student_id ไว้ใน Object เพื่อใช้เป็น Key ในการค้นหาต่อไป
         student_code: info?.code || "N/A",
         Name: info?.fullName || "Unknown Student",
         section: info?.section || "-",
@@ -176,6 +185,7 @@ export default function CloStatsDashboard({
 
       // สร้าง Object พื้นฐานพร้อมกับ "ยกก้อน" ขแนนมาทั้งหมด
       return {
+        student_id: scoreEntry.student_id, // 🟢 เพิ่ม student_id ไว้ใน Object เพื่อใช้เป็น Key ในการค้นหาต่อไป
         student_code: info?.code || "N/A",
         Name: info?.fullName || "Unknown Student",
         section: info?.section || "-",
@@ -192,29 +202,26 @@ export default function CloStatsDashboard({
   }, [data.studentStatPercent, data.studentName]);
 
   const formattedChartData = useMemo(() => {
-    // 1. เช็คว่ามีข้อมูล cloStats หรือไม่ (อ้างอิงตาม JSON ที่คุณส่งมา)
     if (!data.scoreCloStat || !Array.isArray(data.scoreCloStat)) return [];
 
-    // 2. ใช้ข้อมูลจาก Array มาจัดการต่อ
-    return (
-      [...data.scoreCloStat]
-        // 3. เรียงลำดับ CLO1, CLO2, CLO10 ให้ถูกต้อง
-        .sort((a: any, b: any) =>
-          a.cloCode.localeCompare(b.cloCode, undefined, {
-            numeric: true,
-            sensitivity: "base",
-          }),
-        )
-        // 4. Map ข้อมูลเข้าโครงสร้างที่ Chart ต้องการ
-        .map((item: any) => ({
-          cloLabel: item.cloCode, // เช่น "CLO1"
-          avgScore: item.mean, // ค่าเฉลี่ย
-          maxScore: item.max, // ค่าสูงสุด
-          minScore: item.min, // ค่าต่ำสุด
-          midScore: item.median, // ค่ากลาง (Median)
-          fullScore: item.highestPossible, // คะแนนเต็ม
-        }))
-    );
+    return [...data.scoreCloStat]
+
+      .sort((a: any, b: any) =>
+        a.cloCode.localeCompare(b.cloCode, undefined, {
+          numeric: true,
+
+          sensitivity: "base",
+        }),
+      )
+
+      .map((item: any) => ({
+        cloLabel: item.cloCode, // เช่น "CLO1"
+        avgScore: item.mean, // ค่าเฉลี่ย
+        maxScore: item.max, // ค่าสูงสุด
+        minScore: item.min, // ค่าต่ำสุด
+        midScore: item.median, // ค่ากลาง (Median)
+        fullScore: item.highestPossible, // คะแนนเต็ม
+      }));
   }, [data.scoreCloStat]);
 
   const formattedChartDataPercent = useMemo(() => {
@@ -243,6 +250,16 @@ export default function CloStatsDashboard({
     );
   }, [data.scoreCloStatPercent]);
 
+  const gradeCountData = useMemo(() => {
+    if (!data.GradeSummary) return [];
+    return Object.entries(data.GradeSummary).map(
+      ([grade, info]: [string, any]) => ({
+        grade: grade,
+        averages: info.categoryAverages || {}, // 🚩 เช็คว่าในนี้ Key เป็น "CLO1" หรือ "CLO 1"
+      }),
+    );
+  }, [data.GradeSummary]);
+  
   const [displayMode, setDisplayMode] = useState<"chart" | "radar">("chart");
 
   const handleCaptureGraph = async () => {
@@ -316,22 +333,85 @@ export default function CloStatsDashboard({
 
   const [dataMode, setDataMode] = useState<"score" | "percent">("score");
 
-  const [individualStudentData, setIndividualStudentData] = useState<any>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
 
-  const handleStudentView = (data: any | null) => {
-    setIndividualStudentData(data);
-  };
+  const uniqueGrades = useMemo(() => {
+    if (!data.GradeSummary) return [];
+
+    return Object.keys(data.GradeSummary)
+      .filter((key) => key !== "total") // 🟢 กรองคีย์ที่ไม่ใช่เกรดออกที่นี่
+      .sort((a, b) => {
+        const order: Record<string, number> = {
+          A: 1,
+          "B+": 2,
+          B: 3,
+          "C+": 4,
+          C: 5,
+          "D+": 6,
+          D: 7,
+          F: 8,
+        };
+        return (order[a] || 99) - (order[b] || 99);
+      });
+  }, [data.GradeSummary]);
 
   useEffect(() => {
-    setIndividualStudentData(null);
-  }, [dataMode, displayMode, token]);
+    if (uniqueGrades.length > 0) {
+      setVisibleLines((prev) => {
+        const newGradeStates: Record<string, boolean> = {};
+        uniqueGrades.forEach((grade) => {
+          const key = `avg_grade_${grade}`;
+          // ถ้ายังไม่มี key นี้ใน state ให้ตั้งเป็น false (ปิดไว้ก่อน)
+          if (prev[key] === undefined) {
+            newGradeStates[key] = false;
+          }
+        });
+        return { ...prev, ...newGradeStates };
+      });
+    }
+  }, [uniqueGrades]);
 
+  const getGradeColor = (g: string) => {
+    const colors: Record<string, string> = {
+      // 🟢 กลุ่ม Top: เขียวเข้มตัดกับน้ำเงินสว่าง
+      A: "#064e3b", // Emerald 900 (เขียวเข้มจัด)
+      "B+": "#3b82f6", // Blue 500 (น้ำเงินสว่างสดใส)
+      B: "#1e3a8a", // Blue 900 (น้ำเงินเข้ม Navy)
+
+      // 🟡 กลุ่ม Mid: ม่วงสว่างตัดกับส้มทอง
+      "C+": "#a855f7", // Purple 500 (ม่วงสว่าง)
+      C: "#d97706", // Amber 600 (ส้มทองสว่าง)
+
+      // 🔴 กลุ่ม Risk: ชมพูเข้มตัดกับแดงสว่าง
+      "D+": "#be123c", // Rose 700 (ชมพูแดงเข้ม)
+      D: "#fb7185", // Rose 400 (ชมพูพาสเทลสว่าง)
+      F: "#450a0a", // Red 950 (แดงดำ - สื่อถึงจุดวิกฤต)
+    };
+
+    return colors[g] || "#64748b"; // Default: Slate 500
+  };
+
+  // 2. ฟังก์ชัน Handle การคลิกปุ่ม Eye
+  const handleStudentView = (id: string) => {
+    // ถ้ากดซ้ำคนเดิมให้ปิด (Toggle) หรือจะเปลี่ยนคนก็ได้
+    setSelectedStudentId((prev) => (prev === id ? null : id));
+  };
 
   const activeTableData =
     dataMode === "score" ? flattenedTableData : flattenedTableDataPercent;
 
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
+
+  const individualStudentData = useMemo(() => {
+    if (!selectedStudentId) return null;
+
+    return activeTableData.find((s) => {
+      return String(s.student_id) === String(selectedStudentId);
+    });
+  }, [selectedStudentId, activeTableData]);
 
   // 2. ถ้าโหลดเสร็จแล้ว แต่ไม่มีข้อมูล (Check จากหลายๆ จุดเพื่อให้มั่นใจ)
   const hasNoData =
@@ -354,59 +434,7 @@ export default function CloStatsDashboard({
         onSaveImage={handleCaptureGraph}
         onExportExcel={handleExportAllExcel}
       />
-      {/* <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">
-            Dashboard for CLO Performance
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">
-                 Analyzing CLO performance based on{" "}
-                 {displayMode === "score" ? "raw points" : "percentage metrics"}
-               </p> 
-        </div>
 
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-          <button
-            onClick={handleCaptureGraph}
-            className="group flex items-center gap-2.5 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-[11px] tracking-wider font-bold rounded-xl shadow-lg shadow-blue-200/50 transition-all duration-300 active:scale-95"
-          >
-            <FaCamera className="text-sm group-hover:-rotate-12 transition-transform duration-300" />
-            <span>SAVE IMAGE</span>
-          </button>
-
-          <button
-            onClick={handleExportAllExcel}
-            className="group flex items-center gap-2.5 px-6 py-3 bg-white border border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white text-[11px] tracking-wider font-bold rounded-xl shadow-sm hover:shadow-emerald-200 transition-all duration-300 active:scale-95"
-          >
-            <FaFileExcel className="text-sm group-hover:bounce transition-transform duration-300" />
-            <span>EXPORT REPORT</span>
-          </button>
-        </div>
-        <div>
-          <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200">
-            <button
-              onClick={() => setDisplayMode("chart")}
-              className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
-                displayMode === "chart"
-                  ? "bg-white text-blue-600 shadow-md"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              Bar Chart
-            </button>
-            <button
-              onClick={() => setDisplayMode("radar")}
-              className={`px-6 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${
-                displayMode === "radar"
-                  ? "bg-white text-blue-600 shadow-md"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              Radar Chart
-            </button>
-          </div>
-        </div>
-      </div> */}
       <DashboardControls
         displayMode={displayMode}
         setDisplayMode={setDisplayMode}
@@ -415,47 +443,15 @@ export default function CloStatsDashboard({
         dataMode={dataMode}
         setDataMode={setDataMode}
       />
-      {/* <div className="flex items-center gap-1.5 p-1 rounded-[1.25rem]">
-        <ToggleButton
-          label="MAX"
-          active={visibleLines.maxScore}
-          onClick={() =>
-            setVisibleLines((p) => ({
-              ...p,
-              maxScore: !p.maxScore,
-            }))
-          }
-          color="#22c55e"
-        />
-        <ToggleButton
-          label="MIN"
-          active={visibleLines.minScore}
-          onClick={() =>
-            setVisibleLines((p) => ({
-              ...p,
-              minScore: !p.minScore,
-            }))
-          }
-          color="#ef4444"
-        />
-        <ToggleButton
-          label="AVG"
-          active={visibleLines.allAvg}
-          onClick={() => setVisibleLines((p) => ({ ...p, allAvg: !p.allAvg }))}
-          color="#6366f1"
-        />
-        <ToggleButton
-          label="MED"
-          active={visibleLines.midScore}
-          onClick={() =>
-            setVisibleLines((p) => ({
-              ...p,
-              midScore: !p.midScore,
-            }))
-          }
-          color="#f59e0b"
-        />
-      </div> */}
+
+      {/* Grade Toggles Section */}
+      {/* Grade Toggles Container */}
+      <GradeFilterGroup
+        uniqueGrades={uniqueGrades}
+        visibleLines={visibleLines}
+        setVisibleLines={setVisibleLines}
+        getGradeColor={getGradeColor}
+      />
 
       {/* Charts Grid Section */}
       <div
@@ -480,9 +476,10 @@ export default function CloStatsDashboard({
               </p>
             </div>
 
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceTrendChart
-                chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือก
+                chartData={activeChartData}
+                balanceData={gradeCountData}
                 individualStudentData={individualStudentData}
                 xAxisKey="cloLabel"
                 allAvgKey="avgScore"
@@ -491,6 +488,7 @@ export default function CloStatsDashboard({
                 midScoreKey="midScore"
                 maxScorePosKey="fullScore"
                 visibleLines={visibleLines}
+                getGradeColor={getGradeColor}
               />
             </div>
           </div>
@@ -509,9 +507,11 @@ export default function CloStatsDashboard({
                 View
               </p>
             </div>
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceBalanceChart
-                chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
+                chartData={activeChartData} // 🟢
+                // ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
+                balanceData={gradeCountData}
                 individualStudentData={individualStudentData}
                 xAxisKey="cloLabel"
                 allAvgKey="avgScore"
@@ -520,27 +520,28 @@ export default function CloStatsDashboard({
                 midScoreKey="midScore"
                 maxScorePosKey="fullScore"
                 visibleLines={visibleLines}
+                getGradeColor={getGradeColor}
               />
             </div>
           </div>
         )}
       </div>
       <div className="w-full max-w-375 mx-auto">
-         <StudentPerformanceTable
-                  studentsData={activeTableData}
-                  title="Individual Student Performance"
-                  onViewDetails={handleStudentView}
-                  // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
-                  selectedId={
-                    individualStudentData
-                      ? String(
-                          individualStudentData.student_id ||
-                            individualStudentData.id ||
-                            individualStudentData.student_code,
-                        )
-                      : null
-                  }
-                />
+        <StudentPerformanceTable
+          studentsData={activeTableData}
+          title="Individual Student Performance"
+          onViewDetails={handleStudentView}
+          // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
+          selectedId={
+            individualStudentData
+              ? String(
+                  individualStudentData.student_id ||
+                    individualStudentData.id ||
+                    individualStudentData.student_code,
+                )
+              : null
+          }
+        />
       </div>
     </div>
   );

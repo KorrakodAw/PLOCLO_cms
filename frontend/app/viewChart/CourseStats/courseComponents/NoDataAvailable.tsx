@@ -3,7 +3,7 @@ export const NoDataAvailable = ({
 }: {
   alertMessage?: string;
 }) => (
-  <div className="mt-8 bg-white p-12 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+  <div className="mt-8 min-w-[1500px] bg-white p-12 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
     <div className="bg-slate-50 p-4 rounded-full mb-4">
       <svg
         className="w-12 h-12 text-slate-300"

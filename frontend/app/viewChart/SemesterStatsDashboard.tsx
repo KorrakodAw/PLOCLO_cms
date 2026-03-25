@@ -122,6 +122,7 @@ export default function SemesterStatsDashboard({
         student_name: string;
         ploScores: PLOScoreItem[];
       }) => ({
+        student_id: student.student_id,
         student_code: student.student_code,
         student_name: student.student_name,
         ploScores: student.ploScores || [],
@@ -138,6 +139,7 @@ export default function SemesterStatsDashboard({
         student_name: string;
         ploScores: PLOScoreItem[];
       }) => ({
+        student_id: student.student_id,
         student_code: student.student_code,
         student_name: student.student_name,
         ploScores: student.ploScores || [],
@@ -265,21 +267,29 @@ export default function SemesterStatsDashboard({
 
   const [dataMode, setDataMode] = useState<"score" | "percent">("score");
 
-  const [individualStudentData, setIndividualStudentData] = useState<any>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
 
-  const handleStudentView = (data: any | null) => {
-    setIndividualStudentData(data);
+  // 2. ฟังก์ชัน Handle การคลิกปุ่ม Eye
+  const handleStudentView = (id: string) => {
+    // ถ้ากดซ้ำคนเดิมให้ปิด (Toggle) หรือจะเปลี่ยนคนก็ได้
+    setSelectedStudentId((prev) => (prev === id ? null : id));
   };
-
-    useEffect(() => {
-      setIndividualStudentData(null);
-    }, [dataMode, displayMode, token]);
 
   const activeTableData =
     dataMode === "score" ? flattenedStudentData : flattenedStudentDataPercent;
 
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
+
+  const individualStudentData = useMemo(() => {
+    if (!selectedStudentId) return null;
+
+    return activeTableData.find((s) => {
+      return String(s.student_id) === String(selectedStudentId);
+    });
+  }, [selectedStudentId, activeTableData]);
 
   if (loading) {
     return <DashboardLoading />;
@@ -397,7 +407,6 @@ export default function SemesterStatsDashboard({
             individualStudentData
               ? String(
                   individualStudentData.student_id ||
-                    individualStudentData.id ||
                     individualStudentData.student_code,
                 )
               : null

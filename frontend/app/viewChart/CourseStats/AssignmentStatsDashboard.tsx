@@ -23,10 +23,12 @@ import * as XLSX from "xlsx";
 import { NoDataAvailable } from "./courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./courseComponents/DashboardHeader";
 import { DashboardControls } from "./courseComponents/DashboardControls";
+import { GradeFilterGroup } from "./courseComponents/GradeFilterGroup";
 
 interface AssignmentStatsDashboardProps {
   CsemesterId: string;
   program_id: string;
+  onLoadingChange?: (isLoading: boolean) => void;
 }
 
 export default function AssignmentStatsDashboard({
@@ -50,6 +52,7 @@ export default function AssignmentStatsDashboard({
     studentStat: null,
     studentStatPercent: null,
     studentName: null,
+    GradeSummary: null,
   });
 
   const fetchData = useCallback(async () => {
@@ -63,6 +66,7 @@ export default function AssignmentStatsDashboard({
       studentStat: null,
       studentStatPercent: null,
       studentName: null,
+      GradeSummary: null,
     });
     try {
       // 🚀 ใช้ Promise.all เพื่อดึงข้อมูลพร้อมกันทั้ง 4 APIs (เร็วขึ้นมาก)
@@ -72,6 +76,7 @@ export default function AssignmentStatsDashboard({
         studentStats,
         studentStatsPercent,
         studentName,
+        GradeSummary,
       ] = await Promise.all([
         apiClient.get(`/calculation/realScoreAndGrade/stats`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -95,6 +100,10 @@ export default function AssignmentStatsDashboard({
         apiClient.get(`/student/semester-students/${CsemesterId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        apiClient.get(`/calculation/realScoreAndGrade/gradSummary`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { CsemesterId },
+        }),
       ]);
 
       const AssStats = stats.data.categoryStats || [];
@@ -107,6 +116,7 @@ export default function AssignmentStatsDashboard({
         studentStatPercent:
           studentStatsPercent.data.realScorePercentagePerStudent || [],
         studentName: studentName.data || [],
+        GradeSummary: GradeSummary.data || null,
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -130,7 +140,7 @@ export default function AssignmentStatsDashboard({
       names.map((s: any) => [
         s.id,
         {
-          code: s.student_code || s.student_id,
+          code: s.student_code,
           fullName: `${s.first_name} ${s.last_name}`.trim(),
           section: s.sectionNo,
         },
@@ -142,6 +152,7 @@ export default function AssignmentStatsDashboard({
 
       // สร้าง Object พื้นฐานพร้อมกับ "ยกก้อน" ขแนนมาทั้งหมด
       return {
+        student_id: scoreEntry.student_id, // 🟢 เพิ่ม student_id ไว้ใน Object เพื่อใช้เป็น Key ในการค้นหาต่อไป
         student_code: info?.code || "N/A",
         Name: info?.fullName || "Unknown Student",
         section: info?.section || "-",
@@ -246,6 +257,16 @@ export default function AssignmentStatsDashboard({
     );
   }, [data.scoreAssStatPercent]);
 
+  const gradeCountData = useMemo(() => {
+    if (!data.GradeSummary) return [];
+    return Object.entries(data.GradeSummary).map(
+      ([grade, info]: [string, any]) => ({
+        grade: grade,
+        averages: info.categoryAverages || {}, // 🚩 เช็คว่าในนี้ Key เป็น "CLO1" หรือ "CLO 1"
+      }),
+    );
+  }, [data.GradeSummary]);
+
   const [displayMode, setDisplayMode] = useState<"chart" | "radar">("chart");
 
   const handleCaptureGraph = async () => {
@@ -319,21 +340,85 @@ export default function AssignmentStatsDashboard({
 
   const [dataMode, setDataMode] = useState<"score" | "percent">("score");
 
-  const [individualStudentData, setIndividualStudentData] = useState<any>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
 
-  const handleStudentView = (data: any | null) => {
-    setIndividualStudentData(data);
-  };
+  const uniqueGrades = useMemo(() => {
+    if (!data.GradeSummary) return [];
+
+    return Object.keys(data.GradeSummary)
+      .filter((key) => key !== "total") // 🟢 กรองคีย์ที่ไม่ใช่เกรดออกที่นี่
+      .sort((a, b) => {
+        const order: Record<string, number> = {
+          A: 1,
+          "B+": 2,
+          B: 3,
+          "C+": 4,
+          C: 5,
+          "D+": 6,
+          D: 7,
+          F: 8,
+        };
+        return (order[a] || 99) - (order[b] || 99);
+      });
+  }, [data.GradeSummary]);
 
   useEffect(() => {
-    setIndividualStudentData(null);
-  }, [dataMode, displayMode, token]);
+    if (uniqueGrades.length > 0) {
+      setVisibleLines((prev) => {
+        const newGradeStates: Record<string, boolean> = {};
+        uniqueGrades.forEach((grade) => {
+          const key = `avg_grade_${grade}`;
+          // ถ้ายังไม่มี key นี้ใน state ให้ตั้งเป็น false (ปิดไว้ก่อน)
+          if (prev[key] === undefined) {
+            newGradeStates[key] = false;
+          }
+        });
+        return { ...prev, ...newGradeStates };
+      });
+    }
+  }, [uniqueGrades]);
+
+  const getGradeColor = (g: string) => {
+    const colors: Record<string, string> = {
+      // 🟢 กลุ่ม Top: เขียวเข้มตัดกับน้ำเงินสว่าง
+      A: "#064e3b", // Emerald 900 (เขียวเข้มจัด)
+      "B+": "#3b82f6", // Blue 500 (น้ำเงินสว่างสดใส)
+      B: "#1e3a8a", // Blue 900 (น้ำเงินเข้ม Navy)
+
+      // 🟡 กลุ่ม Mid: ม่วงสว่างตัดกับส้มทอง
+      "C+": "#a855f7", // Purple 500 (ม่วงสว่าง)
+      C: "#d97706", // Amber 600 (ส้มทองสว่าง)
+
+      // 🔴 กลุ่ม Risk: ชมพูเข้มตัดกับแดงสว่าง
+      "D+": "#be123c", // Rose 700 (ชมพูแดงเข้ม)
+      D: "#fb7185", // Rose 400 (ชมพูพาสเทลสว่าง)
+      F: "#450a0a", // Red 950 (แดงดำ - สื่อถึงจุดวิกฤต)
+    };
+
+    return colors[g] || "#64748b"; // Default: Slate 500
+  };
+
+  // 2. ฟังก์ชัน Handle การคลิกปุ่ม Eye
+  const handleStudentView = (id: string) => {
+    // ถ้ากดซ้ำคนเดิมให้ปิด (Toggle) หรือจะเปลี่ยนคนก็ได้
+    setSelectedStudentId((prev) => (prev === id ? null : id));
+  };
 
   const activeTableData =
     dataMode === "score" ? flattenedTableData : flattenedTableDataPercent;
 
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
+
+  const individualStudentData = useMemo(() => {
+    if (!selectedStudentId) return null;
+
+    return activeTableData.find((s) => {
+      return String(s.student_id) === String(selectedStudentId);
+    });
+  }, [selectedStudentId, activeTableData]);
 
   // 2. ถ้าโหลดเสร็จแล้ว แต่ไม่มีข้อมูล (Check จากหลายๆ จุดเพื่อให้มั่นใจ)
   const hasNoData =
@@ -365,11 +450,22 @@ export default function AssignmentStatsDashboard({
         setDataMode={setDataMode}
       />
 
+      <GradeFilterGroup
+        uniqueGrades={uniqueGrades}
+        visibleLines={visibleLines}
+        setVisibleLines={setVisibleLines}
+        getGradeColor={getGradeColor}
+      />
+
       {/* Charts Grid Section */}
       <div
         ref={graphRef}
         className="grid grid-cols-1 gap-8"
-        style={{ minHeight: "500px", backgroundColor: "white" }}
+        style={{
+          minHeight: "500px",
+          maxWidth: "1500px",
+          backgroundColor: "white",
+        }}
       >
         {/* Card 1: Bar Chart */}
         {displayMode === "chart" && (
@@ -384,9 +480,10 @@ export default function AssignmentStatsDashboard({
               </p>
             </div>
 
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceTrendChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือก
+                balanceData={gradeCountData}
                 individualStudentData={individualStudentData}
                 xAxisKey="categoryLabel"
                 allAvgKey="avgScore"
@@ -395,6 +492,7 @@ export default function AssignmentStatsDashboard({
                 midScoreKey="midScore"
                 maxScorePosKey="fullScore"
                 visibleLines={visibleLines}
+                getGradeColor={getGradeColor}
               />
             </div>
           </div>
@@ -413,9 +511,10 @@ export default function AssignmentStatsDashboard({
                 View
               </p>
             </div>
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceBalanceChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
+                balanceData={gradeCountData}
                 individualStudentData={individualStudentData}
                 xAxisKey="categoryLabel"
                 allAvgKey="avgScore"
@@ -424,6 +523,7 @@ export default function AssignmentStatsDashboard({
                 midScoreKey="midScore"
                 maxScorePosKey="fullScore"
                 visibleLines={visibleLines}
+                getGradeColor={getGradeColor}
               />
             </div>
           </div>

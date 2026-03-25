@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 
 interface PerformanceTrendChartProps {
   chartData: any[];
-  balanceData?: any[];
+  balanceData?: any; // เปลี่ยนเป็น any เพื่อรับ GradeSummary object
   visibleLines?: Record<string, boolean>;
   getGradeColor?: (grade: string) => string;
   xAxisKey: string;
@@ -23,7 +23,7 @@ interface PerformanceTrendChartProps {
   allAvgKey?: string;
   maxScorePosKey: string;
   midScoreKey?: string;
-  individualStudentData?: any[];
+  individualStudentData?: any;
 }
 
 export const PerformanceTrendChart = ({
@@ -39,57 +39,56 @@ export const PerformanceTrendChart = ({
   allAvgKey,
   individualStudentData,
 }: PerformanceTrendChartProps) => {
-  // Extract unique grades to show individual grade radars if toggled
   const { t } = useTranslation("common");
-  // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
-  const uniqueGrades = useMemo(() => {
+
+  // 1. เตรียมข้อมูลเกรดและคะแนนเฉลี่ยแต่ละด้าน
+  const gradeCountData = useMemo(() => {
     if (!balanceData) return [];
-    return balanceData.map((d) => d.grade);
+    // กรอง 'total' ออก และ Map ข้อมูลเกรด
+    return Object.entries(balanceData)
+      .filter(([key]) => key !== "total")
+      .map(([grade, info]: [string, any]) => ({
+        grade: grade,
+        averages: info.categoryAverages || {},
+      }));
   }, [balanceData]);
 
-  // 2. รวมข้อมูลเพื่อให้ Radar ของเกรดแสดงผลบนแกนเดียวกับภาพรวม
-  // เราจะนำค่าเฉลี่ยของแต่ละเกรดไปใส่ใน chartData เพื่อให้ Recharts วาดได้
+  // 2. รวมข้อมูลคะแนนเกรดเข้าไปใน chartData หลัก
   const finalChartData = useMemo(() => {
+    if (!chartData) return [];
     return chartData.map((point) => {
       const updatedPoint = { ...point };
+      // ดึงชื่อ CLO เช่น "CLO1"
+      const currentLabel = String(point[xAxisKey] || "").replace(/\s+/g, "");
 
-      uniqueGrades.forEach((grade) => {
-        const gradeInfo = balanceData?.find((d) => d.grade === grade);
-        // ค้นหาค่าคะแนนจาก ploScores, cloScores หรือ assignmentScores
-        const scoreEntry =
-          gradeInfo?.ploScores?.find((p: any) => p.label === point[xAxisKey]) ||
-          gradeInfo?.cloScores?.find((c: any) => c.label === point[xAxisKey]) ||
-          gradeInfo?.assignmentScores?.find(
-            (a: any) => a.label === point[xAxisKey],
-          );
-
-        if (scoreEntry) {
-          updatedPoint[`avg_grade_${grade}`] = scoreEntry.value;
+      // วนลูปเอาคะแนนจาก gradeCountData (ที่ส่งมาจาก Props balanceData) มาใส่
+      balanceData?.forEach((item: any) => {
+        const score = item.averages[currentLabel];
+        if (score !== undefined) {
+          updatedPoint[`avg_grade_${item.grade}`] = Number(score);
         }
       });
-
       return updatedPoint;
     });
-  }, [chartData, balanceData, uniqueGrades, xAxisKey]);
+  }, [chartData, balanceData, xAxisKey]);
 
   const dataMax = useMemo(() => {
-    if (!finalChartData.length) return 100;
-    return Math.max(...finalChartData.map((d) => d[maxScorePosKey] || 0));
-  }, [finalChartData, maxScorePosKey]);
+    if (!chartData.length) return 100;
+    return Math.max(...chartData.map((d) => d[maxScorePosKey] || 0));
+  }, [chartData, maxScorePosKey]);
 
   const isPercent = dataMax === 100;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart
-        data={finalChartData}
+        data={finalChartData} // ใช้ข้อมูลที่รวมเกรดแล้ว
         margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
       >
         <CartesianGrid
           strokeDasharray="5 5"
           vertical={false}
           stroke="#e2e8f0"
-          // strokeOpacity={0.9}
         />
         <XAxis
           dataKey={xAxisKey}
@@ -111,13 +110,8 @@ export const PerformanceTrendChart = ({
           }}
           itemStyle={{ color: "#0f172a" }}
           formatter={(value: number, name: string) => {
-            // 🟢 ถ้าเป็นโหมด Percent และชื่อคือ Full Score ให้ซ่อน (return null)
-            if (isPercent && name === t("fullScore")) {
-              return [null, null];
-            }
-
-            // ข้อมูลปกติที่ต้องการแสดง
-            return [`${value.toFixed(2)}${isPercent ? "%" : ""}`, name];
+            if (isPercent && name === t("fullScore")) return [null, null];
+            return [`${Number(value).toFixed(2)}${isPercent ? "%" : ""}`, name];
           }}
         />
         <Legend
@@ -125,31 +119,26 @@ export const PerformanceTrendChart = ({
           align="right"
           height={50}
           iconType="circle"
-          formatter={(value) => {
-            // 🟢 ถ้าชื่อตรงกับ "Full Score" (หรือค่าที่ t("fullScore") คืนมา) ให้เป็นสีดำ
-            // ถ้าไม่ใช่ ให้ปล่อยเป็นสีปกติของ Recharts
-            const isFullScore = value === t("fullScore");
-
-            return (
-              <span
-                className={
-                  isFullScore ? "text-black font-medium" : "font-medium"
-                }
-                style={{ color: isFullScore ? "#000000" : undefined }}
-              >
-                {value}
-              </span>
-            );
-          }}
+          formatter={(value) => (
+            <span
+              className="font-medium"
+              style={{ color: value === t("fullScore") ? "#000" : undefined }}
+            >
+              {value}
+            </span>
+          )}
         />
+        {/* Full Score Bar */}
         <Bar
           dataKey={maxScorePosKey}
           name={t("fullScore")}
           fill={isPercent ? "#f1f5f9" : "#93e3f5"}
           radius={[6, 6, 0, 0]}
-          barSize={isPercent ? 300 : 300}
+          barSize={300} // ปรับขนาดให้พอดี ไม่ใหญ่เกินไป
           fillOpacity={isPercent ? 1 : 0.8}
         />
+
+        {/* Statistical Lines */}
         {visibleLines?.maxScore && (
           <Line
             type="monotone"
@@ -193,84 +182,62 @@ export const PerformanceTrendChart = ({
             strokeWidth={2}
           />
         )}
-        {uniqueGrades.map(
-          (grade) =>
-            visibleLines?.[`avg_grade_${grade}`] && (
-              <Line
-                key={grade}
-                name={`Grade ${grade}`}
-                dataKey={`avg_grade_${grade}`}
-                stroke={getGradeColor?.(grade)}
-                fill={getGradeColor?.(grade)}
-                fillOpacity={0.3}
-                strokeWidth={2}
-              />
-            ),
-        )}
+
+        {/* Dynamic Grade Lines */}
+        {balanceData?.map((item: any) => {
+          const key = `avg_grade_${item.grade}`;
+          if (!visibleLines?.[key]) return null;
+          return (
+            <Line
+              key={item.grade}
+              dataKey={key}
+              name={`Grade ${item.grade}`}
+              stroke={getGradeColor?.(item.grade)}
+              connectNulls={true}
+              strokeWidth={2.5}
+            />
+          );
+        })}
+
+        {/* Individual Student Line */}
         {individualStudentData && (
           <Line
             type="monotone"
-            // 🛠️ Refactor: ใช้ Helper Function เพื่อความสะอาด
             dataKey={(dataPoint) => {
-              const currentLabel = dataPoint[xAxisKey];
+              const currentLabel = (dataPoint[xAxisKey] || "").replace(
+                /\s+/g,
+                "",
+              );
+              const scoresArray =
+                individualStudentData.ploScores ||
+                individualStudentData.ploPercentages ||
+                individualStudentData.cloScores ||
+                individualStudentData.cloPercentage ||
+                individualStudentData.categoryScores ||
+                [];
 
-              // 1. รวมทุก Array ที่อาจจะมีข้อมูลเข้าด้วยกัน (Flat search)
-              // ใช้ Optional Chaining (?.) เพื่อป้องกัน Error กรณี Property ไม่มีอยู่จริง
-              const allScores = [
-                ...(individualStudentData.ploScores || []),
-                ...(individualStudentData.ploPercentages || []),
-                ...(individualStudentData.cloScores || []),
-                ...(individualStudentData.cloPercentages || []),
-                ...(individualStudentData.categoryScores || []),
-                ...(individualStudentData.categoryPercentages || []),
-              ];
-
-              // 2. ค้นหาข้อมูลที่ตรงกับ Label บนแกน X
-              const target = allScores.find(
-                (item) =>
-                  item.ploCode === currentLabel ||
-                  item.plo_name === currentLabel ||
-                  item.cloCode === currentLabel ||
-                  item.category === currentLabel,
+              const target = scoresArray.find(
+                (s: any) =>
+                  (s.ploCode || s.cloCode || s.category || "").replace(
+                    /\s+/g,
+                    "",
+                  ) === currentLabel,
               );
 
-              if (!target) return null;
-
-              // 3. ดึงค่าตัวเลขตัวแรกที่เจอ (Priority Mapping)
-              const val =
-                target.ploScore ??
-                target.percentage ??
-                target.score ??
-                target.cloScore ??
-                target.realScore ??
-                target.realScorePercentages;
-
-              return val !== undefined ? Number(val) : null;
+              return target
+                ? Number(
+                    target.ploScore ||
+                      target.percentage ||
+                      target.cloScore ||
+                      target.score,
+                  )
+                : null;
             }}
-            // --- Configuration ---
-            name={`คะแนนของ: ${individualStudentData.student_name || individualStudentData.Name || "นักเรียนคนนี้"}`}
+            name={`คะแนนของ: ${individualStudentData.student_name || "นักเรียน"}`}
             stroke="#0f172a"
             strokeWidth={4}
-            strokeLinecap="round"
-            connectNulls // เชื่อมเส้นกรณีข้อมูลขาดช่วง
-            // --- Styles (Slate Dark Theme) ---
-            dot={{
-              r: 6,
-              fill: "#0f172a",
-              stroke: "#fff",
-              strokeWidth: 2.5,
-            }}
-            activeDot={{
-              r: 8,
-              fill: "#1e293b",
-              strokeWidth: 0,
-            }}
-            style={{
-              filter: "drop-shadow(0px 3px 4px rgba(15, 23, 42, 0.2))",
-            }}
-            // --- Animation ---
-            animationDuration={1000}
-            animationEasing="ease-in-out"
+            connectNulls={true}
+            dot={{ r: 6, fill: "#0f172a", stroke: "#fff", strokeWidth: 2 }}
           />
         )}
       </ComposedChart>

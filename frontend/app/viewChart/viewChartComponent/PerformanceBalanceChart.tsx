@@ -15,14 +15,14 @@ interface PerformanceBalanceChartProps {
   chartData: any[];
   visibleLines?: Record<string, boolean>;
   getGradeColor?: (grade: string) => string;
-  xAxisKey: string; // e.g., "cloCode"
-  maxScoreKey?: string; // e.g., "max"
-  minScoreKey?: string; // e.g., "min"
-  allAvgKey?: string; // e.g., "mean"
-  maxScorePosKey: string; // e.g., "maxCloScore"
-  balanceData?: any[];
-  midScoreKey?: string; // e.g., "median"
-  individualStudentData?: any[]; // ข้อมูลของนักเรียนแต่ละคนสำหรับแสดงเส้นเฉพาะ
+  xAxisKey: string;
+  maxScoreKey?: string;
+  minScoreKey?: string;
+  allAvgKey?: string;
+  maxScorePosKey: string;
+  balanceData?: any[]; // ข้อมูลที่ส่งมาจาก gradeCountData ในไฟล์หลัก
+  midScoreKey?: string;
+  individualStudentData?: any;
 }
 
 export const PerformanceBalanceChart = ({
@@ -38,38 +38,36 @@ export const PerformanceBalanceChart = ({
   allAvgKey,
   individualStudentData,
 }: PerformanceBalanceChartProps) => {
-  // Extract unique grades to show individual grade radars if toggled
   const { t } = useTranslation("common");
-  // 1. ดึงเกรดที่มีอยู่จริงจาก balanceData
+
+  // 1. ดึงรายการเกรดจาก balanceData (ซึ่งเป็น Array ของ {grade, averages})
   const uniqueGrades = useMemo(() => {
-    if (!balanceData) return [];
+    if (!balanceData || !Array.isArray(balanceData)) return [];
     return balanceData.map((d) => d.grade);
   }, [balanceData]);
 
-  // 2. รวมข้อมูลเพื่อให้ Radar ของเกรดแสดงผลบนแกนเดียวกับภาพรวม
-  // เราจะนำค่าเฉลี่ยของแต่ละเกรดไปใส่ใน chartData เพื่อให้ Recharts วาดได้
+  // 2. รวมข้อมูลคะแนนเกรดเข้ากับ chartData เพื่อให้ Radar วาดเส้นได้
   const finalChartData = useMemo(() => {
+    if (!chartData || !Array.isArray(chartData)) return [];
+
     return chartData.map((point) => {
       const updatedPoint = { ...point };
+      // ทำความสะอาด Label (เช่น "CLO 1" -> "CLO1") เพื่อให้ตรงกับ Key ใน averages
+      const rawLabel = point[xAxisKey] || "";
+      const sanitizedLabel =
+        typeof rawLabel === "string" ? rawLabel.replace(/\s+/g, "") : rawLabel;
 
-      uniqueGrades.forEach((grade) => {
-        const gradeInfo = balanceData?.find((d) => d.grade === grade);
-        // ค้นหาค่าคะแนนจาก ploScores, cloScores หรือ assignmentScores
-        const scoreEntry =
-          gradeInfo?.ploScores?.find((p: any) => p.label === point[xAxisKey]) ||
-          gradeInfo?.cloScores?.find((c: any) => c.label === point[xAxisKey]) ||
-          gradeInfo?.assignmentScores?.find(
-            (a: any) => a.label === point[xAxisKey],
-          );
-
-        if (scoreEntry) {
-          updatedPoint[`avg_grade_${grade}`] = scoreEntry.value;
+      // วนลูปหาคะแนนของแต่ละเกรดจาก balanceData
+      balanceData?.forEach((item) => {
+        const score = item.averages?.[sanitizedLabel];
+        if (score !== undefined && score !== null) {
+          updatedPoint[`avg_grade_${item.grade}`] = Number(score);
         }
       });
 
       return updatedPoint;
     });
-  }, [chartData, balanceData, uniqueGrades, xAxisKey]);
+  }, [chartData, balanceData, xAxisKey]);
 
   const dataMax = useMemo(() => {
     if (!finalChartData.length) return 100;
@@ -77,12 +75,13 @@ export const PerformanceBalanceChart = ({
   }, [finalChartData, maxScorePosKey]);
 
   const isPercent = dataMax === 100;
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <RadarChart cx="50%" cy="50%" outerRadius="80%" data={finalChartData}>
         <PolarGrid stroke="#e2e8f0" />
         <PolarAngleAxis
-          dataKey={xAxisKey} // This will now correctly use "cloCode" or "ploCode"
+          dataKey={xAxisKey}
           tick={{ fill: "#64748b", fontSize: 12, fontWeight: 500 }}
         />
         <PolarRadiusAxis
@@ -96,19 +95,13 @@ export const PerformanceBalanceChart = ({
             border: "none",
             boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
           }}
-          itemStyle={{ color: "#0f172a" }}
           formatter={(value: number, name: string) => {
-            // 🟢 ถ้าเป็นโหมด Percent และชื่อคือ Full Score ให้ซ่อน (return null)
-            if (isPercent && name === t("fullScore")) {
-              return [null, null];
-            }
-
-            // ข้อมูลปกติที่ต้องการแสดง
-            return [`${value.toFixed(2)}${isPercent ? "%" : ""}`, name];
+            if (isPercent && name === t("fullScore")) return [null, null];
+            return [`${Number(value).toFixed(2)}${isPercent ? "%" : ""}`, name];
           }}
         />
 
-        {/* Background Radar: Total Possible Score */}
+        {/* Full Score Background */}
         <Radar
           name={t("fullScore")}
           dataKey={maxScorePosKey}
@@ -117,110 +110,120 @@ export const PerformanceBalanceChart = ({
           fillOpacity={0.1}
         />
 
-        {/* Dynamic Radars based on Visibility */}
-        {visibleLines?.maxScore && maxScoreKey && (
+        {/* Statistical Radars */}
+        {visibleLines?.maxScore && (
           <Radar
             name={t("maxScore")}
-            dataKey={maxScoreKey} // Maps to "max"
+            dataKey={maxScoreKey}
             stroke="#22c55e"
             fill="#22c55e"
-            fillOpacity={0.1}
+            fillOpacity={0.05}
           />
         )}
-
-        {visibleLines?.minScore && minScoreKey && (
+        {visibleLines?.minScore && (
           <Radar
             name={t("minScore")}
-            dataKey={minScoreKey} // Maps to "min"
+            dataKey={minScoreKey}
             stroke="#ef4444"
             fill="#ef4444"
+            fillOpacity={0.05}
+          />
+        )}
+        {visibleLines?.allAvg && (
+          <Radar
+            name={t("averageScore")}
+            dataKey={allAvgKey}
+            stroke="#6366f1"
+            fill="#6366f1"
             fillOpacity={0.1}
+            strokeWidth={3}
+          />
+        )}
+        {visibleLines?.midScore && (
+          <Radar
+            name={t("medianScore")}
+            dataKey={midScoreKey}
+            stroke="#f59e0b"
+            fill="#f59e0b"
+            fillOpacity={0.1}
+            strokeWidth={2}
           />
         )}
 
-        {visibleLines?.allAvg && allAvgKey && (
-          <Radar
-            name={t("averageScore")}
-            dataKey={allAvgKey} // Maps to "mean"
-            stroke="#6366f1"
-            fill="#6366f1"
-            fillOpacity={0.2}
-            strokeWidth={2}
-          />
-        )}
-        {visibleLines?.midScore && midScoreKey && (
-          <Radar
-            name={t("medianScore")}
-            dataKey={midScoreKey} // Maps to "median"
-            stroke="#f59e0b"
-            fill="#f59e0b"
-            fillOpacity={0.2}
-            strokeWidth={2}
-          />
-        )}
-        {/* Individual Grade Radars */}
-        {uniqueGrades.map(
-          (grade) =>
-            visibleLines?.[`avg_grade_${grade}`] && (
-              <Radar
-                key={grade}
-                name={`Grade ${grade}`}
-                dataKey={`avg_grade_${grade}`}
-                stroke={getGradeColor?.(grade)}
-                fill={getGradeColor?.(grade)}
-                fillOpacity={0.3}
-                strokeWidth={2}
-              />
-            ),
-        )}
+        {/* 🟢 Grade Radars (เส้นเกรด) */}
+        {balanceData?.map((item: any) => {
+          const key = `avg_grade_${item.grade}`;
+          if (!visibleLines?.[key]) return null;
+
+          const gradeColor = getGradeColor?.(item.grade);
+
+          return (
+            <Radar
+              key={item.grade}
+              dataKey={key}
+              name={`Grade ${item.grade}`}
+              stroke={gradeColor}
+              fill="none"
+              connectNulls={true}
+              strokeWidth={2.5}
+              animationDuration={800}
+            />
+          );
+        })}
+
+        {/* Individual Student Radar */}
         {individualStudentData && (
           <Radar
-            name={`${individualStudentData.Name}`}
             dataKey={(dataPoint) => {
-              const key = dataPoint[xAxisKey];
-              const value = individualStudentData[key];
-              return value ? Number(value) : 0;
+              const currentLabel = String(dataPoint[xAxisKey] || "").replace(
+                /\s+/g,
+                "",
+              );
+              const allScores = [
+                ...(individualStudentData.ploScores || []),
+                ...(individualStudentData.ploPercentages || []),
+                ...(individualStudentData.cloScores || []),
+                ...(individualStudentData.cloPercentages || []),
+                ...(individualStudentData.categoryScores || []),
+              ];
+
+              const target = allScores.find(
+                (item) =>
+                  String(
+                    item.ploCode || item.cloCode || item.category || "",
+                  ).replace(/\s+/g, "") === currentLabel,
+              );
+
+              return target
+                ? Number(
+                    target.ploScore ||
+                      target.percentage ||
+                      target.score ||
+                      target.cloScore,
+                  )
+                : null;
             }}
-            // 🎨 ใช้สี Slate-800 เพื่อให้ดู Minimal และไม่ซ้ำกับเฉดสีอื่นที่มีอยู่
-            stroke="#1e293b" // Slate 800 (เกือบดำแต่ซอฟต์กว่า)
-            strokeWidth={2.5} // ความหนาพอดีๆ ไม่ให้ดูเทอะทะ
-            fill="#334155" // Slate 700
-            fillOpacity={0.15} // จางมากเพื่อให้ยังเห็น Grid และเส้นค่าเฉลี่ยด้านหลัง
-            // ✨ ปรับ Dot ให้เล็กลงและสะอาดตา
-            dot={{
-              r: 3,
-              fill: "#1e293b",
-              stroke: "#fff",
-              strokeWidth: 1.5,
-            }}
-            activeDot={{
-              r: 5,
-              fill: "#0f172a", // Slate 900 เมื่อชี้
-            }}
-            animationDuration={1000}
+            name={`คะแนนของ: ${individualStudentData.student_name || individualStudentData.Name || "นักเรียน"}`}
+            stroke="#0f172a"
+            fill="#0f172a"
+            fillOpacity={0.3}
+            strokeWidth={4}
           />
         )}
+
         <Legend
           verticalAlign="top"
           align="right"
           height={50}
           iconType="circle"
-          formatter={(value) => {
-            // 🟢 ถ้าชื่อตรงกับ "Full Score" (หรือค่าที่ t("fullScore") คืนมา) ให้เป็นสีดำ
-            // ถ้าไม่ใช่ ให้ปล่อยเป็นสีปกติของ Recharts
-            const isFullScore = value === t("fullScore");
-
-            return (
-              <span
-                className={
-                  isFullScore ? "text-black font-medium" : "font-medium"
-                }
-                style={{ color: isFullScore ? "#000000" : undefined }}
-              >
-                {value}
-              </span>
-            );
-          }}
+          formatter={(value) => (
+            <span
+              className="font-medium"
+              style={{ color: value === t("fullScore") ? "#000" : undefined }}
+            >
+              {value}
+            </span>
+          )}
         />
       </RadarChart>
     </ResponsiveContainer>

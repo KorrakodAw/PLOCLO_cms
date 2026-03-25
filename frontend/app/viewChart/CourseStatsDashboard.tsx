@@ -103,7 +103,7 @@ export default function CourseStatsDashboard({
               Grade Distribution
             </h3>
           </div>
-          <div className="h-[350px] w-full max-w-375">
+          <div className="h-87.5 w-full max-w-375">
             {formattedGradeData.length > 0 ? (
               <GradeDistributionChart data={formattedGradeData} />
             ) : (
@@ -130,7 +130,9 @@ export default function CourseStatsDashboard({
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => {
+                    setActiveTab(tab.id as any);
+                  }}
                   className={`
                     flex items-center gap-2.5 px-8 py-3 text-sm font-bold rounded-xl transition-all duration-300
                     ${
@@ -152,7 +154,7 @@ export default function CourseStatsDashboard({
           </div>
 
           {/* Tab Content */}
-          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 min-h-[600px]">
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-10 min-h-150">
             <div className="animate-in fade-in slide-in-from-bottom-6 duration-700 ease-out">
               {activeTab === "clo" && (
                 <CloStatsDashboard
@@ -165,12 +167,14 @@ export default function CourseStatsDashboard({
                   CsemesterId={CsemesterId}
                   courseId={courseId}
                   program_id={program_id}
+                  onLoadingChange={(isLoading) => setLoading(isLoading)}
                 />
               )}
               {activeTab === "assignment" && (
                 <AssignmentStatsDashboard
                   CsemesterId={CsemesterId}
                   program_id={program_id}
+                  onLoadingChange={(isLoading) => setLoading(isLoading)}
                 />
               )}
             </div>

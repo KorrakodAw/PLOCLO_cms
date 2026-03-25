@@ -263,21 +263,30 @@ export default function YearStatsDashboard({
 
   const [dataMode, setDataMode] = useState<"score" | "percent">("score");
 
-  const [individualStudentData, setIndividualStudentData] = useState<any>(null);
+  // 1. เปลี่ยนจากเก็บ Object ข้อมูล เป็นเก็บแค่ ID ของนักเรียนที่เลือก
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
 
-  const handleStudentView = (data: any | null) => {
-    setIndividualStudentData(data);
+  // 2. ฟังก์ชัน Handle การคลิกปุ่ม Eye
+  const handleStudentView = (id: string) => {
+    // ถ้ากดซ้ำคนเดิมให้ปิด (Toggle) หรือจะเปลี่ยนคนก็ได้
+    setSelectedStudentId((prev) => (prev === id ? null : id));
   };
-
-  useEffect(() => {
-    setIndividualStudentData(null);
-  }, [dataMode, displayMode, token]);
 
   const activeTableData =
     dataMode === "score" ? flattenedStudentData : flattenedStudentDataPercent;
 
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
+
+  const individualStudentData = useMemo(() => {
+    if (!selectedStudentId) return null;
+
+    return activeTableData.find((s) => {
+      return String(s.student_id) === String(selectedStudentId);
+    });
+  }, [selectedStudentId, activeTableData]);
 
   if (loading) {
     return (
@@ -365,7 +374,7 @@ export default function YearStatsDashboard({
               </p>
             </div>
 
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceTrendChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือก
                 individualStudentData={individualStudentData} // 🟢 ส่งข้อมูลนักเรียนที่เลือกไปยังกราฟ
@@ -394,7 +403,7 @@ export default function YearStatsDashboard({
                 View
               </p>
             </div>
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceBalanceChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
                 individualStudentData={individualStudentData}
@@ -420,7 +429,6 @@ export default function YearStatsDashboard({
             individualStudentData
               ? String(
                   individualStudentData.student_id ||
-                    individualStudentData.id ||
                     individualStudentData.student_code,
                 )
               : null

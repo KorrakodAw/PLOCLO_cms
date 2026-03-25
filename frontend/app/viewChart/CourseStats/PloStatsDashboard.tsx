@@ -27,12 +27,14 @@ interface PloStatsDashboardProps {
   CsemesterId: string;
   courseId: string;
   program_id: string;
+  onLoadingChange?: (isLoading: boolean) => void;
 }
 
 export default function PloStatsDashboard({
   CsemesterId,
   courseId,
   program_id,
+  
 }: PloStatsDashboardProps) {
   const graphRef = useRef<HTMLDivElement>(null);
   const { user, token } = useAuth();
@@ -171,6 +173,7 @@ export default function PloStatsDashboard({
         const info = studentInfoMap.get(scoreEntry.student_id);
 
         return {
+          student_id: scoreEntry.student_id,
           student_code: info?.code || "N/A",
           Name: info?.fullName || "Unknown Student",
           section: info?.section || "-",
@@ -178,7 +181,6 @@ export default function PloStatsDashboard({
         };
       });
   }, [data.studentStat, data.studentName, program_id]);
-
 
   const flattenedTableDataPercent = useMemo(() => {
     const scores = data.studentStatPercent || [];
@@ -208,6 +210,7 @@ export default function PloStatsDashboard({
         const info = studentInfoMap.get(scoreEntry.studentId);
 
         return {
+          student_id: scoreEntry.studentId,
           student_code: info?.code || "N/A",
           Name: info?.fullName || "Unknown Student",
           section: info?.section || "-",
@@ -215,8 +218,6 @@ export default function PloStatsDashboard({
         };
       });
   }, [data.studentStatPercent, data.studentName, program_id]);
-
-
 
   const formattedChartDataPercent = useMemo(() => {
     if (!data.scorePloStatPercent) return [];
@@ -314,21 +315,29 @@ export default function PloStatsDashboard({
 
   const [dataMode, setDataMode] = useState<"score" | "percent">("score");
 
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
+
+  // 2. ฟังก์ชัน Handle การคลิกปุ่ม Eye
+  const handleStudentView = (id: string) => {
+    // ถ้ากดซ้ำคนเดิมให้ปิด (Toggle) หรือจะเปลี่ยนคนก็ได้
+    setSelectedStudentId((prev) => (prev === id ? null : id));
+  };
+
   const activeTableData =
     dataMode === "score" ? flattenedTableData : flattenedTableDataPercent;
 
-  const [individualStudentData, setIndividualStudentData] = useState<any>(null);
-
-  const handleStudentView = (data: any | null) => {
-    setIndividualStudentData(data);
-  };
-
-  useEffect(() => {
-    setIndividualStudentData(null);
-  }, [dataMode, displayMode, token]);
-
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
+
+  const individualStudentData = useMemo(() => {
+    if (!selectedStudentId) return null;
+
+    return activeTableData.find((s) => {
+      return String(s.student_id) === String(selectedStudentId);
+    });
+  }, [selectedStudentId, activeTableData]);
 
   // 2. ถ้าโหลดเสร็จแล้ว แต่ไม่มีข้อมูล (Check จากหลายๆ จุดเพื่อให้มั่นใจ)
   const hasNoData =
@@ -383,7 +392,7 @@ export default function PloStatsDashboard({
               </p>
             </div>
 
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceTrendChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือก
                 individualStudentData={individualStudentData}
@@ -412,7 +421,7 @@ export default function PloStatsDashboard({
                 View
               </p>
             </div>
-            <div className="h-[450px] w-full">
+            <div className="h-112.5 w-full">
               <PerformanceBalanceChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
                 individualStudentData={individualStudentData}
@@ -429,21 +438,21 @@ export default function PloStatsDashboard({
         )}
       </div>
       <div className="w-full max-w-375 mx-auto">
-         <StudentPerformanceTable
-                  studentsData={activeTableData}
-                  title="Individual Student Performance"
-                  onViewDetails={handleStudentView}
-                  // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
-                  selectedId={
-                    individualStudentData
-                      ? String(
-                          individualStudentData.student_id ||
-                            individualStudentData.id ||
-                            individualStudentData.student_code,
-                        )
-                      : null
-                  }
-                />
+        <StudentPerformanceTable
+          studentsData={activeTableData}
+          title="Individual Student Performance"
+          onViewDetails={handleStudentView}
+          // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
+          selectedId={
+            individualStudentData
+              ? String(
+                  individualStudentData.student_id ||
+                    individualStudentData.id ||
+                    individualStudentData.student_code,
+                )
+              : null
+          }
+        />
       </div>
     </div>
   );
