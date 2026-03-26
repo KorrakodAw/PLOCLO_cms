@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import { TrendingUp } from "lucide-react";
 
@@ -62,7 +63,12 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
       }));
   }, [data, selectedPlo]);
 
-  if (data.length === 0) return null;
+  if (data.length === 0)
+    return (
+      <div className="text-center text-slate-400 py-20">
+        No PLO achievement data available.
+      </div>
+    );
 
   return (
     <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm w-full">
@@ -150,10 +156,20 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
             <Bar
               dataKey="target"
               name="Term Max Potential"
-              fill="#f1f5f9"
               radius={[12, 12, 12, 12]}
-              barSize={300} // ปรับขนาด Bar ให้พอดี
-            />
+              barSize={300}
+            >
+              {chartData.map((entry, index) => {
+                const opacity = 0.1 + (index / chartData.length) * 0.4;
+                return (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill="#6366f1" // สี Indigo หลัก
+                    fillOpacity={opacity}
+                  />
+                );
+              })}
+            </Bar>
 
             {/* Foreground Line: Student Growth */}
             <Line

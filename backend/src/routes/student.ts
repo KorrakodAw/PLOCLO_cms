@@ -41,7 +41,8 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
         p.program_name_en,
         p.program_name_th,
         p.program_shortname_th,
-        p.program_shortname_en
+        p.program_shortname_en,
+        p.program_year
       FROM student s
       JOIN program p ON s.program_id = p.id
       WHERE s.program_id = ANY($1::int[])
@@ -51,23 +52,25 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
 
     // 3. จัดกลุ่มข้อมูล (Group by program_id) ให้เป็น Array ของ Object
     const groupedData = result.rows.reduce((acc: any[], student: any) => {
-      // ค้นหาว่าใน acc มีกลุ่มของ program_id นี้หรือยัง
-      let group = acc.find((g) => g.programId === student.program_id);
+      // 🟢 ลองเช็คทั้ง student.program_id และ student.programId
+      // หรือใช้ชื่อให้ตรงกับที่ SELECT มา (s.program_id)
+      const pId = student.program_id || student.programid;
+
+      let group = acc.find((g) => g.programId === pId);
 
       if (!group) {
-        // ถ้ายังไม่มี ให้สร้างกลุ่มใหม่
         group = {
-          programId: student.program_id,
+          programId: pId,
           programNameEn: student.program_name_en,
           programNameTh: student.program_name_th,
           programShortNameEn: student.program_shortname_en,
           programShortNameTh: student.program_shortname_th,
+          programYear: student.program_year,
           students: [],
         };
         acc.push(group);
       }
 
-      // เพิ่มนักเรียนเข้าไปในกลุ่มนั้นๆ
       group.students.push({
         id: student.id,
         student_code: student.student_code,

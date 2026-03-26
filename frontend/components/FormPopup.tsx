@@ -209,7 +209,6 @@ export default function FormPopup<T>({
       onClose();
     } catch (err) {
       console.error(err);
-      alert("Failed to submit form");
     } finally {
       setLoading(false);
     }

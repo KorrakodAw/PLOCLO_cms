@@ -167,6 +167,43 @@ export default function AddStudent({
     }
   };
 
+  const addSingleStudent = async (studentData: any) => {
+    if (!token || !programId) return;
+    setLoadingStudent(true);
+
+    let firstName = studentData.first_name || "";
+    let lastName = studentData.last_name || "";
+
+    if (studentData.nameEn) {
+      const parts = String(studentData.nameEn).trim().split(/\s+/);
+      firstName = parts[0];
+      lastName = parts.slice(1).join(" ");
+    }
+
+    try {
+      await apiClient.post(
+        "/student",
+        {
+          student_code: String(studentData.code),
+          first_name: firstName,
+          last_name: lastName,
+          email: String(studentData.nameTh || ""), // แนะนำให้เช็คฟิลด์ email อีกครั้ง
+          program_id: Number(programId),
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      showToast("Student added successfully!", "success");
+      fetchStudents();
+    } catch (err) {
+      showToast("Failed to add student", "error");
+    } finally {
+      setLoadingStudent(false);
+    }
+  };
+
   const sortedStudents = useMemo(() => {
     return [...students].sort((a, b) => {
       // แปลงเป็น String ก่อนเปรียบเทียบเพื่อความปลอดภัย
@@ -272,7 +309,7 @@ export default function AddStudent({
               upload: t("Upload Excel"),
             }}
             showAbbreviationInputs={false}
-            onSubmit={(data: any) => handleAddStudentBulk([data])} // Reuse bulk for single
+            onSubmit={addSingleStudent} // Reuse bulk for single
             onSubmitExcel={handleAddStudentBulk}
           />
         </div>

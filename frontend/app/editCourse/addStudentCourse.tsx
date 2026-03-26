@@ -9,6 +9,7 @@ import AlertPopup from "@/components/AlertPopup";
 import { useAuth } from "../context/AuthContext";
 import * as XLSX from "xlsx";
 import { Upload, Plus, Users, Trash2 } from "lucide-react";
+import StudentSelectionModal from "./components/StudentSelectionModal";
 
 interface Student {
   id: number;
@@ -93,6 +94,7 @@ export default function AddStudentCourse({
       }
 
       const programIdsParam = currentIds.join(",");
+      console.log(programIdsParam);
 
       // 🟢 ยิง API พร้อมกันเพื่อความเร็ว (Parallel)
       const [studentRes, sectionRes, courseRes] = await Promise.all([
@@ -121,11 +123,11 @@ export default function AddStudentCourse({
     }
   }, [isLoggedIn, token, sectionId]); // รันใหม่เมื่อเปลี่ยน Section เท่านั้น
 
-  useEffect(() => {
-    console.log(availableStudents);
-    console.log(enrolledStudents);
-    console.log(studentsInAnySection);
-  });
+  // useEffect(() => {
+  //   console.log(availableStudents);
+  //   console.log(enrolledStudents);
+  //   console.log(studentsInAnySection);
+  // });
 
   // Filter Logic
   const availableStudents = allProgramStudents
@@ -448,161 +450,13 @@ export default function AddStudentCourse({
       <Table columns={StudentColumns} data={enrolledStudents} />
 
       {/* MODAL POPUP (Same as before, just mapped to selectedCandidates) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="p-6 border-b flex justify-between items-center bg-white">
-              <h3 className="text-xl font-bold text-[#1e293b]">
-                Select Students
-              </h3>
-              <button
-                onClick={() => {
-                  setSelectedCandidates([]);
-                  setIsModalOpen(false);
-                }}
-                className="text-gray-400 text-2xl hover:text-slate-600"
-              >
-                &times;
-              </button>
-            </div>
-
-            {/* 🟢 ส่วนของ Tabs ด้านบน (Navigation) */}
-            <div className="flex border-b overflow-x-auto bg-slate-50 px-4 gap-2 min-h-[50px] max-h-[100px]">
-              {availableStudents.map((group: any) => (
-                <button
-                  key={group.programId}
-                  onClick={() => setActiveTab(group.programId)}
-                  className={`px-4 py-3 text-[10px] font-black tracking-widest uppercase transition-all border-b-2 whitespace-nowrap ${
-                    activeTab === group.programId
-                      ? "border-blue-600 text-blue-600 bg-white"
-                      : "border-transparent text-slate-400 hover:text-slate-600"
-                  }`}
-                >
-                  {group.programShortNameEn || "Program " + group.programId}
-                </button>
-              ))}
-            </div>
-
-            {/* 🟢 Body: แสดงเฉพาะกลุ่มที่เลือกใน Tab */}
-            <div className="flex-1 overflow-y-auto p-4 bg-white min-h-[400px]">
-              {availableStudents.map((group: any) => {
-                // 🔍 แสดงเฉพาะ Program ที่ตรงกับ Tab ที่เลือกเท่านั้น
-                if (activeTab !== group.programId) return null;
-
-                return (
-                  <div
-                    key={group.programId}
-                    className="animate-in fade-in duration-300"
-                  >
-                    {/* ส่วนหัวสำหรับ Select All ภายในโปรแกรมนั้น */}
-                    <div className="bg-slate-50 px-4 py-2 border border-b-0 rounded-t-xl flex justify-between items-center">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                        {group.programNameEn}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-slate-400">
-                          SELECT ALL IN PROGRAM
-                        </span>
-                        <input
-                          type="checkbox"
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                          checked={
-                            group.students.length > 0 &&
-                            group.students.every((s: any) =>
-                              selectedCandidates.includes(s.id),
-                            )
-                          }
-                          onChange={(e) => {
-                            const ids = group.students.map((s: any) => s.id);
-                            if (e.target.checked)
-                              setSelectedCandidates((prev) =>
-                                Array.from(new Set([...prev, ...ids])),
-                              );
-                            else
-                              setSelectedCandidates((prev) =>
-                                prev.filter((id) => !ids.includes(id)),
-                              );
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* ตารางรายชื่อ (แบบ Rounded สวยงาม) */}
-                    <div className="overflow-hidden border rounded-b-xl">
-                      <table className="w-full text-left">
-                        <tbody className="divide-y divide-slate-50">
-                          {group.students.map((s: any) => (
-                            <tr
-                              key={s.id}
-                              className="hover:bg-blue-50/30 transition-colors"
-                            >
-                              <td className="p-3 w-10 text-center">
-                                <input
-                                  type="checkbox"
-                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                  checked={selectedCandidates.includes(s.id)}
-                                  onChange={() => {
-                                    setSelectedCandidates((prev) =>
-                                      prev.includes(s.id)
-                                        ? prev.filter((id) => id !== s.id)
-                                        : [...prev, s.id],
-                                    );
-                                  }}
-                                />
-                              </td>
-                              <td className="p-3 text-xs font-mono text-slate-400 w-24">
-                                {s.student_code}
-                              </td>
-                              <td className="p-3 text-sm font-medium text-slate-700">
-                                {s.first_name} {s.last_name}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer (เหมือนเดิม) */}
-            <div className="p-6 border-t flex justify-between items-center bg-white sticky bottom-0">
-              <div className="text-sm">
-                <span className="text-slate-400 font-bold uppercase text-[10px]">
-                  Selected:
-                </span>
-                <span className="ml-2 text-orange-600 font-black text-lg">
-                  {selectedCandidates.length}
-                </span>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    setSelectedCandidates([]);
-                  }}
-                  className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddSelected}
-                  disabled={loading || selectedCandidates.length === 0}
-                  className="bg-[#d1d5db] text-white px-8 py-2 rounded-lg font-bold disabled:bg-slate-200"
-                  style={{
-                    backgroundColor:
-                      selectedCandidates.length > 0 ? "#3b82f6" : "",
-                  }} // ปรับสีปุ่มตามรูป
-                >
-                  {loading ? "Adding..." : "Add Students"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <StudentSelectionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        availableStudents={availableStudents} // ส่ง Array ของ Program ที่มี Students อยู่ข้างใน
+        onConfirm={handleAddSelected}
+        loading={false}
+      />
 
       {/* ALERT POPUP FOR DELETE CONFIRMATION */}
       {showAlertPopup && (
