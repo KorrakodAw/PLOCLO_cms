@@ -120,6 +120,13 @@ export default function AddStudentCourse({
       loadData();
     }
   }, [isLoggedIn, token, sectionId]); // รันใหม่เมื่อเปลี่ยน Section เท่านั้น
+
+  useEffect(() => {
+    console.log(availableStudents);
+    console.log(enrolledStudents);
+    console.log(studentsInAnySection);
+  });
+
   // Filter Logic
   const availableStudents = allProgramStudents
     .map((group) => {
@@ -191,7 +198,6 @@ export default function AddStudentCourse({
       document.body.style.overflow = "unset";
     };
   }, [isModalOpen]);
-  
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [invalidCodes, setInvalidCodes] = useState<string[]>([]);
@@ -215,44 +221,57 @@ export default function AddStudentCourse({
         const missingFromProgram: string[] = [];
         let skipCount = 0;
 
+        // 🟢 1. สร้างตัวแปรชั่วคราวเพื่อรวมนักเรียนจากทุกกลุ่ม (Flatten) มาไว้ที่ระนาบเดียวกัน
+        // ใช้เฉพาะในฟังก์ชันนี้เพื่อให้ .find ทำงานได้ และไม่กระทบตัวแปรหลัก
+        const studentsLookupArray = allProgramStudents.flatMap(
+          (group: any) => group.students || [],
+        );
+
         data.forEach((row) => {
-          // ดึงรหัสจาก Column ที่เป็นไปได้
+          // ดึงรหัสจาก Excel (รองรับหลายชื่อ Column)
           const code = String(
-            row.student_id || row["รหัสนิสิต"] || row.student_code || "",
+            row.student_id || row.student_code || row["รหัสนิสิต"] || "",
           ).trim();
           if (!code) return;
 
-          // 🟢 1. หาตัวนิสิตในฐานข้อมูลหลักสูตร (All Program Students)
-          const studentInfo = allProgramStudents.find(
-            (s) => s.student_code === code,
+          // 🟢 2. ค้นหาจาก Lookup Array ที่เราเตรียมไว้
+          const studentInfo = studentsLookupArray.find(
+            (s: any) => String(s.student_code) === code,
           );
 
           if (!studentInfo) {
-            // ไม่พบในหลักสูตร -> เก็บไว้แจ้งเตือน
+            // ❌ ไม่พบในหลักสูตร: รหัสผิด หรือไม่ได้อยู่ในกลุ่มที่ดึงมา
             missingFromProgram.push(code);
-          } else {
-            // 🟢 2. ตรวจสอบว่านิสิตคนนี้ "อยู่ในวิชานี้แล้วหรือยัง"
-            const isAlreadyEnrolled = studentsInAnySection.some(
-              (s) => s.id === studentInfo.id,
-            );
+            return;
+          }
 
-            if (isAlreadyEnrolled) {
-              // มีอยู่แล้ว -> ข้ามไป
-              skipCount++;
-            } else {
-              // เป็นนิสิตใหม่สำหรับวิชานี้ -> ใส่ใน List เตรียมเพิ่ม
-              validStudentIds.push(studentInfo.id);
-            }
+          const sId = studentInfo.id;
+
+          // 🟢 3. ตรวจสอบการลงทะเบียนซ้ำ (เช็คจากทุก Section ในวิชานี้ และในกลุ่มปัจจุบัน)
+          const isAlreadyInAnySection = studentsInAnySection.some(
+            (s: any) => s.id === sId || s.student_id === sId,
+          );
+
+          const isAlreadyInThisSection = enrolledStudents.some(
+            (s: any) => s.student_id === sId, // โครงสร้าง StudentCourse มักใช้ student_id
+          );
+
+          if (isAlreadyInThisSection || isAlreadyInAnySection) {
+            // ⏸️ มีชื่ออยู่แล้วในรายวิชานี้ (ไม่ว่าจะกลุ่มไหน) -> ข้าม
+            skipCount++;
+          } else {
+            // ✅ เป็นคนใหม่จริงๆ: เก็บ ID ไว้เตรียมยิง Bulk Post
+            validStudentIds.push(sId);
           }
         });
 
-        // 🔴 แสดง Error Popup สำหรับรหัสที่ไม่พบในหลักสูตร
+        // 🔴 แสดง Error Popup สำหรับรหัสที่ไม่พบในฐานข้อมูล
         if (missingFromProgram.length > 0) {
           setInvalidCodes(missingFromProgram);
           setShowErrorPopup(true);
         }
 
-        // 🔵 ส่งเฉพาะรายการที่สามารถเพิ่มได้จริง
+        // 🔵 ส่งข้อมูลเฉพาะคนใหม่ที่สามารถเพิ่มได้จริง
         if (validStudentIds.length > 0) {
           await apiClient.post(
             "/studentOnCourse/bulk",
@@ -264,12 +283,12 @@ export default function AddStudentCourse({
           );
 
           showToast(
-            `Successfully added ${validStudentIds.length} students. (Skipped ${skipCount} already in course)`,
+            `Successfully added ${validStudentIds.length} students. (Skipped ${skipCount} existing)`,
             "success",
           );
-          await loadData(); // รีโหลดข้อมูลตาราง
+          await loadData(); // รีโหลดข้อมูลตารางหลัก
         } else if (missingFromProgram.length === 0) {
-          // กรณีไม่มี Error แต่ก็ไม่มีคนใหม่ให้เพิ่มเลย
+          // กรณีไม่มีรหัสผิด แต่ทุกคนในไฟล์มีชื่อในระบบอยู่แล้ว
           showToast(`All students in the file are already enrolled.`, "error");
         }
       } catch (err) {
@@ -277,7 +296,7 @@ export default function AddStudentCourse({
         showToast("Failed to process Excel file", "error");
       } finally {
         setLoading(false);
-        if (e.target) e.target.value = ""; // เคลียร์ Input
+        if (e.target) e.target.value = ""; // เคลียร์ Input เพื่อให้เลือกไฟล์เดิมซ้ำได้
       }
     };
     reader.readAsBinaryString(file);
@@ -460,7 +479,7 @@ export default function AddStudentCourse({
                       : "border-transparent text-slate-400 hover:text-slate-600"
                   }`}
                 >
-                  {group.shortName || "Program " + group.programId}
+                  {group.programShortNameEn || "Program " + group.programId}
                 </button>
               ))}
             </div>
@@ -479,7 +498,7 @@ export default function AddStudentCourse({
                     {/* ส่วนหัวสำหรับ Select All ภายในโปรแกรมนั้น */}
                     <div className="bg-slate-50 px-4 py-2 border border-b-0 rounded-t-xl flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                        {group.programName}
+                        {group.programNameEn}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] font-bold text-slate-400">

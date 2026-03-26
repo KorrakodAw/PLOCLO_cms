@@ -193,7 +193,7 @@ model CloPloMapping {
   program         Program        @relation(fields: [program_id], references: [id], onDelete: Cascade)
 
   @@id([cloId, ploId, program_id, semester_id])
-  @@unique([cloId, ploId, program_id], map: "unique_clo_plo_program")
+  @@unique([cloId, ploId, program_id, semester_id], map: "unique_clo_plo_program")
   @@map("clo_plo_mapping")
 }
 

@@ -47,8 +47,15 @@ export default function AddStudent({
         headers: { Authorization: `Bearer ${token}` },
         params: { programId },
       });
-      setStudents(Array.isArray(res.data) ? res.data : res.data.data || []);
-    } catch {
+
+      const studentsArray = res.data?.[0]?.students || [];
+
+      setStudents(studentsArray);
+
+      // Debug เช็คว่าได้ Array ของนักเรียนจริงๆ ไหม
+      console.log("Students List:", studentsArray);
+    } catch (err) {
+      console.error("Fetch Students Error:", err);
       showToast(t("Failed to load student data."), "error");
     } finally {
       setLoadingStudent(false);
@@ -199,7 +206,13 @@ export default function AddStudent({
       accessor: "first_name",
       render: (row) => `${row.first_name} ${row.last_name}`,
     },
-    { header: t("Email"), accessor: "email" },
+    {
+      header: t("Email"),
+      accessor: "email",
+      // 🟢 แก้ไขตรงนี้: รับ row มาเป็น Student object
+      render: (row: Student) =>
+        row.email && row.email.trim() !== "" ? row.email : "-",
+    },
     {
       header: t("Actions"),
       accessor: "id",
@@ -219,7 +232,6 @@ export default function AddStudent({
   return (
     <div className="p-6 md:p-10 min-h-screen bg-slate-50/50 font-kanit">
       {loadingStudent && <LoadingOverlay />}
-
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm mb-8 gap-4">

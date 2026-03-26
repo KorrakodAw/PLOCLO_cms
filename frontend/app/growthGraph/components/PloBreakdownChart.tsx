@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ComposedChart,
   Bar,
@@ -10,7 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Layers, Calendar, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 
 interface BreakdownItem {
   semester: number;
@@ -25,19 +25,29 @@ interface PloDetail {
 }
 
 export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
-  // 1. Sort PLO Buttons by Code (เช่น PLO1, PLO2, PLO10)
+  // 1. Sort PLO Buttons by Code (PLO1, PLO2, PLO10...)
   const sortedPloList = useMemo(() => {
     return [...data].sort((a, b) =>
       a.ploCode.localeCompare(b.ploCode, undefined, { numeric: true }),
     );
   }, [data]);
 
-  const [selectedPlo, setSelectedPlo] = useState(
-    sortedPloList[0]?.ploCode || "",
-  );
+  // 2. State สำหรับเก็บค่าที่เลือก (เริ่มต้นเป็นค่าว่าง)
+  const [selectedPlo, setSelectedPlo] = useState("");
 
-  // 2. Prepare & Sort Chart Data by Year/Semester
+  // 🟢 3. บังคับให้ Default กลับไปที่ปุ่มแรกทุกครั้งที่ sortedPloList เปลี่ยนแปลง (Data Update)
+  useEffect(() => {
+    if (sortedPloList.length > 0) {
+      setSelectedPlo(sortedPloList[0].ploCode);
+    } else {
+      setSelectedPlo("");
+    }
+  }, [sortedPloList]);
+
+  // 4. เตรียมข้อมูลสำหรับวาดกราฟ
   const chartData = useMemo(() => {
+    if (!selectedPlo) return [];
+
     const currentPlo = data.find((p) => p.ploCode === selectedPlo);
     if (!currentPlo) return [];
 
@@ -61,7 +71,9 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
           <div>
             <h2 className="text-xl font-black text-slate-800 flex items-center gap-2.5">
               <div className="p-2 bg-indigo-500 rounded-xl text-white shadow-md shadow-indigo-100">
-                <TrendingUp size={20} />
+                <span className="flex items-center justify-center">
+                  <TrendingUp size={20} />
+                </span>
               </div>
               PLO Semester Growth
             </h2>
@@ -71,15 +83,15 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
           </div>
         </div>
 
-        {/* 🟢 Sorted PLO Selector Tabs */}
+        {/* 🟢 PLO Selector Tabs */}
         <div className="flex flex-wrap gap-2 p-1.5 bg-slate-50/80 rounded-2xl border border-slate-100">
           {sortedPloList.map((plo) => (
             <button
               key={plo.ploCode}
               onClick={() => setSelectedPlo(plo.ploCode)}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 ${
                 selectedPlo === plo.ploCode
-                  ? "bg-white shadow-md text-indigo-600 border border-slate-200 ring-2 ring-indigo-500/5"
+                  ? "bg-white shadow-md text-indigo-600 border border-slate-200 ring-2 ring-indigo-500/5 translate-y-[-1px]"
                   : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               }`}
             >
@@ -106,7 +118,6 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#64748b", fontSize: 13, fontWeight: 800 }}
-              dy={15}
             />
             <YAxis
               axisLine={false}
@@ -135,16 +146,16 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
               }}
             />
 
-            {/* 🟢 Bar: Term Highest Possible (เป็นพื้นหลัง) */}
+            {/* Background Bar: Term Potential */}
             <Bar
               dataKey="target"
               name="Term Max Potential"
               fill="#f1f5f9"
               radius={[12, 12, 12, 12]}
-              barSize={50}
+              barSize={300} // ปรับขนาด Bar ให้พอดี
             />
 
-            {/* 🟢 Line: Raw Score (เส้นการเติบโต) */}
+            {/* Foreground Line: Student Growth */}
             <Line
               type="monotone"
               dataKey="actual"
@@ -159,20 +170,23 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
         </ResponsiveContainer>
       </div>
 
+      {/* Footer Info */}
       <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
         <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-          Breakdown Active: {selectedPlo}
+          Breakdown Active: {selectedPlo || "None"}
         </span>
         <div className="flex gap-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-1 bg-slate-200 rounded-full" />
-            <span className="text-[10px] font-bold text-slate-400">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">
               Potential
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-1 bg-indigo-500 rounded-full" />
-            <span className="text-[10px] font-bold text-slate-400">Actual</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">
+              Actual Score
+            </span>
           </div>
         </div>
       </div>
