@@ -39,6 +39,8 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
         s.email,
         s.program_id,
         p.program_name_en,
+        p.program_name_th,
+        p.program_shortname_th,
         p.program_shortname_en
       FROM student s
       JOIN program p ON s.program_id = p.id
@@ -56,8 +58,10 @@ router.get("/", authenticateToken, async (req: Request, res: Response) => {
         // ถ้ายังไม่มี ให้สร้างกลุ่มใหม่
         group = {
           programId: student.program_id,
-          programName: student.program_name_en,
-          shortName: student.program_shortname_en,
+          programNameEn: student.program_name_en,
+          programNameTh: student.program_name_th,
+          programShortNameEn: student.program_shortname_en,
+          programShortNameTh: student.program_shortname_th,
           students: [],
         };
         acc.push(group);

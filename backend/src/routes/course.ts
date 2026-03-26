@@ -11,6 +11,27 @@ const parseIntSafe = (value: any) => {
   return isNaN(parsed) ? undefined : parsed;
 };
 
+router.get("/ById/:id", authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params; // 1. ดึง ID ออกจาก URL Params
+
+    const course = await prisma.course.findUnique({
+      where: {
+        id: Number(id),
+      },
+    });
+
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.json(course);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch course" });
+  }
+});
+
 // POST / - สร้าง Master Course และจัดการ Semester/Section/Program
 router.post("/", authenticateToken, async (req: Request, res: Response) => {
   const {
@@ -247,7 +268,7 @@ router.get(
             program_code: targetProgramCode,
           },
           // คุณสามารถเพิ่ม type: "core" ตรงนี้ได้ถ้าต้องการกรองเฉพาะวิชาบังคับในหลักสูตร
-          type: "core"
+          type: "core",
         };
 
         const [total, items] = await prisma.$transaction([

@@ -3,14 +3,7 @@
 import React, { useState, useEffect, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import {
-  Trash2,
-  UserPlus,
-  Users,
-  Mail,
-
-  ShieldCheck,
-} from "lucide-react";
+import { Trash2, UserPlus, Users, Mail, ShieldCheck } from "lucide-react";
 import { apiClient } from "@/utils/apiClient";
 import { useGlobalToast } from "@/app/context/ToastContext";
 import { useAuth } from "@/app/context/AuthContext";
@@ -43,7 +36,6 @@ export default function CourseInstructorsPage({ params }: PageProps) {
   const searchParams = useSearchParams();
   const courseId = searchParams.get("courseId") ?? "";
 
-
   const { token } = useAuth();
   const { t, i18n } = useTranslation("common");
   const { showToast } = useGlobalToast();
@@ -68,7 +60,7 @@ export default function CourseInstructorsPage({ params }: PageProps) {
 
       // 1. ดึงข้อมูลวิชา และ อาจารย์ที่สอนวิชานี้อยู่แล้ว
       const [courseRes, currentRes] = await Promise.all([
-        apiClient.get(`/course/${courseId}`, {
+        apiClient.get(`/course/ById/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         apiClient.get(`/instructorOnCourse/${courseId}`, {
@@ -81,17 +73,8 @@ export default function CourseInstructorsPage({ params }: PageProps) {
       setCurrentInstructors(currentRes.data || []);
 
       // 2. ดึงข้อมูล Program เพื่อหา Faculty ID
-      const programId = courseInfo?.program_id;
-      let facultyId = null; // สร้างตัวแปร Local ไว้เก็บค่าเพื่อใช้ต่อทันที
-
-      if (programId) {
-        const programRes = await apiClient.get(`/program/${programId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        facultyId = programRes?.data?.faculty_id;
-        
-      }
+      const facultyId = courseInfo?.faculty_id;
+      // สร้างตัวแปร Local ไว้เก็บค่าเพื่อใช้ต่อทันที
 
       // 3. ตรวจสอบและดึงรายชื่ออาจารย์ "ทั้งหมด" ในคณะ
       // ใช้ facultyId แทนการใช้ State (facultyUsingId)
@@ -165,8 +148,6 @@ export default function CourseInstructorsPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-
-
       {/* 1. Breadcrumb Bar */}
       <div className="px-8 py-5">
         <BreadCrumb
@@ -297,7 +278,6 @@ export default function CourseInstructorsPage({ params }: PageProps) {
                       setShowDeletePopup(true);
                     }}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                   
                   >
                     <Trash2 size={18} />
                   </button>

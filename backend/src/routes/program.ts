@@ -11,9 +11,6 @@ const router = Router();
 
 router.post("/duplicate", authenticateToken, duplicateProgram);
 
-// =========================================
-// 1. GET ALL (Dropdowns / Non-paginated)
-// =========================================
 router.get("/", authenticateToken, async (req, res) => {
   try {
     const facultyId = req.query.facultyId as string | undefined;

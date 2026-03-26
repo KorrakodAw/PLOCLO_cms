@@ -263,10 +263,12 @@ export default function EditCourseClient({
                 {/* 1. Action Buttons Group */}
                 <div className="flex flex-wrap items-center gap-3">
                   <button
-                    onClick={() =>
+                    onClick={() => 
+                    {
+                      setLoading(true);
                       router.push(
-                        `/editCourse/${courseCode}/instructors?courseId=${formData?.id}`,
-                      )
+                      `/editCourse/${courseCode}/instructors?courseId=${formData?.id}`,
+                    );}
                     }
                     className="group flex items-center gap-2 px-5 py-2.5 text-[11px] font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100 shadow-sm hover:shadow-blue-200 uppercase tracking-wider"
                   >

@@ -28,6 +28,13 @@ export default function ViewChartPage() {
     label: string;
   }
 
+  interface Course {
+    courseCode: string;
+    courseName: string;
+    courseNameTh: string;
+    semesterId: number;
+  }
+
   const [options, setOptions] = useState({
     university: [] as Option[],
     faculty: [] as Option[],
@@ -114,7 +121,7 @@ export default function ViewChartPage() {
           headers: { Authorization: `Bearer ${token}` },
           params: { university_id: selections.university },
         });
-        const options = res.data.map((f: any) => ({
+        const options = res.data.map((f: Faculty) => ({
           label: lang === "th" ? f.name_th || f.name : f.name,
           value: String(f.id),
         }));
@@ -137,7 +144,7 @@ export default function ViewChartPage() {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
-        const options = res.data.map((p: any) => ({
+        const options = res.data.map((p: Program) => ({
           label:
             lang === "th"
               ? p.program_shortname_th || p.program_shortname_en
@@ -161,7 +168,7 @@ export default function ViewChartPage() {
           headers: { Authorization: `Bearer ${token}` },
           params: { programCode: selections.program },
         });
-        const options = res.data.map((item: any) => ({
+        const options = res.data.map((item: { program_year: number; id: number }) => ({
           label: item.program_year.toString(),
           value: JSON.stringify({ id: item.id, year: item.program_year }),
         }));
@@ -201,7 +208,7 @@ export default function ViewChartPage() {
         });
 
         // 4. แปลงข้อมูลสำหรับ Dropdown
-        const semesterOptions = res.data.map((item: any) => ({
+        const semesterOptions = res.data.map((item: number) => ({
           label: `${item}`,
           value: String(item), // 🟢 บังคับเป็น String
         }));
@@ -232,7 +239,7 @@ export default function ViewChartPage() {
           },
         });
 
-        const courseOptions = res.data.map((c: any) => ({
+        const courseOptions = res.data.map((c: Course) => ({
           label: `${c.courseCode} - ${lang === "th" ? c.courseNameTh : c.courseName}`,
           value: String(c.semesterId), // 🟢 บังคับเป็น String
         }));

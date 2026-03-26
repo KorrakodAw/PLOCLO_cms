@@ -18,6 +18,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  TrendingUp,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -79,6 +80,13 @@ export default function Navbar({
       icon: <LayoutDashboard size={22} />,
       label: t("analytics"),
       show: canViewAnalytics,
+    },
+    {
+      id: "graphGrowth",
+      href: "/growthGraph",
+      icon: <TrendingUp size={22} />,
+      label: t("growthGraph"),
+      show: canManageAdmin,
     },
     {
       id: "programs",
