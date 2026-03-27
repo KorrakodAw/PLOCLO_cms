@@ -185,6 +185,7 @@ export const PerformanceBalanceChart = ({
                 ...(individualStudentData.cloScores || []),
                 ...(individualStudentData.cloPercentages || []),
                 ...(individualStudentData.categoryScores || []),
+                ...(individualStudentData.categoryPercentages || []),
               ];
 
               const target = allScores.find(
@@ -198,7 +199,7 @@ export const PerformanceBalanceChart = ({
                 ? Number(
                     target.ploScore ||
                       target.percentage ||
-                      target.score ||
+                      target.realScore ||
                       target.cloScore,
                   )
                 : null;

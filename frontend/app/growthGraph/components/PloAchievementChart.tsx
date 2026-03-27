@@ -42,7 +42,11 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
   const unit = isPercentage ? "%" : "";
 
   if (data.length === 0)
-    return null; // หรือแสดงข้อความว่าไม่มีข้อมูล
+    return (
+      <div className="text-center text-slate-400 py-20">
+        No PLO achievement data available.
+      </div>
+    ); // หรือแสดงข้อความว่าไม่มีข้อมูล
 
   return (
     <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm mt-8">
@@ -142,7 +146,7 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
               barSize={300}
             >
               {sortedData.map((entry, index) => {
-                const opacity = 0.3 + (index / sortedData.length) * 0.4;
+                const opacity = 0.5 + (index / sortedData.length) * 0.4;
                 return (
                   <Cell
                     key={`cell-${index}`}

@@ -2806,10 +2806,15 @@ export async function getStudentPloDetailedCumulative(
   tx: any,
   studentId: number,
 ) {
-  // 1. เตรียมข้อมูลพื้นฐาน
+  // 1. เตรียมข้อมูลพื้นฐาน - เพิ่มการ select name
   const student = await tx.student.findUnique({
     where: { id: studentId },
-    select: { program_id: true },
+    select: {
+      program_id: true,
+      student_code: true,
+      first_name: true, // 🟢 ดึงชื่อ
+      last_name: true, // 🟢 ดึงนามสกุล
+    },
   });
   if (!student) throw new Error("Student not found");
 
@@ -2823,13 +2828,13 @@ export async function getStudentPloDetailedCumulative(
   });
 
   const uniqueSemesters = Array.from(
-    new Map<string, SemesterInfo>(
+    new Map<string, any>(
       scores.map((s: any) => [
         `${s.assignment.semester.year}-${s.assignment.semester.semester}`,
-        s.assignment.semester as SemesterInfo,
+        s.assignment.semester,
       ]),
     ).values(),
-  ).sort((a, b) =>
+  ).sort((a: any, b: any) =>
     a.year !== b.year ? a.year - b.year : a.semester - b.semester,
   );
 
@@ -2893,7 +2898,7 @@ export async function getStudentPloDetailedCumulative(
   );
   const grandTotal = totalHighestAll || 1;
 
-  // 3. จัด Format และคำนวณแบบ Running Total ทั้งหมด
+  // 3. จัด Format และคำนวณแบบ Running Total
   const result = Object.entries(tempPloData).map(([ploCode, data]) => {
     const totalHighestPercentage = Number(
       ((data.totalHighest / grandTotal) * 100).toFixed(2),
@@ -2913,12 +2918,10 @@ export async function getStudentPloDetailedCumulative(
         year: t.year,
         semester: t.semester,
         termHighestPossible: Number(runningHighestPossible.toFixed(2)),
-        // เพดานสะสม ณ เทอมนั้น เทียบกับ Grand Total (เพดานขยับขึ้น)
         termHighestPossiblePercentage: Number(
           ((runningHighestPossible / grandTotal) * 100).toFixed(2),
         ),
         rawScore: Number(runningRawScore.toFixed(2)),
-        // คะแนนที่เด็กทำได้สะสม ณ เทอมนั้น เทียบกับ Grand Total (คะแนนวิ่งตามเพดาน)
         contributionPercentage: Number(
           ((runningRawScore / grandTotal) * 100).toFixed(2),
         ),
@@ -2937,6 +2940,9 @@ export async function getStudentPloDetailedCumulative(
 
   return {
     studentId,
+    // 🟢 ส่งค่าชื่อและนามสกุลออกไปพร้อมกัน
+    studentCode: student.student_code,
+    studentName: `${student.first_name} ${student.last_name}`,
     totalHighestAll: Number(totalHighestAll.toFixed(2)),
     ploDetailedStats: result,
   };

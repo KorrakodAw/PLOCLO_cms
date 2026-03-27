@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { TrendingUp } from "lucide-react";
+import { ChevronDown, TrendingUp } from "lucide-react";
 
 interface BreakdownItem {
   semester: number;
@@ -71,39 +71,40 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
     );
 
   return (
-    <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm w-full">
-      <div className="flex flex-col gap-6 mb-8">
-        <div className="flex items-start justify-between">
+    <div className="bg-white p-8  rounded-[32px] border border-slate-200 mt-8 shadow-sm transition-all hover:shadow-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
+        {/* Header Info */}
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-100 shrink-0">
+            <TrendingUp size={22} />
+          </div>
           <div>
-            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2.5">
-              <div className="p-2 bg-indigo-500 rounded-xl text-white shadow-md shadow-indigo-100">
-                <span className="flex items-center justify-center">
-                  <TrendingUp size={20} />
-                </span>
-              </div>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight">
               PLO Semester Growth
             </h2>
-            <p className="text-xs text-slate-400 mt-1 font-medium">
+            <p className="text-[11px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">
               Line: Actual Score | Bar: Term Potential
             </p>
           </div>
         </div>
 
-        {/* 🟢 PLO Selector Tabs */}
-        <div className="flex flex-wrap gap-2 p-1.5 bg-slate-50/80 rounded-2xl border border-slate-100">
-          {sortedPloList.map((plo) => (
-            <button
-              key={plo.ploCode}
-              onClick={() => setSelectedPlo(plo.ploCode)}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all duration-200 ${
-                selectedPlo === plo.ploCode
-                  ? "bg-white shadow-md text-indigo-600 border border-slate-200 ring-2 ring-indigo-500/5 translate-y-[-1px]"
-                  : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              {plo.ploCode}
-            </button>
-          ))}
+        {/* 🟢 PLO Selector Dropdown */}
+        <div className="relative min-w-[160px]">
+          <select
+            value={selectedPlo}
+            onChange={(e) => setSelectedPlo(e.target.value)}
+            className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-4 pr-10 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer shadow-sm"
+          >
+            {sortedPloList.map((plo) => (
+              <option key={plo.ploCode} value={plo.ploCode}>
+                Select {plo.ploCode}
+              </option>
+            ))}
+          </select>
+          {/* Custom Arrow Icon */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+            <ChevronDown size={16} strokeWidth={3} />
+          </div>
         </div>
       </div>
 
@@ -112,7 +113,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
-            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
             <CartesianGrid
               strokeDasharray="12 12"
@@ -124,6 +125,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
               axisLine={false}
               tickLine={false}
               tick={{ fill: "#64748b", fontSize: 13, fontWeight: 800 }}
+              dy={10}
             />
             <YAxis
               axisLine={false}
@@ -138,7 +140,6 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
                 boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
                 padding: "16px",
               }}
-              itemStyle={{ color: "#0f172a" }}
             />
             <Legend
               verticalAlign="top"
@@ -152,26 +153,25 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
               }}
             />
 
-            {/* Background Bar: Term Potential */}
             <Bar
               dataKey="target"
               name="Term Max Potential"
-              radius={[12, 12, 12, 12]}
-              barSize={300}
+              radius={[8, 8, 8, 8]}
+              barSize={300} // ปรับขนาดให้พอดี ไม่บังกัน
+              fill="#3e2a85"
             >
-              {chartData.map((entry, index) => {
-                const opacity = 0.1 + (index / chartData.length) * 0.4;
+              {sortedPloList.map((entry, index) => {
+                const opacity = 0.4 + (index / sortedPloList.length) * 0.4;
                 return (
                   <Cell
                     key={`cell-${index}`}
-                    fill="#6366f1" // สี Indigo หลัก
+                    fill="#3e2a85"
                     fillOpacity={opacity}
                   />
                 );
               })}
             </Bar>
 
-            {/* Foreground Line: Student Growth */}
             <Line
               type="monotone"
               dataKey="actual"
@@ -189,7 +189,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
       {/* Footer Info */}
       <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
         <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-          Breakdown Active: {selectedPlo || "None"}
+          Analysis Mode: <span className="text-indigo-600">{selectedPlo}</span>
         </span>
         <div className="flex gap-4">
           <div className="flex items-center gap-2">

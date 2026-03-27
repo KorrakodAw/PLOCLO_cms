@@ -259,7 +259,7 @@ export default function CloStatsDashboard({
       }),
     );
   }, [data.GradeSummary]);
-  
+
   const [displayMode, setDisplayMode] = useState<"chart" | "radar">("chart");
 
   const handleCaptureGraph = async () => {
@@ -295,23 +295,35 @@ export default function CloStatsDashboard({
     try {
       const workbook = XLSX.utils.book_new();
 
-      const dataToExport = flattenedTableData.map((item) => {
+      const isPercentage = activeTableData === flattenedTableDataPercent;
+      const dataTypeLabel = isPercentage ? "Percentage" : "RawScore";
+
+      const dataToExport = activeTableData.map((item) => {
         const row: { [key: string]: string | number } = {
           "Student Code": item.student_code,
           "Student Name": item.Name,
         };
 
-        if (item.cloScores && Array.isArray(item.cloScores)) {
-          item.cloScores.forEach(
-            (clo: { cloCode: string; cloScore: number }) => {
-              row[clo.cloCode] = clo.cloScore;
-            },
-          );
+        // เลือกใช้ข้อมูลตามประเภทที่มี
+        const cloData = item.cloPercentages || item.cloScores;
+
+        if (cloData && Array.isArray(cloData)) {
+          cloData.forEach((clo: any) => {
+            // ดึงค่า: ถ้าเป็นโหมด Percent ให้หา .percentage ก่อน ถ้าเป็นโหมด Score ให้หา .cloScore
+            const rawValue = isPercentage
+              ? (clo.percentage ?? clo.cloPercentage)
+              : clo.cloScore;
+
+            if (clo.cloCode && rawValue !== undefined) {
+              // ปรับทศนิยม 2 ตำแหน่ง และแปลงกลับเป็น Number
+              row[clo.cloCode] = Number(Number(rawValue).toFixed(2));
+            }
+          });
         }
         return row;
       });
 
-      const sheets = [{ data: dataToExport, name: "CLO_Scores" }];
+      const sheets = [{ data: dataToExport, name: `CLO_${dataTypeLabel}` }];
 
       sheets.forEach((s) => {
         if (s.data.length > 0) {
@@ -320,13 +332,20 @@ export default function CloStatsDashboard({
         }
       });
 
-      XLSX.writeFile(
-        workbook,
-        `Academic_Report_${new Date().getFullYear()}.xlsx`,
-      );
-      showToast("Exported all data to Excel!", "success");
+      // 2. ปรับชื่อไฟล์ให้มีคำว่า RawScore หรือ Percentage ตามข้อมูลที่เลือก
+      const now = new Date();
+      const dateStr = now.toISOString().split("T")[0];
+      const timeStr =
+        now.getHours().toString().padStart(2, "0") +
+        now.getMinutes().toString().padStart(2, "0");
+
+      // ชื่อไฟล์จะเป็น: Academic_Report_Percentage_2026-03-27_1500.xlsx เป็นต้น
+      const fileName = `Academic_Report_${dataTypeLabel}_${dateStr}_${timeStr}.xlsx`;
+
+      XLSX.writeFile(workbook, fileName);
+      showToast(`Exported ${dataTypeLabel} data successfully!`, "success");
     } catch (error) {
-      console.error(error);
+      console.error("Export Error:", error);
       showToast("Export failed", "error");
     }
   };
@@ -404,6 +423,7 @@ export default function CloStatsDashboard({
 
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
+
 
   const individualStudentData = useMemo(() => {
     if (!selectedStudentId) return null;

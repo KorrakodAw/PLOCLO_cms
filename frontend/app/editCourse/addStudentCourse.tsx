@@ -94,7 +94,6 @@ export default function AddStudentCourse({
       }
 
       const programIdsParam = currentIds.join(",");
-      console.log(programIdsParam);
 
       // 🟢 ยิง API พร้อมกันเพื่อความเร็ว (Parallel)
       const [studentRes, sectionRes, courseRes] = await Promise.all([
@@ -122,12 +121,6 @@ export default function AddStudentCourse({
       loadData();
     }
   }, [isLoggedIn, token, sectionId]); // รันใหม่เมื่อเปลี่ยน Section เท่านั้น
-
-  // useEffect(() => {
-  //   console.log(availableStudents);
-  //   console.log(enrolledStudents);
-  //   console.log(studentsInAnySection);
-  // });
 
   // Filter Logic
   const availableStudents = allProgramStudents

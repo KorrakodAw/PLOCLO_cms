@@ -46,51 +46,58 @@ export const StudentTable = ({
   }
 
   return (
-    <div className="mt-8 space-y-5 ">
-      {/* Header & Search Group */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
-        <div>
-          <h2 className="text-xl font-black text-slate-800 flex items-center gap-2.5">
-            <div className="p-2 bg-indigo-500 rounded-lg text-white">
-              <GraduationCap size={20} />
-            </div>
-            Student Directory
-          </h2>
-          <p className="text-xs text-slate-400 mt-1 font-medium">
-            Manage and view performance of{" "}
-            <span className="text-indigo-600 font-bold">{students.length}</span>{" "}
-            enrolled students
-          </p>
+    <div className="mt-6 space-y-4">
+      {/* 🟢 Header & Search Section: ปรับให้กะทัดรัดและ Responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-slate-800 rounded-xl text-white shadow-sm shrink-0">
+            <GraduationCap size={18} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 leading-tight">
+              Student Directory
+            </h2>
+            <p className="text-[11px] text-slate-400 font-medium">
+              <span className="text-slate-600 font-bold">
+                {students.length}
+              </span>{" "}
+              Total Students
+            </p>
+          </div>
         </div>
 
-        <div className="relative group">
+        {/* Search Input: กว้างขึ้นใน Mobile และคงที่ใน Desktop */}
+        <div className="relative group w-full sm:w-64">
           <Search
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"
-            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors"
+            size={16}
           />
           <input
             type="text"
             placeholder="Quick search..."
-            className="pl-11 pr-4 py-2.5 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 rounded-2xl text-sm transition-all outline-none w-full md:w-72 shadow-sm"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 rounded-xl text-sm transition-all outline-none shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Table Container */}
-      <div className="bg-white border border-slate-200 rounded-[24px] shadow-sm overflow-hidden transition-all">
-        <div className="max-h-[500px] overflow-y-auto scrollbar-hide hover:scrollbar-default">
+      {/* 🟢 Table Container: ปรับปรุงการเลื่อน (Scrolling) */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        {/* เปลี่ยน max-h เป็นค่าที่เหมาะสม หรือเอาออกถ้าต้องการให้ Scroll ตามหน้าหลัก 
+          ในที่นี้ปรับเป็น 400px และทำให้ Scrollbar ดูเรียบง่ายที่สุด
+      */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[420px] scrollbar-thin scrollbar-thumb-slate-200">
           <table className="w-full text-left border-separate border-spacing-0">
             <thead className="sticky top-0 z-20">
               <tr>
-                <th className="bg-slate-50/90 backdrop-blur-md px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[0.1em] border-b border-slate-100">
-                  Student Info
+                <th className="bg-slate-50/95 backdrop-blur-sm px-5 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                  Full Name
                 </th>
-                <th className="bg-slate-50/90 backdrop-blur-md px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-[0.1em] border-b border-slate-100">
-                  Student Code
+                <th className="bg-slate-50/95 backdrop-blur-sm px-5 py-3 text-[10px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                  ID Code
                 </th>
-                <th className="bg-slate-50/90 backdrop-blur-md px-6 py-4 text-right border-b border-slate-100"></th>
+                <th className="bg-slate-50/95 backdrop-blur-sm px-5 py-3 text-right border-b border-slate-100"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -99,32 +106,30 @@ export const StudentTable = ({
                   <tr
                     key={student.id}
                     onClick={() => onSelectStudent?.(student.id)}
-                    className="group hover:bg-indigo-50/30 transition-all cursor-pointer"
+                    className="group hover:bg-slate-50/80 transition-all cursor-pointer"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-5 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        {/* Avatar Simulation: เพิ่มสีสันให้ตาราง */}
-                        {/* <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs border border-white shadow-sm group-hover:from-indigo-100 group-hover:to-indigo-200    group-hover:text-indigo-600 transition-colors">
+                        {/* Avatar แบบจิ๋ว: ช่วยให้มองเห็นง่ายแต่ไม่รก */}
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-[10px] border border-slate-200 group-hover:bg-indigo-100 group-hover:text-indigo-600 group-hover:border-indigo-200 transition-all uppercase">
                           {student.first_name[0]}
                           {student.last_name[0]}
-                        </div> */}
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-700 transition-colors">
-                            {student.first_name} {student.last_name}
-                          </span>
                         </div>
+                        <span className="text-sm font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">
+                          {student.first_name} {student.last_name}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-500 group-hover:bg-white group-hover:text-indigo-500 transition-all border border-transparent group-hover:border-indigo-100">
-                        <Hash size={12} />
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      <span className="font-mono text-[13px] font-medium text-slate-400 group-hover:text-slate-600">
                         {student.student_code}
-                      </div>
+                      </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="inline-flex p-2 bg-transparent group-hover:bg-white rounded-xl text-slate-300 group-hover:text-indigo-500 group-hover:shadow-sm transition-all border border-transparent group-hover:border-slate-100">
-                        <ChevronRight size={18} strokeWidth={3} />
-                      </div>
+                    <td className="px-5 py-3 text-right">
+                      <ChevronRight
+                        size={16}
+                        className="inline-block text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all"
+                      />
                     </td>
                   </tr>
                 ))
@@ -132,10 +137,10 @@ export const StudentTable = ({
                 <tr>
                   <td
                     colSpan={3}
-                    className="px-6 py-20 text-center text-slate-400"
+                    className="px-6 py-12 text-center text-slate-400"
                   >
-                    <p className="text-sm font-medium italic">
-                      No matches found for "{searchTerm}"
+                    <p className="text-xs font-medium italic">
+                      No results for "{searchTerm}"
                     </p>
                   </td>
                 </tr>
@@ -145,14 +150,14 @@ export const StudentTable = ({
         </div>
       </div>
 
-      {/* Footer Info */}
-      <div className="flex items-center justify-between px-2">
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-          End of List
-        </p>
-        <p className="text-[10px] text-slate-400 font-bold">
-          {filteredStudents.length} Students Displayed
-        </p>
+      {/* 🟢 Footer Info: ลดขนาดลงเพื่อไม่ให้กวนสายตา */}
+      <div className="flex items-center justify-between px-1 opacity-60">
+        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] ml-6">
+          End of results
+        </span>
+        <span className="text-[9px] text-slate-400 font-bold mr-8">
+          Showing {filteredStudents.length} of {students.length}
+        </span>
       </div>
     </div>
   );

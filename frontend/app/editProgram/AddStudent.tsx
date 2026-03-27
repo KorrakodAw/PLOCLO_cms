@@ -53,7 +53,6 @@ export default function AddStudent({
       setStudents(studentsArray);
 
       // Debug เช็คว่าได้ Array ของนักเรียนจริงๆ ไหม
-      console.log("Students List:", studentsArray);
     } catch (err) {
       console.error("Fetch Students Error:", err);
       showToast(t("Failed to load student data."), "error");

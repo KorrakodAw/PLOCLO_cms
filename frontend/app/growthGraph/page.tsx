@@ -149,10 +149,6 @@ export default function GrowthGraphPage() {
     fetchYears();
   }, [selections.program, token]);
 
-  useEffect(() => {
-    console.log(selections.years);
-  });
-
   return (
     <ProtectedRoute roles={["system_admin", "Super_admin"]}>
       {/* 🟢 กำหนดความกว้างสูงสุดที่นี่ที่เดียว และใช้ mx-auto เพื่อจัดกึ่งกลางหน้าจอ */}

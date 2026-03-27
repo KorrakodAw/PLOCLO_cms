@@ -212,8 +212,9 @@ export const PerformanceTrendChart = ({
                 individualStudentData.ploScores ||
                 individualStudentData.ploPercentages ||
                 individualStudentData.cloScores ||
-                individualStudentData.cloPercentage ||
+                individualStudentData.cloPercentages ||
                 individualStudentData.categoryScores ||
+                individualStudentData.categoryPercentages ||
                 [];
 
               const target = scoresArray.find(
@@ -229,11 +230,11 @@ export const PerformanceTrendChart = ({
                     target.ploScore ||
                       target.percentage ||
                       target.cloScore ||
-                      target.score,
+                      target.realScore,
                   )
                 : null;
             }}
-            name={`คะแนนของ: ${individualStudentData.student_name || "นักเรียน"}`}
+            name={`คะแนนของ: ${individualStudentData.student_name || individualStudentData.Name || "นักเรียน"}`}
             stroke="#0f172a"
             strokeWidth={4}
             connectNulls={true}

@@ -274,44 +274,63 @@ export default function PloStatsDashboard({
   };
 
   const handleExportAllExcel = () => {
-    try {
-      const workbook = XLSX.utils.book_new();
-
-      const dataToExport = flattenedTableData.map((item) => {
-        const row: { [key: string]: string | number } = {
-          "Student Code": item.student_code,
-          "Student Name": item.Name,
-        };
-
-        if (item.ploScores && Array.isArray(item.ploScores)) {
-          item.ploScores.forEach(
-            (plo: { ploCode: string; ploScore: number }) => {
-              row[plo.ploCode] = plo.ploScore;
-            },
-          );
-        }
-        return row;
-      });
-
-      const sheets = [{ data: dataToExport, name: "PLO_Scores" }];
-
-      sheets.forEach((s) => {
-        if (s.data.length > 0) {
-          const ws = XLSX.utils.json_to_sheet(s.data);
-          XLSX.utils.book_append_sheet(workbook, ws, s.name);
-        }
-      });
-
-      XLSX.writeFile(
-        workbook,
-        `Academic_Report_${new Date().getFullYear()}.xlsx`,
-      );
-      showToast("Exported all data to Excel!", "success");
-    } catch (error) {
-      console.error(error);
-      showToast("Export failed", "error");
-    }
-  };
+      try {
+        const workbook = XLSX.utils.book_new();
+  
+        const isPercentage = activeTableData === flattenedTableDataPercent;
+        const dataTypeLabel = isPercentage ? "Percentage" : "RawScore";
+  
+        const dataToExport = activeTableData.map((item) => {
+          const row: { [key: string]: string | number } = {
+            "Student Code": item.student_code,
+            "Student Name": item.Name,
+          };
+  
+          // เลือกใช้ข้อมูลตามประเภทที่มี
+          const ploData = item.ploPercentages || item.ploScores;
+  
+          if (ploData && Array.isArray(ploData)) {
+            ploData.forEach((plo: any) => {
+              // ดึงค่า: ถ้าเป็นโหมด Percent ให้หา .percentage ก่อน ถ้าเป็นโหมด Score ให้หา .cloScore
+              const rawValue = isPercentage
+                ? (plo.percentage ?? plo.ploPercentage)
+                : plo.ploScore;
+  
+              if (plo.ploCode && rawValue !== undefined) {
+                // ปรับทศนิยม 2 ตำแหน่ง และแปลงกลับเป็น Number
+                row[plo.ploCode] = Number(Number(rawValue).toFixed(2));
+              }
+            });
+          }
+          return row;
+        });
+  
+        const sheets = [{ data: dataToExport, name: `PLO_${dataTypeLabel}` }];
+  
+        sheets.forEach((s) => {
+          if (s.data.length > 0) {
+            const ws = XLSX.utils.json_to_sheet(s.data);
+            XLSX.utils.book_append_sheet(workbook, ws, s.name);
+          }
+        });
+  
+        // 2. ปรับชื่อไฟล์ให้มีคำว่า RawScore หรือ Percentage ตามข้อมูลที่เลือก
+        const now = new Date();
+        const dateStr = now.toISOString().split("T")[0];
+        const timeStr =
+          now.getHours().toString().padStart(2, "0") +
+          now.getMinutes().toString().padStart(2, "0");
+  
+        // ชื่อไฟล์จะเป็น: Academic_Report_Percentage_2026-03-27_1500.xlsx เป็นต้น
+        const fileName = `Academic_Report_${dataTypeLabel}_${dateStr}_${timeStr}.xlsx`;
+  
+        XLSX.writeFile(workbook, fileName);
+        showToast(`Exported ${dataTypeLabel} data successfully!`, "success");
+      } catch (error) {
+        console.error("Export Error:", error);
+        showToast("Export failed", "error");
+      }
+    };
 
   const [dataMode, setDataMode] = useState<"score" | "percent">("score");
 
