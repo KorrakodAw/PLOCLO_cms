@@ -14,21 +14,22 @@ export default function ProtectedRoute({
   const { user, isLoggedIn, initialized } = useAuth();
   const router = useRouter();
 
+  const isAuthorized =
+    isLoggedIn && (!roles || roles.includes(user?.role ?? ""));
+
   useEffect(() => {
     if (!initialized) return;
+
     if (!isLoggedIn) {
-      // If token expired, reload to clear stale state
-      if (typeof window !== "undefined") {
-        window.location.replace("/");
-      } else {
-        router.replace("/");
-      }
+      window.location.replace("/");
     } else if (roles && !roles.includes(user?.role ?? "")) {
-      router.replace("/403"); // หน้า forbidden
+      router.replace("/403");
     }
-  }, [initialized, isLoggedIn, user, router, roles]);
+  }, [initialized, isLoggedIn, user, roles, router]);
 
   if (!initialized) return <p>Loading...</p>;
+
+  if (!isAuthorized) return null;
 
   return <>{children}</>;
 }

@@ -65,9 +65,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setToken(null);
     setUser(null);
+
     localStorage.removeItem("token");
     localStorage.removeItem("edit_fix_filters");
-    router.replace("/");
+    localStorage.clear();
+
+    window.location.href = "/";
   };
 
   useEffect(() => {

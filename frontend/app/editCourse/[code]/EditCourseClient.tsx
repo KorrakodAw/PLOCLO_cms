@@ -248,7 +248,7 @@ export default function EditCourseClient({
       <div className="px-6 max-w-400 mx-auto space-y-6">
         {/* --- HEADER CARD --- */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-8 md:p-10 flex flex-col lg:flex-row justify-between items-start gap-8">
+          <div className="p-8 md:p-10 flex flex-col min-[1200px]:flex-row justify-between items-start gap-8">
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">
                 Course ID: {formData.id}

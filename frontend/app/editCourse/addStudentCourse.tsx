@@ -446,8 +446,12 @@ export default function AddStudentCourse({
       <StudentSelectionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        availableStudents={availableStudents} // ส่ง Array ของ Program ที่มี Students อยู่ข้างใน
-        onConfirm={handleAddSelected}
+        availableStudents={availableStudents}
+        selectedStudents={selectedCandidates}
+        onConfirm={(newIds) => {
+          setSelectedCandidates(newIds);
+          handleAddSelected();
+        }}
         loading={false}
       />
 

@@ -32,10 +32,12 @@ export default function GrowthGraphPage() {
     years: "",
   });
 
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
+
+  const isInstructor = user?.role === "instructor";
 
   const updateSelections = (updates: Partial<typeof selections>) => {
     setSelections((prev) => ({ ...prev, ...updates }));
@@ -62,25 +64,70 @@ export default function GrowthGraphPage() {
   useEffect(() => {
     if (!token) return;
 
-    apiClient
-      .get("/university", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const universityOptions = res.data.map((uni: University) => ({
+    const initializeData = async () => {
+      try {
+        const uniRes = await apiClient.get("/university", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const uniOptions = uniRes.data.map((uni: University) => ({
           label: lang === "th" ? uni.name_th || uni.name : uni.name,
           value: String(uni.id),
         }));
-        setOptions((prev) => ({ ...prev, university: universityOptions }));
-      })
-      .catch((err) => {
-        showToast("Error fetching university", "error");
-      });
-  }, [token, lang]);
+
+        if (isInstructor) {
+          const insRes = await apiClient.get(
+            `/instructor/email/${user.email}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+
+          const facultyId = insRes.data?.faculty_id;
+
+          const facRes = await apiClient.get(`/faculty/${facultyId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const facultyData = facRes.data;
+
+          const allFacsRes = await apiClient.get("/faculty", {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { university_id: facultyData.university_id },
+          });
+
+          const formattedFacs = allFacsRes.data.map((f: Faculty) => ({
+            label: lang === "th" ? f.name_th || f.name : f.name,
+            value: String(f.id),
+          }));
+
+          setOptions((prev) => ({
+            ...prev,
+            university: uniOptions,
+            faculty: formattedFacs,
+          }));
+
+          updateSelections({
+            university: String(facultyData.university_id),
+            faculty: String(facultyData.id),
+          });
+        } else {
+          setOptions((prev) => ({
+            ...prev,
+            university: selections.university ? prev.university : uniOptions,
+          }));
+        }
+      } catch (error) {
+        console.error(error);
+        showToast("Error fetching universities", "error");
+      }
+    };
+
+    initializeData();
+  }, [token, lang, isInstructor]);
 
   useEffect(() => {
+    if (!selections.university || !token || isInstructor) return;
     const fetchFaculties = async () => {
-      if (!selections.university || !token) return;
       try {
         const res = await apiClient.get("/faculty", {
           headers: { Authorization: `Bearer ${token}` },
@@ -150,7 +197,15 @@ export default function GrowthGraphPage() {
   }, [selections.program, token]);
 
   return (
-    <ProtectedRoute roles={["system_admin", "Super_admin"]}>
+    <ProtectedRoute
+      roles={[
+        "system_admin",
+        "Super_admin",
+        "instructor",
+        "course_admin",
+        "student",
+      ]}
+    >
       {/* 🟢 กำหนดความกว้างสูงสุดที่นี่ที่เดียว และใช้ mx-auto เพื่อจัดกึ่งกลางหน้าจอ */}
       <div className="max-w-[1500px] mx-auto mt-8 px-4 space-y-8">
         {/* 🟢 Dropdown Container: ปรับ max-w-none และเอา items-center ออก */}
@@ -170,6 +225,7 @@ export default function GrowthGraphPage() {
                 years: "",
               })
             }
+            disabled={isInstructor}
           />
           <DropdownSelect
             label="Faculty"
@@ -182,7 +238,7 @@ export default function GrowthGraphPage() {
                 years: "",
               })
             }
-            disabled={!selections.university}
+            disabled={!selections.university || isInstructor}
           />
           <DropdownSelect
             label="Program"

@@ -21,6 +21,7 @@ interface Props {
   availableStudents: ProgramGroup[];
   onConfirm: (selectedIds: number[]) => void;
   loading?: boolean;
+  selectedStudents?: number[]; // เพิ่ม prop สำหรับนักศึกษาที่ถูกเลือกแล้ว (ถ้ามี)
 }
 
 const StudentSelectionModal: React.FC<Props> = ({
@@ -29,10 +30,21 @@ const StudentSelectionModal: React.FC<Props> = ({
   availableStudents,
   onConfirm,
   loading = false,
+  selectedStudents = [], // ใช้ค่าเริ่มต้นเป็น array ว่างถ้าไม่ได้รับ prop นี้
 }) => {
-  const [selectedCandidates, setSelectedCandidates] = useState<number[]>([]);
+  const [selectedCandidates, setSelectedCandidates] =
+    useState<number[]>(selectedStudents);
   const [activeTab, setActiveTab] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedCandidates(selectedStudents);
+      setSearchQuery(""); // ล้างคำค้นหาเมื่อเปิดใหม่
+    }
+  }, [isOpen, selectedStudents]);
 
   // ป้องกันการเลื่อนหน้าหลังเมื่อ Modal เปิด
   useEffect(() => {
@@ -76,12 +88,17 @@ const StudentSelectionModal: React.FC<Props> = ({
     );
   };
 
+  // 🟢 เลือกทั้งหมดในเฉพาะกลุ่มที่แสดง (View)
   const handleSelectAllInProgram = (isChecked: boolean) => {
-    const ids = filteredStudents.map((s) => s.id);
+    const currentVisibleIds = filteredStudents.map((s) => s.id);
     if (isChecked) {
-      setSelectedCandidates((prev) => Array.from(new Set([...prev, ...ids])));
+      setSelectedCandidates((prev) =>
+        Array.from(new Set([...prev, ...currentVisibleIds])),
+      );
     } else {
-      setSelectedCandidates((prev) => prev.filter((id) => !ids.includes(id)));
+      setSelectedCandidates((prev) =>
+        prev.filter((id) => !currentVisibleIds.includes(id)),
+      );
     }
   };
 

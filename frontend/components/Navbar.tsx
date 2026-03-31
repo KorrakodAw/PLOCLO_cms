@@ -64,7 +64,6 @@ export default function Navbar({
     "system_admin",
     "course_admin",
     "student",
-    "guest",
   ].includes(role);
   const canEditCourse = [
     "instructor",
@@ -72,6 +71,7 @@ export default function Navbar({
     "course_admin",
     "Super_admin",
   ].includes(role);
+  const guestRoles = ["guest"].includes(role);
 
   const menuItems = [
     {
@@ -86,7 +86,7 @@ export default function Navbar({
       href: "/growthGraph",
       icon: <TrendingUp size={22} />,
       label: t("growthGraph"),
-      show: canManageAdmin,
+      show: canViewAnalytics,
     },
     {
       id: "programs",
@@ -117,6 +117,15 @@ export default function Navbar({
       show: canManageAdmin,
     },
   ];
+
+  const handleLogout = () => {
+    localStorage.removeItem("edit_fix_filters");
+    localStorage.removeItem("token");
+
+    logout();
+
+    window.location.href = "/";
+  };
 
   return (
     <>
@@ -237,9 +246,7 @@ export default function Navbar({
               )}
 
               <button
-                onClick={() => {
-                  logout();
-                }}
+                onClick={handleLogout}
                 title={!isOpen ? t("logout") : ""}
                 className={`flex items-center transition-colors duration-200 text-slate-400 hover:text-red-500
                   ${!isOpen ? "justify-center w-full" : "justify-start gap-4"}`}

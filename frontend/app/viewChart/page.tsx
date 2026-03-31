@@ -14,10 +14,10 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import YearStatsDashboard from "./YearStatsDashboard";
 import SemesterStatsDashboard from "./SemesterStatsDashboard";
 import CourseStatsDashboard from "./CourseStatsDashboard";
-
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 export default function ViewChartPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -54,22 +54,22 @@ export default function ViewChartPage() {
   });
 
   const [chartYearParams, setChartYearParams] = useState<{
-    id: any;
-    year: any;
+    id: string;
+    year: string;
   } | null>(null);
 
   const [chartSemesterParams, setChartSemesterParams] = useState<{
-    id: any;
-    year: any;
-    semester: any;
+    id: string;
+    year: string;
+    semester: string;
   } | null>(null);
 
   const [chartCourseParams, setChartCourseParams] = useState<{
-    Csemester_id: any;
-    year: any;
-    semester: any;
-    courseId: any;
-    program_id: any;
+    Csemester_id: string;
+    year: string;
+    semester: string;
+    courseId: string;
+    program_id: string;
   } | null>(null);
 
   const [isHydrated, setIsHydrated] = useState(false);
@@ -88,55 +88,104 @@ export default function ViewChartPage() {
   }, [token]);
 
   useEffect(() => {
-    if (selections.university || selections.faculty || selections.program) {
+    if (token && (selections.university || selections.faculty)) {
       localStorage.setItem("edit_fix_filters", JSON.stringify(selections));
     }
-  });
+  }, [selections, token]);
+
+  const isInstructor = user?.role === "instructor";
+
+  const updateSelections = (updates: Partial<typeof selections>) => {
+    setSelections((prev) => ({ ...prev, ...updates }));
+  };
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !user?.email) return;
 
-    apiClient
-      .get("/university", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const universityOptions = res.data.map((uni: University) => ({
+    const initializeBaseData = async () => {
+      try {
+        const uniRes = await apiClient.get("/university", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const universityOptions = uniRes.data.map((uni: University) => ({
           label: lang === "th" ? uni.name_th || uni.name : uni.name,
           value: String(uni.id),
         }));
-        setOptions((prev) => ({ ...prev, university: universityOptions }));
-      })
-      .catch((err) => {
-        showToast("Error fetching university", "error");
-      });
-  }, [token, lang]); // โหลดแค่ตอน Token หรือ ภาษาเปลี่ยน
 
-  // 1. ฟังก์ชันดึงข้อมูลคณะ (เน้นดึงอย่างเดียว)
+        if (isInstructor) {
+          const insRes = await apiClient.get(
+            `/instructor/email/${user.email}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+          const facultyId = insRes.data?.faculty_id;
+
+          const facRes = await apiClient.get(`/faculty/${facultyId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const facultyData = facRes.data;
+
+          const allFacsRes = await apiClient.get("/faculty", {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { university_id: facultyData.university_id },
+          });
+
+          const formattedFacs = allFacsRes.data.map((f: Faculty) => ({
+            label: lang === "th" ? f.name_th || f.name : f.name,
+            value: String(f.id),
+          }));
+
+          // ✅ อัปเดต Options: มหาลัยทั้งหมด + คณะในมหาลัยนั้น
+          setOptions((prev) => ({
+            ...prev,
+            university: universityOptions,
+            faculty: formattedFacs,
+          }));
+
+          // ✅ อัปเดต Selections ล็อกค่าตามสังกัด
+          updateSelections({
+            university: String(facultyData.university_id),
+            faculty: String(facultyData.id),
+          });
+        } else {
+          // --- 🔑 กรณี Admin ทั่วไป ---
+          setOptions((prev) => ({ ...prev, university: universityOptions }));
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("Error initializing data", "error");
+      }
+    };
+
+    initializeBaseData();
+  }, [token, lang, isInstructor, user?.email]);
+
   useEffect(() => {
+    if (isInstructor || !selections.university || !token) return;
+
     const fetchFaculties = async () => {
-      if (!selections.university || !token) return;
       try {
         const res = await apiClient.get("/faculty", {
           headers: { Authorization: `Bearer ${token}` },
           params: { university_id: selections.university },
         });
-        const options = res.data.map((f: Faculty) => ({
+        const facOptions = res.data.map((f: Faculty) => ({
           label: lang === "th" ? f.name_th || f.name : f.name,
           value: String(f.id),
         }));
-        setOptions((prev) => ({ ...prev, faculty: options }));
+        setOptions((prev) => ({ ...prev, faculty: facOptions, program: [] }));
       } catch {
         showToast("Error fetching faculty", "error");
       }
     };
-
     fetchFaculties();
-  }, [selections.university, token, lang]); // รันเมื่อ University เปลี่ยน
+  }, [selections.university, token, lang, isInstructor]);
 
   useEffect(() => {
+    if (!selections.faculty || !token) return;
+
     const fetchPrograms = async () => {
-      if (!selections.faculty || !token) return;
       try {
         const res = await apiClient.get(
           `/program/ByFaculty/${selections.faculty}`,
@@ -144,21 +193,25 @@ export default function ViewChartPage() {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
-        const options = res.data.map((p: Program) => ({
+        const progOptions = res.data.map((p: Program) => ({
           label:
             lang === "th"
               ? p.program_shortname_th || p.program_shortname_en
               : p.program_shortname_en,
           value: p.program_code,
         }));
-        setOptions((prev) => ({ ...prev, program: options }));
+
+        setOptions((prev) => ({ ...prev, program: progOptions }));
+
+        if (isInstructor && progOptions.length === 1 && !selections.program) {
+          updateSelections({ program: progOptions[0].value });
+        }
       } catch {
         showToast("Error fetching program", "error");
       }
     };
-
     fetchPrograms();
-  }, [selections.faculty, token, lang]);
+  }, [selections.faculty, token, lang, isInstructor]);
 
   useEffect(() => {
     const fetchYears = async () => {
@@ -168,10 +221,12 @@ export default function ViewChartPage() {
           headers: { Authorization: `Bearer ${token}` },
           params: { programCode: selections.program },
         });
-        const options = res.data.map((item: { program_year: number; id: number }) => ({
-          label: item.program_year.toString(),
-          value: JSON.stringify({ id: item.id, year: item.program_year }),
-        }));
+        const options = res.data.map(
+          (item: { program_year: number; id: number }) => ({
+            label: item.program_year.toString(),
+            value: JSON.stringify({ id: item.id, year: item.program_year }),
+          }),
+        );
         setOptions((prev) => ({ ...prev, years: options }));
       } catch {
         showToast("Error fetching years", "error");
@@ -183,11 +238,9 @@ export default function ViewChartPage() {
 
   useEffect(() => {
     const fetchSemesters = async () => {
-      // 1. ตรวจสอบเงื่อนไข: ต้องมีทั้งปีที่เลือก และ Token
       if (!selections.years || !token) return;
 
       try {
-        // 2. จัดการเรื่อง JSON Value (กรณีที่ปีถูกเก็บเป็น Stringified Object)
         let selectedYear;
         try {
           const yearObj =
@@ -195,25 +248,21 @@ export default function ViewChartPage() {
               ? JSON.parse(selections.years)
               : selections.years;
           selectedYear = yearObj?.year;
-        } catch (e) {
-          // ถ้า Parse ไม่ได้ ให้ใช้ค่านั้นตรงๆ (เผื่อกรณีเป็นตัวเลขธรรมดา)
+        } catch {
           selectedYear = selections.years;
         }
 
         if (!selectedYear) return;
 
-        // 3. เรียก API
         const res = await apiClient.get(`/course/unique/${selectedYear}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // 4. แปลงข้อมูลสำหรับ Dropdown
         const semesterOptions = res.data.map((item: number) => ({
           label: `${item}`,
-          value: String(item), // 🟢 บังคับเป็น String
+          value: String(item),
         }));
 
-        // 5. อัปเดต Options ใน State
         setOptions((prev) => ({ ...prev, semester: semesterOptions }));
       } catch (error) {
         console.error("Fetch Semesters Error:", error);
@@ -222,7 +271,7 @@ export default function ViewChartPage() {
     };
 
     fetchSemesters();
-  }, [selections.years, token, showToast]); // 🟢 รันใหม่ทุกครั้งที่ selections.years เปลี่ยน
+  }, [selections.years, token, showToast]);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -251,8 +300,6 @@ export default function ViewChartPage() {
 
     fetchCourses();
   }, [selections.years, selections.semester, token, lang]);
-
-  // 2. ใช้ useEffect ควบคุมเมื่อ University เปลี่ยน
 
   useEffect(() => {
     if (selections.years) {
@@ -297,7 +344,7 @@ export default function ViewChartPage() {
     } else {
       setChartSemesterParams(null);
     }
-  }, [selections.semester, selections.years]); // 👈 เพิ่ม selections.years ในนี้ด้วยเพื่อให้ค่าอัปเดตเมื่อปีเปลี่ยน
+  }, [selections.semester, selections.years]);
 
   useEffect(() => {
     if (selections.courses) {
@@ -326,100 +373,150 @@ export default function ViewChartPage() {
     }
   }, [selections.courses, selections.years, selections.semester]);
 
-  const updateSelections = (updates: Partial<typeof selections>) => {
-    setSelections((prev) => ({ ...prev, ...updates }));
+  const handleClearFilters = () => {
+    updateSelections({
+      university: "",
+      faculty: "",
+      program: "",
+      years: "",
+      courses: "",
+      semester: "",
+    });
+    setChartYearParams(null);
+    setChartSemesterParams(null);
+    setChartCourseParams(null);
   };
 
   return (
-    <div>
+    <ProtectedRoute
+      roles={["system_admin", "Super_admin", "instructor", "course_admin", "student"]}
+    >
       {loading && <LoadingOverlay />}{" "}
       {/* แสดง Loading Overlay เมื่อกำลังโหลดข้อมูล */}
-      <div
-        className="bg-white/50 
-              min-[768px]:grid-cols-3 
-              min-[1500px]:grid-cols-6 
-              items-endbg-white/50 backdrop-blur-sm p-4 rounded-[2.5rem] border border-slate-200/60 shadow-sm grid grid-cols-2  gap-4 items-end max-w-[1500px] aliign-middle mx-auto"
-      >
-        <DropdownSelect
-          label="University"
-          options={options.university}
-          value={selections.university}
-          onChange={(val) =>
-            updateSelections({
-              university: String(val),
-              faculty: "",
-              program: "",
-              years: "",
-              courses: "",
-              semester: "",
-            })
-          }
-        />
-        <DropdownSelect
-          label="Faculty"
-          options={options.faculty}
-          value={selections.faculty}
-          onChange={(val) =>
-            updateSelections({
-              faculty: String(val),
-              program: "",
-              years: "",
-              courses: "",
-              semester: "",
-            })
-          }
-          disabled={!selections.university}
-        />
-        <DropdownSelect
-          label="Program"
-          options={options.program}
-          value={selections.program}
-          onChange={(val) =>
-            updateSelections({
-              program: String(val),
-              years: "",
-              courses: "",
-              semester: "",
-            })
-          }
-          disabled={!selections.faculty}
-        />
-        <DropdownSelect
-          label="Year"
-          options={options.years}
-          value={selections.years}
-          onChange={(val) =>
-            updateSelections({
-              years: String(val),
-              semester: "",
-              courses: "",
-            })
-          }
-          disabled={!selections.program}
-        />
-        <DropdownSelect
-          label="Semester"
-          options={options.semester}
-          value={selections.semester}
-          onChange={(val) =>
-            updateSelections({
-              semester: String(val),
-              courses: "",
-            })
-          }
-          disabled={!selections.years}
-        />
-        <DropdownSelect
-          label="Course"
-          options={options.courses}
-          value={selections.courses}
-          onChange={(val) =>
-            updateSelections({
-              courses: String(val),
-            })
-          }
-          disabled={!selections.semester}
-        />
+      <div className="max-w-[1500px] mx-auto">
+        <div
+          className="relative bg-white/60 backdrop-blur-md p-6 rounded-[2.5rem] border border-slate-200/60 shadow-sm 
+               grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-5 items-end transition-all duration-300"
+        >
+          {/* 1. University */}
+          <DropdownSelect
+            label="University"
+            options={options.university}
+            value={selections.university}
+            onChange={(val) =>
+              updateSelections({
+                university: String(val),
+                faculty: "",
+                program: "",
+                years: "",
+                courses: "",
+                semester: "",
+              })
+            }
+            disabled={isInstructor}
+          />
+
+          {/* 2. Faculty */}
+          <DropdownSelect
+            label="Faculty"
+            options={options.faculty}
+            value={selections.faculty}
+            onChange={(val) =>
+              updateSelections({
+                faculty: String(val),
+                program: "",
+                years: "",
+                courses: "",
+                semester: "",
+              })
+            }
+            disabled={!selections.university || isInstructor}
+          />
+
+          {/* 3. Program */}
+          <DropdownSelect
+            label="Program"
+            options={options.program}
+            value={selections.program}
+            onChange={(val) =>
+              updateSelections({
+                program: String(val),
+                years: "",
+                courses: "",
+                semester: "",
+              })
+            }
+            disabled={!selections.faculty}
+          />
+
+          {/* 4. Year */}
+          <DropdownSelect
+            label="Year"
+            options={options.years}
+            value={selections.years}
+            onChange={(val) =>
+              updateSelections({
+                years: String(val),
+                semester: "",
+                courses: "",
+              })
+            }
+            disabled={!selections.program}
+          />
+
+          {/* 5. Semester */}
+          <DropdownSelect
+            label="Semester"
+            options={options.semester}
+            value={selections.semester}
+            onChange={(val) =>
+              updateSelections({
+                semester: String(val),
+                courses: "",
+              })
+            }
+            disabled={!selections.years}
+          />
+
+          {/* 6. Course */}
+          <DropdownSelect
+            label="Course"
+            options={options.courses}
+            value={selections.courses}
+            onChange={(val) =>
+              updateSelections({
+                courses: String(val),
+              })
+            }
+            disabled={!selections.semester}
+          />
+
+          {/* 7. Clear Filters Button */}
+          <div className="col-span-2 md:col-span-3 xl:col-span-1 flex justify-end xl:justify-center pb-1">
+            <button
+              onClick={handleClearFilters}
+              className="w-full xl:w-auto px-5 py-2.5 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white 
+                   border border-red-100 hover:border-red-500 rounded-2xl text-xs font-black 
+                   transition-all duration-200 active:scale-95 flex items-center justify-center gap-2"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              CLEAR
+            </button>
+          </div>
+        </div>
       </div>
       {/* แสดง Dashboard ตามการเลือก */}
       {!chartYearParams && !chartSemesterParams && !chartCourseParams && (
@@ -480,6 +577,6 @@ export default function ViewChartPage() {
           program_id={chartCourseParams.program_id}
         />
       )}
-    </div>
+    </ProtectedRoute>
   );
 }

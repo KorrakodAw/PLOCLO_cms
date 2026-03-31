@@ -245,6 +245,6 @@
   "Below": "Below",
   "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F": "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F",
   "core": "Core",
-  "elective": "Elective"
-  
+  "elective": "Elective",
+  "growthGraph": "Achievement"
 }

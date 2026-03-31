@@ -249,5 +249,6 @@
   "Below" : "ต่ำกว่า",
   "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F": "คำเตือน: ตรวจสอบให้แน่ใจว่าคะแนนอยู่ในลำดับที่ลดลง (A > B+ > B ...). นักศึกษาที่ไม่ตรงตามเงื่อนไข D จะได้รับเกรด F โดยอัตโนมัติ",
   "core": "หลักสูตรแกนกลาง",
-  "elective": "หลักสูตรเลือก"
+  "elective": "หลักสูตรเลือก",
+  "growthGraph":"ผลลัพธ์"
 }
