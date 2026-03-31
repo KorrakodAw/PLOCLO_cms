@@ -94,6 +94,7 @@ export default function ViewChartPage() {
   }, [selections, token]);
 
   const isInstructor = user?.role === "instructor";
+  const isStudent = user?.role === "student";
 
   const updateSelections = (updates: Partial<typeof selections>) => {
     setSelections((prev) => ({ ...prev, ...updates }));
@@ -148,8 +149,86 @@ export default function ViewChartPage() {
             university: String(facultyData.university_id),
             faculty: String(facultyData.id),
           });
+        } else if (isStudent) {
+          // --- 🎓 Student Logic ---
+
+          // 1. ดึงข้อมูลนักศึกษาจาก Email
+          const stdRes = await apiClient.get(`/student/email/${user.email}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const studentData = stdRes.data; // ในนี้จะมี program_id ของนักศึกษาคนนี้
+
+          // 2. ดึงข้อมูล Program ของนักศึกษาคนนี้โดยเฉพาะ เพื่อเอา program_year จริงๆ
+          const studentProgramRes = await apiClient.get(
+            `/program/${studentData.program_id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+          const studentProgramData = studentProgramRes.data;
+          const targetYear = studentProgramData.program_year; // 🟢 ปีการศึกษาที่นักศึกษาสังกัด
+
+          // 3. ดึงข้อมูล Faculty (เพื่อเอา university_id และชื่อคณะ)
+          const facRes = await apiClient.get(
+            `/faculty/${studentProgramData.faculty_id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+          const facultyData = facRes.data;
+
+          // 4. ดึงรายการปีการศึกษาทั้งหมดที่เปิดใน Program Code นี้ (เพื่อสร้างตัวเลือกใน Dropdown)
+          const yearRes = await apiClient.get(`/program/ByCodeForViewChart`, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { programCode: studentProgramData.program_code },
+          });
+
+          const yearOptions = yearRes.data.map((item: any) => ({
+            label: item.program_year.toString(),
+            value: JSON.stringify({ id: item.id, year: item.program_year }),
+          }));
+
+          // 🟢 5. หาตัวเลือก (Option) ที่มี year ตรงกับ studentProgramData.program_year
+          const studentYearOption =
+            yearOptions.find((opt: any) => {
+              try {
+                const val = JSON.parse(opt.value);
+                return val.year === targetYear;
+              } catch {
+                return false;
+              }
+            }) || yearOptions[0];
+
+          // ✅ อัปเดต Options
+          setOptions((prev) => ({
+            ...prev,
+            university: universityOptions,
+            faculty: [
+              {
+                label: lang === "th" ? facultyData.name_th : facultyData.name,
+                value: String(facultyData.id),
+              },
+            ],
+            program: [
+              {
+                label:
+                  lang === "th"
+                    ? studentProgramData.program_shortname_th
+                    : studentProgramData.program_shortname_en,
+                value: String(studentProgramData.program_code),
+              },
+            ],
+            years: yearOptions,
+          }));
+
+          // ✅ ล็อกค่า Selections ทั้งหมดตามสังกัดของนักศึกษา
+          updateSelections({
+            university: String(facultyData.university_id),
+            faculty: String(facultyData.id),
+            program: String(studentProgramData.program_code),
+            years: studentYearOption ? studentYearOption.value : "", // 🟢 ล็อกปีการศึกษาที่ถูกต้อง
+          });
         } else {
-          // --- 🔑 กรณี Admin ทั่วไป ---
           setOptions((prev) => ({ ...prev, university: universityOptions }));
         }
       } catch (err) {
@@ -374,22 +453,51 @@ export default function ViewChartPage() {
   }, [selections.courses, selections.years, selections.semester]);
 
   const handleClearFilters = () => {
-    updateSelections({
-      university: "",
-      faculty: "",
-      program: "",
-      years: "",
-      courses: "",
-      semester: "",
-    });
-    setChartYearParams(null);
+    if (isInstructor) {
+      updateSelections({
+        university: selections.university,
+        faculty: selections.faculty,
+        program: "",
+        years: "",
+        courses: "",
+        semester: "",
+      });
+      setChartYearParams(null);
+    } else if (isStudent) {
+      updateSelections({
+        university: selections.university,
+        faculty: selections.faculty,
+        program: selections.program,
+        years: selections.years,
+        courses: "",
+        semester: "",
+      });
+    } else {
+      updateSelections({
+        university: "",
+        faculty: "",
+        program: "",
+        years: "",
+        courses: "",
+        semester: "",
+      });
+      setChartYearParams(null);
+    }
+
     setChartSemesterParams(null);
     setChartCourseParams(null);
+    localStorage.removeItem("edit_fix_filters");
   };
 
   return (
     <ProtectedRoute
-      roles={["system_admin", "Super_admin", "instructor", "course_admin", "student"]}
+      roles={[
+        "system_admin",
+        "Super_admin",
+        "instructor",
+        "course_admin",
+        "student",
+      ]}
     >
       {loading && <LoadingOverlay />}{" "}
       {/* แสดง Loading Overlay เมื่อกำลังโหลดข้อมูล */}
@@ -413,7 +521,7 @@ export default function ViewChartPage() {
                 semester: "",
               })
             }
-            disabled={isInstructor}
+            disabled={isInstructor || isStudent} // 🟢 Instructor และ Student ไม่สามารถเปลี่ยนมหาลัยได้
           />
 
           {/* 2. Faculty */}
@@ -430,7 +538,7 @@ export default function ViewChartPage() {
                 semester: "",
               })
             }
-            disabled={!selections.university || isInstructor}
+            disabled={!selections.university || isInstructor || isStudent}
           />
 
           {/* 3. Program */}
@@ -446,7 +554,7 @@ export default function ViewChartPage() {
                 semester: "",
               })
             }
-            disabled={!selections.faculty}
+            disabled={!selections.faculty || isStudent}
           />
 
           {/* 4. Year */}
@@ -461,7 +569,7 @@ export default function ViewChartPage() {
                 courses: "",
               })
             }
-            disabled={!selections.program}
+            disabled={!selections.program || isStudent}
           />
 
           {/* 5. Semester */}

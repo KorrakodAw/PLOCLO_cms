@@ -38,6 +38,7 @@ export default function GrowthGraphPage() {
   const lang = i18n.language;
 
   const isInstructor = user?.role === "instructor";
+  const isStudent = user?.role === "student";
 
   const updateSelections = (updates: Partial<typeof selections>) => {
     setSelections((prev) => ({ ...prev, ...updates }));
@@ -109,6 +110,76 @@ export default function GrowthGraphPage() {
           updateSelections({
             university: String(facultyData.university_id),
             faculty: String(facultyData.id),
+          });
+        } else if (isStudent) {
+          const stdRes = await apiClient.get(`/student/email/${user.email}`, {
+            headers: { Authorization: `Beareer ${token}` },
+          });
+          const studentData = stdRes.data;
+
+          const studentProgramRes = await apiClient.get(
+            `/program/${studentData.program_id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+
+          const studentProgramData = studentProgramRes.data;
+          const targetYear = studentProgramData.program_year;
+
+          const facRes = await apiClient.get(
+            `/faculty/${studentProgramData.faculty_id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+
+          const facultyData = facRes.data;
+
+          const yearRes = await apiClient.get(`/program/ByCodeForViewChart`, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { programCode: studentProgramData.program_code },
+          });
+
+          const yearOptions = yearRes.data.map(
+            (item: { program_year: number; id: number }) => ({
+              label: item.program_year.toString(),
+              value: String(item.id),
+            }),
+          );
+
+          setOptions((prev) => ({
+            ...prev,
+            university: uniOptions,
+            faculty: [
+              {
+                label:
+                  lang === "th"
+                    ? facultyData.name_th || facultyData.name
+                    : facultyData.name,
+                value: String(facultyData.id),
+              },
+            ],
+            program: [
+              {
+                label:
+                  lang === "th"
+                    ? studentProgramData.program_shortname_th ||
+                      studentProgramData.program_shortname_en
+                    : studentProgramData.program_shortname_en,
+                value: String(studentProgramData.program_code),
+              },
+            ],
+            years: yearOptions,
+          }));
+
+          updateSelections({
+            university: String(facultyData.university_id),
+            faculty: String(facultyData.id),
+            program: String(studentProgramData.program_code),
+            years:
+              yearOptions.find((y) => y.label === targetYear.toString())
+                ?.value || "",
           });
         } else {
           setOptions((prev) => ({
@@ -225,7 +296,7 @@ export default function GrowthGraphPage() {
                 years: "",
               })
             }
-            disabled={isInstructor}
+            disabled={isInstructor || isStudent}
           />
           <DropdownSelect
             label="Faculty"
@@ -238,7 +309,7 @@ export default function GrowthGraphPage() {
                 years: "",
               })
             }
-            disabled={!selections.university || isInstructor}
+            disabled={!selections.university || isInstructor || isStudent}
           />
           <DropdownSelect
             label="Program"
@@ -250,7 +321,7 @@ export default function GrowthGraphPage() {
                 years: "",
               })
             }
-            disabled={!selections.faculty}
+            disabled={!selections.faculty || isStudent}
           />
           <DropdownSelect
             label="Year"
@@ -261,7 +332,7 @@ export default function GrowthGraphPage() {
                 years: String(val),
               })
             }
-            disabled={!selections.faculty}
+            disabled={!selections.faculty || isStudent}
           />
         </div>
 
