@@ -33,7 +33,9 @@ export default function YearStatsDashboard({
   const graphRef = useRef<HTMLDivElement>(null);
   const { showToast } = useGlobalToast();
   const [loading, setLoading] = useState(false);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+
+  const isGuest = user?.role === "guest";
 
   const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({
     maxScore: false,
@@ -340,7 +342,7 @@ export default function YearStatsDashboard({
       <DashboardHeader
         title={`Yearly PLO Performance Dashboard - ${year}`}
         onSaveImage={handleCaptureGraph}
-        onExportExcel={handleExportAllExcel}
+        onExportExcel={isGuest ? undefined : handleExportAllExcel}
       />
       <DashboardControls
         displayMode={displayMode}
@@ -419,22 +421,24 @@ export default function YearStatsDashboard({
           </div>
         )}
       </div>
-      <div className="w-full max-w-375 mx-auto">
-        <StudentPerformanceTable
-          studentsData={activeTableData}
-          title="Individual Student Performance"
-          onViewDetails={handleStudentView}
-          // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
-          selectedId={
-            individualStudentData
-              ? String(
-                  individualStudentData.student_id ||
-                    individualStudentData.student_code,
-                )
-              : null
-          }
-        />
-      </div>
+      {!isGuest && (
+        <div className="w-full max-w-375 mx-auto">
+          <StudentPerformanceTable
+            studentsData={activeTableData}
+            title="Individual Student Performance"
+            onViewDetails={handleStudentView}
+            // ส่ง ID จาก data ที่เลือกอยู่เข้าไปเพื่อให้ปุ่มเปลี่ยนสีได้ถูกต้อง
+            selectedId={
+              individualStudentData
+                ? String(
+                    individualStudentData.student_id ||
+                      individualStudentData.student_code,
+                  )
+                : null
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

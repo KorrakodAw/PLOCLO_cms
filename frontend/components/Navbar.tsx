@@ -71,7 +71,7 @@ export default function Navbar({
     "course_admin",
     "Super_admin",
   ].includes(role);
-  const guestRoles = ["guest"].includes(role);
+  const canViewAnalyticswithGuest = ["guest"].includes(role);
 
   const menuItems = [
     {
@@ -79,7 +79,7 @@ export default function Navbar({
       href: "/viewChart",
       icon: <LayoutDashboard size={22} />,
       label: t("analytics"),
-      show: canViewAnalytics,
+      show: canViewAnalytics || canViewAnalyticswithGuest,
     },
     {
       id: "graphGrowth",

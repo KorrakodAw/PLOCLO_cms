@@ -95,6 +95,8 @@ export default function ViewChartPage() {
 
   const isInstructor = user?.role === "instructor";
   const isStudent = user?.role === "student";
+  const isGuest = user?.role === "guest";
+
 
   const updateSelections = (updates: Partial<typeof selections>) => {
     setSelections((prev) => ({ ...prev, ...updates }));
@@ -497,14 +499,16 @@ export default function ViewChartPage() {
         "instructor",
         "course_admin",
         "student",
+        "guest",
       ]}
     >
       {loading && <LoadingOverlay />}{" "}
       {/* แสดง Loading Overlay เมื่อกำลังโหลดข้อมูล */}
       <div className="max-w-[1500px] mx-auto">
         <div
-          className="relative bg-white/60 backdrop-blur-md p-6 rounded-[2.5rem] border border-slate-200/60 shadow-sm 
-               grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-5 items-end transition-all duration-300"
+          className={`relative bg-white/60 backdrop-blur-md p-6 rounded-[2.5rem] border border-slate-200/60 shadow-sm 
+        grid grid-cols-2 md:grid-cols-3 gap-5 items-end transition-all duration-300
+        ${isGuest ? "xl:grid-cols-5" : "xl:grid-cols-7"}`} // 🟢 ปรับจำนวน Column ตาม Role
         >
           {/* 1. University */}
           <DropdownSelect
@@ -521,7 +525,7 @@ export default function ViewChartPage() {
                 semester: "",
               })
             }
-            disabled={isInstructor || isStudent} // 🟢 Instructor และ Student ไม่สามารถเปลี่ยนมหาลัยได้
+            disabled={isInstructor || isStudent}
           />
 
           {/* 2. Faculty */}
@@ -572,40 +576,46 @@ export default function ViewChartPage() {
             disabled={!selections.program || isStudent}
           />
 
-          {/* 5. Semester */}
-          <DropdownSelect
-            label="Semester"
-            options={options.semester}
-            value={selections.semester}
-            onChange={(val) =>
-              updateSelections({
-                semester: String(val),
-                courses: "",
-              })
-            }
-            disabled={!selections.years}
-          />
+          {/* 🟢 5. Semester (ซ่อนถ้าเป็น Guest) */}
+          {!isGuest && (
+            <DropdownSelect
+              label="Semester"
+              options={options.semester}
+              value={selections.semester}
+              onChange={(val) =>
+                updateSelections({
+                  semester: String(val),
+                  courses: "",
+                })
+              }
+              disabled={!selections.years}
+            />
+          )}
 
-          {/* 6. Course */}
-          <DropdownSelect
-            label="Course"
-            options={options.courses}
-            value={selections.courses}
-            onChange={(val) =>
-              updateSelections({
-                courses: String(val),
-              })
-            }
-            disabled={!selections.semester}
-          />
+          {/* 🟢 6. Course (ซ่อนถ้าเป็น Guest) */}
+          {!isGuest && (
+            <DropdownSelect
+              label="Course"
+              options={options.courses}
+              value={selections.courses}
+              onChange={(val) =>
+                updateSelections({
+                  courses: String(val),
+                })
+              }
+              disabled={!selections.semester}
+            />
+          )}
 
           {/* 7. Clear Filters Button */}
-          <div className="col-span-2 md:col-span-3 xl:col-span-1 flex justify-end xl:justify-center pb-1">
+          <div
+            className={`col-span-2 md:col-span-3 flex justify-end xl:justify-center pb-1 ${isGuest ? "xl:col-span-1" : "xl:col-span-1"}`}
+          >
             <button
               onClick={handleClearFilters}
               className="w-full xl:w-auto px-5 py-2.5 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white 
-                   border border-red-100 hover:border-red-500 rounded-2xl text-xs font-black 
-                   transition-all duration-200 active:scale-95 flex items-center justify-center gap-2"
+             border border-red-100 hover:border-red-500 rounded-2xl text-xs font-black 
+             transition-all duration-200 active:scale-95 flex items-center justify-center gap-2"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
