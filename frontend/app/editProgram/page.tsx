@@ -164,7 +164,9 @@ export default function EditProgram() {
 
   // --- 4. RENDER ---
   return (
-    <ProtectedRoute roles={["system_admin", "Super_admin"]}>
+    <ProtectedRoute
+      roles={["system_admin", "Super_admin", "instructor", "curriculum_admin"]}
+    >
       <div className="max-w-[1400px] min-h-screen flex flex-col mx-auto p-6 space-y-6">
         {/* Header */}
         <header className="space-y-1">

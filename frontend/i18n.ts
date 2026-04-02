@@ -14,7 +14,7 @@ i18n
     // 💡 REMOVED: lng: "th", // Detector will find the last saved language
 
     // Use a persistent fallback language
-    fallbackLng: "th",
+    fallbackLng: "en",
 
     // 💡 Configuration for the detector
     detection: {

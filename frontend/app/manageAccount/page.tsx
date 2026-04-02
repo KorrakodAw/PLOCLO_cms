@@ -196,7 +196,7 @@ export default function ManageAccount() {
       dot: "bg-red-700",
     },
     {
-      id: "course_admin",
+      id: "curriculum_admin",
       label: t("course_admins"),
       color: "text-red-600",
       dot: "bg-red-500",
@@ -306,7 +306,7 @@ export default function ManageAccount() {
                   // 🟢 กรอง Option ตามสิทธิ์ของผู้ใช้ที่กำลังแก้
                   options: [
                     "system_admin",
-                    "course_admin",
+                    "curriculum_admin",
                     "instructor",
                     "student",
                     "guest",

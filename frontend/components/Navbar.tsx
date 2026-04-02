@@ -62,16 +62,17 @@ export default function Navbar({
     "Super_admin",
     "instructor",
     "system_admin",
-    "course_admin",
+    "curriculum_admin",
     "student",
   ].includes(role);
   const canEditCourse = [
     "instructor",
     "system_admin",
-    "course_admin",
+    "curriculum_admin",
     "Super_admin",
   ].includes(role);
   const canViewAnalyticswithGuest = ["guest"].includes(role);
+  const canManagePrograms = ["curriculum_admin"].includes(role); // Add roles that can manage programs when needed
 
   const menuItems = [
     {
@@ -93,7 +94,7 @@ export default function Navbar({
       href: "/editProgram",
       icon: <Settings size={22} />,
       label: t("programs"),
-      show: canManageAdmin,
+      show: canManageAdmin || canManagePrograms,
     },
     {
       id: "courses",
@@ -165,7 +166,8 @@ export default function Navbar({
 
           {/* Navigation Links */}
           <nav className="flex-1">
-            <ul className="space-y-4">
+            {/* 🟢 1. ลดระยะห่างระหว่าง <li> จาก space-y-4 เป็น space-y-1 หรือ space-y-2 */}
+            <ul className="space-y-1.5">
               {menuItems.map(
                 (item) =>
                   item.show && (
@@ -175,11 +177,10 @@ export default function Navbar({
                         onClick={() => handleNavClick(item.href)}
                       >
                         <div
-                          className={`flex items-center transition-colors duration-200 py-3
-                      ${!isOpen ? "justify-center" : "px-6 justify-start"} 
-                      ${pathname === item.href ? "text-orange-500 font-light" : "text-slate-400 hover:text-slate-900"}`}
+                          className={`flex items-center transition-colors duration-200 
+                ${!isOpen ? "py-1.5 justify-center" : "py-1.5 px-4 justify-start"} // 🟢 2. ลดความสูงที่นี่
+                ${pathname === item.href ? "text-orange-500 font-light" : "text-slate-400 hover:text-slate-900"}`}
                         >
-                          {/* 🟢 Icon: No Transform, Only Color Change */}
                           <div
                             className={`flex items-center justify-center shrink-0 ${!isOpen ? "w-full" : "w-6"}`}
                           >
@@ -187,48 +188,22 @@ export default function Navbar({
                           </div>
 
                           {isOpen && (
-                            <span className="ml-4 text-[15px] tracking-wide whitespace-nowrap">
+                            <span className="ml-4 text-[14px] tracking-wide whitespace-nowrap">
+                              {" "}
+                              {/* 🟢 3. อาจลดขนาด Font เล็กน้อย */}
                               {item.label}
                             </span>
                           )}
 
-                          {/* 🟢 Indicator Line */}
+                          {/* Indicator Line */}
                           {isOpen && pathname === item.href && (
-                            <div className="absolute left-0 w-1 h-6 bg-orange-500 rounded-r-full" />
+                            <div className="absolute left-0 w-1 h-5 bg-orange-500 rounded-r-full" /> // 🟢 4. ลดความสูงเส้น Indicator ตามความสูงเมนู
                           )}
                         </div>
                       </NavLink>
                     </li>
                   ),
               )}
-
-              {/* About Menu */}
-              <li title={!isOpen ? t("about") : ""}>
-                <NavLink
-                  href="/aboutData"
-                  onClick={() => handleNavClick("/aboutData")}
-                >
-                  <div
-                    className={`flex items-center transition-colors duration-200 py-3
-                      ${!isOpen ? "justify-center" : "px-6 justify-start"} 
-                      ${pathname === "/aboutData" ? "text-orange-500 font-bold" : "text-slate-400 hover:text-slate-900"}`}
-                  >
-                    <div
-                      className={`flex items-center justify-center shrink-0 ${!isOpen ? "w-full" : "w-6"}`}
-                    >
-                      <Info size={22} />
-                    </div>
-                    {isOpen && (
-                      <span className="ml-4 text-[15px] tracking-wide whitespace-nowrap">
-                        {t("about")}
-                      </span>
-                    )}
-                    {isOpen && pathname === "/aboutData" && (
-                      <div className="absolute left-0 w-1 h-6 bg-orange-500 rounded-r-full" />
-                    )}
-                  </div>
-                </NavLink>
-              </li>
             </ul>
           </nav>
 

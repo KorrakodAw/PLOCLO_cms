@@ -206,7 +206,7 @@ export default function EditCourse() {
 
   return (
     <ProtectedRoute
-      roles={["system_admin", "Super_admin", "instructor", "course_admin"]}
+      roles={["system_admin", "Super_admin", "instructor", "curriculum_admin"]}
     >
       <div className="max-w-350 min-h-screen flex flex-col mx-auto p-6 space-y-6 ">
         <header className="space-y-1">

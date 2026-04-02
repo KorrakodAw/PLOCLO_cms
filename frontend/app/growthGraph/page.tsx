@@ -273,7 +273,7 @@ export default function GrowthGraphPage() {
         "system_admin",
         "Super_admin",
         "instructor",
-        "course_admin",
+        "curriculum_admin",
         "student",
       ]}
     >

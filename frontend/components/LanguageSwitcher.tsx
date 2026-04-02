@@ -5,8 +5,9 @@ import { useState, useRef, useEffect } from "react";
 import Image from "next/image"; // Import Next.js Image component
 
 const LANGUAGES = [
-  { code: "th", labelKey: "ไทย", flag: "/images/flags/thailand.png" },
   { code: "en", labelKey: "English", flag: "/images/flags/united-states.png" },
+  { code: "th", labelKey: "ไทย", flag: "/images/flags/thailand.png" },
+
   // { code: "jp", labelKey: "日本語", flag: "/images/flags/japan.png" },
   // { code: "zh", labelKey: "中文", flag: "/images/flags/china.png" },
 ];

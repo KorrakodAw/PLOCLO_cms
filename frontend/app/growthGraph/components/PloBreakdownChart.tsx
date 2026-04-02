@@ -12,6 +12,7 @@ import {
   Cell,
 } from "recharts";
 import { ChevronDown, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface BreakdownItem {
   semester: number;
@@ -25,6 +26,8 @@ interface PloDetail {
   breakdown: BreakdownItem[];
 }
 
+
+
 export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
   // 1. Sort PLO Buttons by Code (PLO1, PLO2, PLO10...)
   const sortedPloList = useMemo(() => {
@@ -35,6 +38,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
 
   // 2. State สำหรับเก็บค่าที่เลือก (เริ่มต้นเป็นค่าว่าง)
   const [selectedPlo, setSelectedPlo] = useState("");
+  const { t } = useTranslation("common");
 
   // 🟢 3. บังคับให้ Default กลับไปที่ปุ่มแรกทุกครั้งที่ sortedPloList เปลี่ยนแปลง (Data Update)
   useEffect(() => {
@@ -66,7 +70,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
   if (data.length === 0)
     return (
       <div className="text-center text-slate-400 py-20">
-        No PLO achievement data available.
+        {t("No PLO achievement data available.")}
       </div>
     );
 
@@ -80,10 +84,10 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
           </div>
           <div>
             <h2 className="text-xl font-black text-slate-800 tracking-tight">
-              PLO Semester Growth
+              {t("PLO Semester Growth")}
             </h2>
-            <p className="text-[11px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">
-              Line: Actual Score | Bar: Term Potential
+            <p className="text-sm text-slate-400 mt-0.5 font-medium uppercase tracking-wider">
+              {t("Line: Actual Score | Bar: Term Potential")}
             </p>
           </div>
         </div>
@@ -155,7 +159,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
 
             <Bar
               dataKey="target"
-              name="Term Max Potential"
+              name="Semester Max Score"
               radius={[8, 8, 8, 8]}
               barSize={300} // ปรับขนาดให้พอดี ไม่บังกัน
               fill="#3e2a85"
@@ -188,19 +192,19 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
 
       {/* Footer Info */}
       <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
-        <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
+        <span className="text-[14px] text-slate-400 font-black uppercase tracking-[0.2em]">
           Analysis Mode: <span className="text-indigo-600">{selectedPlo}</span>
         </span>
         <div className="flex gap-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-1 bg-slate-200 rounded-full" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase">
+            <span className="text-[14px] font-bold text-slate-400 uppercase">
               Potential
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-1 bg-indigo-500 rounded-full" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase">
+            <span className="text-[14px] font-bold text-slate-400 uppercase">
               Actual Score
             </span>
           </div>

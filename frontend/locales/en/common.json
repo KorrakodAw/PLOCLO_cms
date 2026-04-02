@@ -246,5 +246,15 @@
   "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F": "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F",
   "core": "Core",
   "elective": "Elective",
-  "growthGraph": "Achievement"
+  "growthGraph": "Achievement",
+  "Growth Analytics": "Growth Analytics",
+  "Monitor and evaluate student performance across PLOs": "Monitor and evaluate student performance across PLOs",
+  "Select a program from the menu above to visualize its performance and growth trends.": "Select a program from the menu above to visualize its performance and growth trends.",
+  "Currently Viewing": "Currently Viewing",
+  "Save Analytics Image": "Save Analytics Image",
+  "No PLO achievement data available.": "No PLO achievement data available.",
+  "PLO Achievement": "PLO Achievement",
+  "Analyze student performance across all Program Learning Outcomes": "Analyze student performance across all Program Learning Outcomes",
+  "PLO Semester Growth": "PLO Semester Growth",
+  "Line: Actual Score | Bar: Term Potential": "Line: Actual Score | Bar: Term Potential"
 }

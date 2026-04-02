@@ -1,6 +1,8 @@
 import { Search, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export const NoData = () => {
+  const { t } = useTranslation("common");
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center rounded-3xl mt-4">
       {/* Visual Indicator */}
@@ -16,11 +18,10 @@ export const NoData = () => {
 
       {/* Text Content */}
       <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-2">
-        Growth Analysis
+        {t("Growth Analytics")}
       </h1>
       <p className="text-slate-500 max-w-[280px] leading-relaxed font-medium">
-        Select a program from the menu above to visualize its performance and
-        growth trends.
+        {t("Select a program from the menu above to visualize its performance and growth trends.")}
       </p>
 
       {/* Decorative Elements */}

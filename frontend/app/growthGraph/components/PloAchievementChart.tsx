@@ -12,6 +12,7 @@ import {
   Cell,
 } from "recharts";
 import { Percent, Hash, ChartBar } from "lucide-react";
+import { useTranslation } from "next-i18next";
 
 interface PloStat {
   ploCode: string;
@@ -21,8 +22,10 @@ interface PloStat {
   ploAchievementPercentage: number;
 }
 
+
 export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
   const [isPercentage, setIsPercentage] = useState(false);
+  const { t } = useTranslation("common");
 
   // 1. Sort Data ตาม ploCode (เช่น PLO1, PLO2, PLO10)
   const sortedData = useMemo(() => {
@@ -44,7 +47,7 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
   if (data.length === 0)
     return (
       <div className="text-center text-slate-400 py-20">
-        No PLO achievement data available.
+        {t("No PLO achievement data available.")}
       </div>
     ); // หรือแสดงข้อความว่าไม่มีข้อมูล
 
@@ -56,10 +59,10 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
             <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
               <ChartBar size={22} />
             </div>
-            PLO Achievement
+           {t("PLO Achievement")}
           </h2>
           <p className="text-sm text-slate-400 mt-1.5 font-medium">
-            Analyze student performance across all Program Learning Outcomes
+           {t("Analyze student performance across all Program Learning Outcomes")}
           </p>
         </div>
 
@@ -140,8 +143,8 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
             {/* Bar: Total Highest (พื้นหลังสีอ่อน) */}
             <Bar
               dataKey={barKey}
-              name="Target Score"
-              fill="#f1f5f9"
+              name="Max PLO Score"
+              fill="#c65c2a"
               radius={[10, 10, 10, 10]}
               barSize={300}
             >

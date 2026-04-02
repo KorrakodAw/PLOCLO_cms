@@ -250,5 +250,16 @@
   "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F": "คำเตือน: ตรวจสอบให้แน่ใจว่าคะแนนอยู่ในลำดับที่ลดลง (A > B+ > B ...). นักศึกษาที่ไม่ตรงตามเงื่อนไข D จะได้รับเกรด F โดยอัตโนมัติ",
   "core": "หลักสูตรแกนกลาง",
   "elective": "หลักสูตรเลือก",
-  "growthGraph":"ผลลัพธ์"
+  "growthGraph":"ผลลัพธ์",
+  "Growth Analytics": "การวิเคราะห์ผลลัพธ์",
+  "Monitor and evaluate student performance across PLOs": "ติดตามและประเมินผลการเรียนของนักศึกษาผ่าน PLO",
+  "Select a program from the menu above to visualize its performance and growth trends.": "เลือกหลักสูตรจากเมนูด้านบนเพื่อดูภาพรวมประสิทธิภาพและแนวโน้มการเติบโตของหลักสูตร",
+  "Currently Viewing": "กำลังดูข้อมูลของ",
+  "Save Analytics Image": "บันทึกภาพการวิเคราะห์",
+  "No PLO achievement data available.": "ไม่มีข้อมูลผลลัพธ์การเรียนรู้ของหลักสูตรที่ใช้ได้",
+  "PLO Achievement": "ผลลัพธ์การเรียนรู้ของหลักสูตร",
+  "Analyze student performance across all Program Learning Outcomes": "วิเคราะห์ผลการเรียนของนักศึกษาผ่านผลลัพธ์การเรียนรู้ของหลักสูตรทั้งหมด",
+  "PLO Semester Growth": "การเติบโตของ PLO ในแต่ละภาคเรียน",
+  "Line: Actual Score | Bar: Term Potential": "เส้น: คะแนนจริง | แถบ: ศักยภาพของภาคเรียน"
+
 }

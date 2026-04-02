@@ -109,10 +109,10 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
       {/* 🟢 Header section: Title & Subtitle */}
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-          Growth Analytics
+          {t("Growth Analytics")}
         </h1>
         <p className="text-sm text-slate-500 font-medium">
-          Monitor and evaluate student performance across PLOs
+          {t("Monitor and evaluate student performance across PLOs")}
         </p>
       </div>
 
@@ -137,8 +137,8 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
                   <User size={28} />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">
-                    Currently Viewing
+                  <span className="text-[16px] font-black text-indigo-500 uppercase tracking-[0.2em]">
+                    {t("Currently Viewing")}
                   </span>
                   <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-4">
                     <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-tight">
@@ -156,7 +156,7 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
                   className="group flex items-center gap-3 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] tracking-widest font-black rounded-2xl shadow-lg shadow-indigo-200/50 transition-all duration-300 active:scale-95"
                 >
                   <FaCamera className="text-sm group-hover:-rotate-12 transition-transform duration-300" />
-                  <span className="uppercase">Save Analytics Image</span>
+                  <span className="uppercase font-light text-[14px]">{t("Save Analytics Image")}</span>
                 </button>
               </div>
             </div>
