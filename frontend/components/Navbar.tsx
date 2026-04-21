@@ -117,6 +117,13 @@ export default function Navbar({
       label: t("accounts"),
       show: canManageAdmin,
     },
+    {
+      id: "aboutData",
+      href: "/aboutData",
+      icon: <Info size={22} />,
+      label: t("aboutData"),
+      show: canViewAnalytics || canViewAnalyticswithGuest,
+    },
   ];
 
   const handleLogout = () => {

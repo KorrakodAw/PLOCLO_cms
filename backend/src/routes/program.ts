@@ -51,6 +51,74 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 router.get(
+  "/ByInstructor/:instructorId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { instructorId } = req.params;
+
+      const instructorPrograms = await prisma.programOnCourse.findMany({
+        where: {
+          semester: {
+            // เช็คชื่อ relation ให้ตรงกับ schema (semester หรือ courseSemester)
+            course: {
+              instructors: {
+                some: {
+                  instructorId: Number(instructorId), // เช็คชื่อฟิลด์ instructorId หรือ instructor_id
+                },
+              },
+            },
+          },
+          type: "core",
+        },
+        select: {
+          program: true,
+        },
+      });
+
+      // 1. 🟢 ใช้ Object หรือ Map ในการ Group ข้อมูลตาม program_code
+      const grouped = instructorPrograms.reduce((acc: any, item) => {
+        const p = item.program;
+        const code = p.program_code;
+
+        if (!acc[code]) {
+          // ถ้ายังไม่มี code นี้ในตัวแปรสะสม ให้สร้าง Object ใหม่
+          acc[code] = {
+            program_ids: [p.id], // 🟢 เริ่มต้นเก็บ ID ใน Array
+            program_code: p.program_code,
+            program_name_en: p.program_name_en,
+            program_name_th: p.program_name_th,
+            program_shortname_en: p.program_shortname_en,
+            program_shortname_th: p.program_shortname_th,
+            latest_program_year: p.program_year,
+          };
+        } else {
+          // ถ้ามี code นี้อยู่แล้ว ให้เพิ่มแค่ ID เข้าไปใน Array (ถ้ายังไม่มี)
+          if (!acc[code].program_ids.includes(p.id)) {
+            acc[code].program_ids.push(p.id);
+          }
+          // อัปเดตปีให้เป็นปีล่าสุดถ้าจำเป็น
+          if (p.program_year > acc[code].latest_program_year) {
+            acc[code].latest_program_year = p.program_year;
+          }
+        }
+        return acc;
+      }, {});
+
+      // 2. แปลงจาก Object กลับเป็น Array เพื่อส่งผลลัพธ์
+      const result = Object.values(grouped).sort(
+        (a: any, b: any) => b.latest_program_year - a.latest_program_year,
+      );
+
+      res.json(result);
+    } catch (err) {
+      console.error("Error group programs:", err);
+      res.status(500).json({ error: "Failed to fetch unique programs" });
+    }
+  },
+);
+
+router.get(
   "/ByFaculty/:facultyId",
   authenticateToken,
   async (req: Request, res: Response) => {

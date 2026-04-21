@@ -122,10 +122,23 @@ export default function EditCourse() {
             value: String(f.id),
           }));
 
+          const programsData = await apiClient.get(
+            "/program/ByInstructor/" + instructorRes.data.id,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+
+          const formattedProgs = programsData.data.map((p: Program) => ({
+            label:
+              lang === "th" ? p.program_shortname_th : p.program_shortname_en,
+            value: String(p.program_code),
+          }));
+
           setOptions({
             universities: [{ label: allLabel, value: "" }, ...formattedUni],
             faculties: formattedFacs,
-            programs: [],
+            programs: formattedProgs,
           });
 
           // Set selections before releasing the initialization flag
@@ -175,7 +188,7 @@ export default function EditCourse() {
 
   // Load Programs
   useEffect(() => {
-    if (!token || !selections.faculty || !isInitialized) return;
+    if (!token || !selections.faculty || isInstructor || !isInitialized) return;
 
     getPrograms(token, selections.faculty)
       .then((data) => {

@@ -8,7 +8,7 @@ import { useTranslation } from "next-i18next";
 import { StudentTable } from "./components/StudentTable";
 import { PloAchievementChart } from "./components/PloAchievementChart";
 import { PloBreakdownChart } from "./components/PloBreakdownChart";
-import { BarChart3, MousePointerClick, Target, User } from "lucide-react";
+import { MousePointerClick, User } from "lucide-react";
 import { toPng } from "html-to-image";
 import { FaCamera } from "react-icons/fa";
 
@@ -20,6 +20,28 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
   const lang = i18n.language;
   const [studentProgramData, setStudentProgramData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+
+  const isStudent = user?.role === "student";
+  const [studentId, setStudentId] = useState<string | null>(null);
+
+  const fetchStudentData = async () => {
+    if (!isStudent || !token) return;
+
+    try {
+      const res = await apiClient.get(`/student/email/${user.email}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const studentData = res.data;
+      setStudentId(studentData.id);
+    } catch (err) {
+      console.error("Error fetching student data:", err);
+      showToast("Error fetching student data", "error");
+    }
+  };
+
+  useEffect(() => {
+    fetchStudentData();
+  }, [token, user, showToast]);
 
   useEffect(() => {
     if (!programId) return;
@@ -33,17 +55,13 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
       .then((res) => {
         setStudentProgramData(res.data?.[0]);
       })
-      .catch((err) => {
+      .catch(() => {
         showToast("Error fetching student growth data", "error");
       });
   }, [programId, token, showToast]);
 
-  useEffect(() => {
-    console.log(graphData);
-  });
-
   const students = studentProgramData?.students || [];
-  const [graphData, setGraphData] = useState(null);
+  const [graphData, setGraphData] = useState([] as any);
 
   const handleStudentClick = (studentId: string) => {
     setLoading(true);
@@ -64,6 +82,12 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
     };
     fetchStudentGraphData();
   };
+
+  useEffect(() => {
+    if (isStudent && studentId) {
+      handleStudentClick(studentId);
+    }
+  }, [studentId, isStudent]);
 
   useEffect(() => {
     setLoading(false);
@@ -99,7 +123,7 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
   };
 
   const detailedStats = graphData?.ploDetailedStats || [];
-
+  
   if (!programId) {
     return <NoData />;
   }
@@ -156,20 +180,29 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
                   className="group flex items-center gap-3 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] tracking-widest font-black rounded-2xl shadow-lg shadow-indigo-200/50 transition-all duration-300 active:scale-95"
                 >
                   <FaCamera className="text-sm group-hover:-rotate-12 transition-transform duration-300" />
-                  <span className="uppercase font-light text-[14px]">{t("Save Analytics Image")}</span>
+                  <span className="uppercase font-light text-[14px]">
+                    {t("Save Analytics Image")}
+                  </span>
                 </button>
               </div>
             </div>
 
             <div
               ref={graphRef}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch mt-8"
             >
-              <div className="min-h-[320px] w-full">
-                <PloAchievementChart data={detailedStats} />
+              {/* Chart Card 1 */}
+              <div className="flex flex-col bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex-1 min-h-[350px] w-full">
+                  <PloAchievementChart data={detailedStats} />
+                </div>
               </div>
-              <div className="min-h-[320px] w-full">
-                <PloBreakdownChart data={detailedStats} />
+
+              {/* Chart Card 2 */}
+              <div className="flex flex-col bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex-1 min-h-[350px] w-full">
+                  <PloBreakdownChart data={detailedStats} />
+                </div>
               </div>
             </div>
           </div>
@@ -193,69 +226,71 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
       </div>
 
       {/* 🟢 Program & Directory Section */}
-      <div className="pt-10 border-t border-slate-100 space-y-6">
-        {/* Program Info Card */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[32px] p-8 shadow-2xl shadow-slate-200">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.8)]" />
-                <span className="text-[10px] font-black tracking-[0.2em] text-indigo-400 uppercase">
-                  Current Program
-                </span>
+      {!isStudent && (
+        <div className="pt-10 border-t border-slate-100 space-y-6">
+          {/* Program Info Card */}
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[32px] p-8 shadow-2xl shadow-slate-200">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.8)]" />
+                  <span className="text-[10px] font-black tracking-[0.2em] text-indigo-400 uppercase">
+                    Current Program
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4">
+                  <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight tracking-tight">
+                    {lang === "th"
+                      ? studentProgramData?.programShortNameTh
+                      : studentProgramData?.programShortNameEn}
+                  </h1>
+                  <div className="px-4 py-1.5 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl">
+                    <span className="text-xs font-black text-indigo-300 uppercase mr-2 opacity-70">
+                      Class
+                    </span>
+                    <span className="text-lg font-black text-white">
+                      {studentProgramData?.programYear}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4">
-                <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight tracking-tight">
-                  {lang === "th"
-                    ? studentProgramData?.programShortNameTh
-                    : studentProgramData?.programShortNameEn}
-                </h1>
-                <div className="px-4 py-1.5 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl">
-                  <span className="text-xs font-black text-indigo-300 uppercase mr-2 opacity-70">
-                    Class
+              <div className="flex items-center gap-4 self-start lg:self-center bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
+                <div className="relative">
+                  <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping absolute opacity-75" />
+                  <div className="relative w-3 h-3 rounded-full bg-emerald-500" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Database Status
                   </span>
-                  <span className="text-lg font-black text-white">
-                    {studentProgramData?.programYear}
+                  <span className="text-xs font-bold text-slate-200">
+                    {students.length} Enrolled Students
                   </span>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="flex items-center gap-4 self-start lg:self-center bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
-              <div className="relative">
-                <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping absolute opacity-75" />
-                <div className="relative w-3 h-3 rounded-full bg-emerald-500" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Database Status
-                </span>
-                <span className="text-xs font-bold text-slate-200">
-                  {students.length} Enrolled Students
-                </span>
-              </div>
-            </div>
+          {/* Student Table Section */}
+          <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
+            <StudentTable
+              students={students}
+              onSelectStudent={handleStudentClick}
+            />
+          </div>
+
+          {/* Footer System Info */}
+          <div className="flex items-center justify-center gap-6 py-4 opacity-30">
+            <div className="h-px flex-1 bg-slate-300" />
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">
+              Academic Intelligence System
+            </span>
+            <div className="h-px flex-1 bg-slate-300" />
           </div>
         </div>
-
-        {/* Student Table Section */}
-        <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
-          <StudentTable
-            students={students}
-            onSelectStudent={handleStudentClick}
-          />
-        </div>
-
-        {/* Footer System Info */}
-        <div className="flex items-center justify-center gap-6 py-4 opacity-30">
-          <div className="h-px flex-1 bg-slate-300" />
-          <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">
-            Academic Intelligence System
-          </span>
-          <div className="h-px flex-1 bg-slate-300" />
-        </div>
-      </div>
+      )}
     </div>
   );
 }

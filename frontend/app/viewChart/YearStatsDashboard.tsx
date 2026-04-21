@@ -36,6 +36,7 @@ export default function YearStatsDashboard({
   const { token, user } = useAuth();
 
   const isGuest = user?.role === "guest";
+  const isStudent = user?.role === "student";
 
   const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({
     maxScore: false,
@@ -421,7 +422,7 @@ export default function YearStatsDashboard({
           </div>
         )}
       </div>
-      {!isGuest && (
+      {!isGuest && !isStudent &&  (
         <div className="w-full max-w-375 mx-auto">
           <StudentPerformanceTable
             studentsData={activeTableData}

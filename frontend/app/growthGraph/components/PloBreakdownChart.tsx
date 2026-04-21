@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, act } from "react";
 import {
   ComposedChart,
   Bar,
@@ -19,14 +19,14 @@ interface BreakdownItem {
   year: number;
   rawScore: number;
   termHighestPossible: number;
+  contributionPercentage: number;
+  termHighestPossiblePercentage: number;
 }
 
 interface PloDetail {
   ploCode: string;
   breakdown: BreakdownItem[];
 }
-
-
 
 export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
   // 1. Sort PLO Buttons by Code (PLO1, PLO2, PLO10...)
@@ -37,6 +37,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
   }, [data]);
 
   // 2. State สำหรับเก็บค่าที่เลือก (เริ่มต้นเป็นค่าว่าง)
+  const [percentageMode, setPercentageMode] = useState(false);
   const [selectedPlo, setSelectedPlo] = useState("");
   const { t } = useTranslation("common");
 
@@ -63,9 +64,13 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
       .map((item) => ({
         name: `${item.semester}/${item.year}`,
         actual: item.rawScore,
+        actualPercentage: item.contributionPercentage,
+        targetPercentage: item.termHighestPossiblePercentage,
         target: item.termHighestPossible,
       }));
   }, [data, selectedPlo]);
+
+ 
 
   if (data.length === 0)
     return (
@@ -75,7 +80,7 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
     );
 
   return (
-    <div className="bg-white p-8  rounded-[32px] border border-slate-200 mt-8 shadow-sm transition-all hover:shadow-md">
+    <div className="bg-white p-8  rounded-[32px]  mt-8 transition-all ">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
         {/* Header Info */}
         <div className="flex items-center gap-4">
@@ -92,22 +97,52 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
           </div>
         </div>
 
-        {/* 🟢 PLO Selector Dropdown */}
-        <div className="relative min-w-[160px]">
-          <select
-            value={selectedPlo}
-            onChange={(e) => setSelectedPlo(e.target.value)}
-            className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 py-2.5 px-4 pr-10 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer shadow-sm"
-          >
-            {sortedPloList.map((plo) => (
-              <option key={plo.ploCode} value={plo.ploCode}>
-                Select {plo.ploCode}
-              </option>
-            ))}
-          </select>
-          {/* Custom Arrow Icon */}
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-            <ChevronDown size={16} strokeWidth={3} />
+        <div className="flex flex-wrap items-center gap-4">
+          {/* 🟢 Refined Segmented Control (Toggle) */}
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/60 shadow-inner">
+            <button
+              onClick={() => setPercentageMode(false)}
+              className={`relative px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                !percentageMode
+                  ? "bg-white text-indigo-600 shadow-sm ring-1 ring-black/5"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Raw
+            </button>
+            <button
+              onClick={() => setPercentageMode(true)}
+              className={`relative px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                percentageMode
+                  ? "bg-white text-indigo-600 shadow-sm ring-1 ring-black/5"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Percent
+            </button>
+          </div>
+
+          {/* 🟢 Enhanced PLO Selector Dropdown */}
+          <div className="relative min-w-[180px] group">
+            <label className="absolute -top-2 left-3 bg-white px-1 text-[10px] font-black text-indigo-500 uppercase tracking-tighter z-10">
+              Program Outcome
+            </label>
+            <select
+              value={selectedPlo}
+              onChange={(e) => setSelectedPlo(e.target.value)}
+              className="w-full appearance-none bg-white border-2 border-slate-100 text-slate-700 py-2.5 px-4 pr-10 rounded-2xl text-sm font-bold group-hover:border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all cursor-pointer shadow-sm"
+            >
+              {sortedPloList.map((plo) => (
+                <option key={plo.ploCode} value={plo.ploCode}>
+                  {plo.ploCode}
+                </option>
+              ))}
+            </select>
+
+            {/* Custom Animated Arrow Icon */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 group-hover:text-indigo-500 transition-colors">
+              <ChevronDown size={18} strokeWidth={2.5} />
+            </div>
           </div>
         </div>
       </div>
@@ -158,8 +193,10 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
             />
 
             <Bar
-              dataKey="target"
-              name="Semester Max Score"
+              dataKey={percentageMode ? "targetPercentage" : "target"}
+              name={
+                percentageMode ? "Term Potential (%)" : "Term Highest Possible"
+              }
               radius={[8, 8, 8, 8]}
               barSize={300} // ปรับขนาดให้พอดี ไม่บังกัน
               fill="#3e2a85"
@@ -178,8 +215,8 @@ export const PloBreakdownChart = ({ data }: { data: PloDetail[] }) => {
 
             <Line
               type="monotone"
-              dataKey="actual"
-              name="Student Raw Score"
+              dataKey={percentageMode ? "actualPercentage" : "actual"}
+              name={percentageMode ? "Actual Score (%)" : "Actual Score"}
               stroke="#6366f1"
               strokeWidth={4}
               dot={{ r: 6, fill: "#6366f1", strokeWidth: 3, stroke: "#fff" }}

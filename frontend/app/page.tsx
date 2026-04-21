@@ -28,7 +28,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6">
       {!isLoggedIn ? (
         <LoginForm />
       ) : (
@@ -41,7 +41,9 @@ export default function HomePage() {
             </h1>
             <p className="text-slate-500 text-lg font-medium opacity-80">
               {isGuest
-                ? "You are logged in as a Guest. Access is limited to general information."
+                ? t(
+                    "You are logged in as a Guest. Access is limited to general information.",
+                  )
                 : t("What would you like to do today?")}
             </p>
           </div>
@@ -53,8 +55,10 @@ export default function HomePage() {
               loading={() => setLoading(true)}
               href="/aboutData"
               icon={<Info className="text-emerald-500" />}
-              title="System Information"
-              description="Understand how the PLO/CLO assessment system works."
+              title={t("System Information")}
+              description={t(
+                "Understand how the PLO/CLO assessment system works.",
+              )}
               colorClass="hover:border-emerald-200"
             />
 
@@ -65,16 +69,18 @@ export default function HomePage() {
                   loading={() => setLoading(true)}
                   href="/viewChart"
                   icon={<LayoutDashboard className="text-blue-500" />}
-                  title="PLO Analytics"
-                  description="Analyze student performance and achievements."
+                  title={t("PLO Analytics")}
+                  description={t(
+                    "Analyze student performance and achievements.",
+                  )}
                   colorClass="hover:border-blue-200"
                 />
                 <QuickActionCard
                   loading={() => setLoading(true)}
                   href="/growthGraph"
                   icon={<TrendingUp className="text-indigo-500" />}
-                  title="Growth Tracking"
-                  description="Monitor competency evolution over time."
+                  title={t("Growth Tracking")}
+                  description={t("Monitor competency evolution over time.")}
                   colorClass="hover:border-indigo-200"
                 />
               </>
@@ -86,8 +92,8 @@ export default function HomePage() {
                 loading={() => setLoading(true)}
                 href="/editCourse"
                 icon={<BookOpen className="text-orange-500" />}
-                title="Manage Courses"
-                description="Assign scores and evaluate outcomes."
+                title={t("Manage Courses")}
+                description={t("Assign scores and evaluate outcomes.")}
                 colorClass="hover:border-orange-200"
               />
             )}
@@ -98,8 +104,8 @@ export default function HomePage() {
                 loading={() => setLoading(true)}
                 href="/editProgram"
                 icon={<Settings className="text-slate-600" />}
-                title="System Settings"
-                description="Configuration for programs and accounts."
+                title={t("System Settings")}
+                description={t("Configuration for programs and accounts.")}
                 colorClass="hover:border-slate-300"
               />
             )}

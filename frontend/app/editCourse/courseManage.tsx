@@ -128,6 +128,7 @@ export default function CourseManagement({
               headers: { Authorization: `Bearer ${token}` },
             },
           );
+
           const fId = instructorRes.data?.faculty_id;
           const facultyRes = await apiClient.get(`/faculty/${fId}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -252,20 +253,57 @@ export default function CourseManagement({
     try {
       const data = await getCoursePaginate(token, page, limit, {
         universityId,
-        facultyId: facultyId,
+        facultyId,
         programCode: programId,
+        search: searchTerm, // 🟢 ส่งค่าค้นหาไปที่ Backend
       });
       setCourses(data.data || []);
+      // ถ้า Backend คืนค่า total มาด้วย อย่าลืมอัปเดต Pagination state
     } catch {
       showToast("Error fetching courses", "error");
     } finally {
       setLoadingCourse(false);
     }
-  }, [isLoggedIn, token, page, universityId, facultyId, programId, showToast]);
+  }, [isLoggedIn, token, page, universityId, facultyId, programId, searchTerm]); // 🟢 เพิ่ม searchTerm เป็น dependency
+
+  const fetchCoursesByInstructor = useCallback(
+    async (targetPage = 1) => {
+      if (!isLoggedIn || !token || !user?.email) return;
+      setLoadingCourse(true);
+      try {
+        const instructorRes = await apiClient.get(
+          `/instructor/email/${user.email}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        // ใช้ targetPage ที่ส่งเข้ามาจาก useEffect
+        const res = await apiClient.get(
+          `/course/ByInstructor/${instructorRes.data.id}?programId=${programId}&page=${targetPage}&limit=10`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        const { data, pagination: paginationData } = res.data;
+
+        setCourses(data || []);
+        setTotalPages(paginationData.totalPages || 1);
+      } catch {
+        showToast("Error fetching courses", "error");
+      } finally {
+        setLoadingCourse(false);
+      }
+    },
+    [isLoggedIn, token, user?.email, programId, showToast],
+  );
 
   useEffect(() => {
-    fetchCourses();
-  }, [fetchCourses]);
+    if (isInstructor) {
+      fetchCoursesByInstructor(page);
+    } else {
+      fetchCourses();
+    }
+  }, [page, fetchCourses, fetchCoursesByInstructor]);
 
   // --- ADD COURSE Handlers ---
 
@@ -464,7 +502,6 @@ export default function CourseManagement({
       new Map(searched.map((item) => [item.code, item])).values(),
     );
 
-    setTotalPages(Math.ceil(uniqueData.length / limit) || 1);
     return uniqueData;
   }, [courses, searchTerm]);
 
@@ -513,6 +550,7 @@ export default function CourseManagement({
 
       <div className="bg-white p-4 rounded-lg shadow-xl">
         {/* 🟢 PASS UNIQUE COURSES TO TABLE */}
+
         <Table<Course> columns={courseColumns} data={filteredCourses} />
 
         <div className="pt-4 flex justify-end">

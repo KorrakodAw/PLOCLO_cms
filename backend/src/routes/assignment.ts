@@ -60,6 +60,20 @@ router.post("/bulk", authenticateToken, async (req, res) => {
   }
 });
 
+router.delete("/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.assignment.delete({
+      where: { id: Number(id) },
+    });
+
+    res.json({ success: true, message: "Assignment deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete assignment" });
+  }
+});
+
 // 2. POST: สร้างงานใหม่ (Linked to Semester Directly)
 router.post("/", authenticateToken, async (req, res) => {
   try {
@@ -139,6 +153,23 @@ router.post("/categoriesWeights", authenticateToken, async (req, res) => {
   }
 });
 
+// เพิ่ม /:id เข้าไปใน route
+router.delete("/categoryWeights/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params; // รับ ID จาก URL
+
+    await prisma.assignmentCategoryWeight.delete({
+      where: {
+        id: Number(id), // ลบด้วย Primary Key ตรงๆ
+      },
+    });
+
+    res.json({ success: true, message: "Deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete" });
+  }
+});
+
 // 5. POST: บันทึกน้ำหนักแบบกลุ่ม (Bulk Upsert by Semester ID)
 router.post("/categoriesWeights/bulk", authenticateToken, async (req, res) => {
   // 🟢 รับ semesterId มาจาก body ให้ตรงกับโครงสร้าง Hierarchy ใหม่
@@ -192,22 +223,24 @@ router.patch("/bulk-weights", authenticateToken, async (req, res) => {
   const { semesterId, updates } = req.body;
 
   if (!semesterId || !Array.isArray(updates)) {
-    return res.status(400).json({ error: "semesterId and updates array are required" });
+    return res
+      .status(400)
+      .json({ error: "semesterId and updates array are required" });
   }
 
   try {
     await prisma.$transaction(
       updates.map((item) =>
         prisma.assignment.updateMany({
-          where: { 
+          where: {
             id: Number(item.id),
-            semester_id: Number(semesterId) // ตรวจสอบความถูกต้องของ Semester
+            semester_id: Number(semesterId), // ตรวจสอบความถูกต้องของ Semester
           },
-          data: { 
-            weight: Number(item.weight) 
+          data: {
+            weight: Number(item.weight),
           },
-        })
-      )
+        }),
+      ),
     );
     res.json({ success: true, message: "Assignment weights updated" });
   } catch (err) {

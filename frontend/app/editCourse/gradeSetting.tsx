@@ -4,7 +4,7 @@ import { apiClient } from "@/utils/apiClient";
 import React, { useState, useEffect, useCallback } from "react";
 import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverLay from "@/components/LoadingOverlay";
-import { Save, AlertCircle } from "lucide-react";
+import { Save, AlertCircle, Trash, Trash2 } from "lucide-react";
 import AlertPopup from "@/components/AlertPopup";
 import { useTranslation } from "react-i18next";
 
@@ -23,11 +23,17 @@ export default function GradeSetting({
 }) {
   const { showToast } = useGlobalToast();
   const [loading, setLoading] = useState(false);
-  const [gradeSettings, setGradeSettings] = useState<GradeLevel[]>(
-    DEFAULT_GRADES.map((g) => ({ grade: g, score: "" })),
+  const [gradeSettings, setGradeSettings] = useState<GradeLevel[]>(() =>
+    DEFAULT_GRADES.map((grade, index) => ({
+      grade: grade,
+      score: String(80 - index * 5), // คำนวณ: 80 - (0*5)=80, 80 - (1*5)=75 ...
+    })),
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { t } = useTranslation("common");
+
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   // 1. Fetch Existing Data
   // 1. Fetch Existing Data
@@ -38,18 +44,24 @@ export default function GradeSetting({
       const res = await apiClient.get(`grade/settings/${semesterId}`);
       const fetchedData: GradeLevel[] = res.data;
 
-      // 🟢 ระบุ Type ให้ mergedGrades เป็น GradeLevel[] ชัดเจน
-      const mergedGrades: GradeLevel[] = DEFAULT_GRADES.map((symbol) => {
-        const existing = fetchedData.find((g) => g.grade === symbol);
-
-        return {
-          grade: symbol,
-          // มั่นใจว่า score จะเป็น number หรือ "" (ห้ามเป็น string อื่น)
-          score: existing ? Number(existing.score) : "",
-        };
-      });
-
-      setGradeSettings(mergedGrades); // 🟢 ตอนนี้ Type จะตรงกันแล้ว
+      if (fetchedData && fetchedData.length > 0) {
+        // 🟢 กรณีมีข้อมูลใน DB: ให้เซตสถานะเป็น Saved และไม่ Dirty
+        const mergedGrades: GradeLevel[] = DEFAULT_GRADES.map((symbol) => {
+          const existing = fetchedData.find((g) => g.grade === symbol);
+          return {
+            grade: symbol,
+            score: existing ? String(existing.score) : "",
+          };
+        });
+        setGradeSettings(mergedGrades);
+        setIsSaved(true);
+        setIsDirty(false);
+      } else {
+        // 🟢 กรณีเป็นข้อมูล Default (DB เป็นค่าว่าง):
+        // ให้ถือว่าเป็น "Unsaved Changes" เพราะข้อมูลบนจอ (80, 75...) ยังไม่ได้เซฟลง DB
+        setIsSaved(false);
+        setIsDirty(true);
+      }
     } catch {
       showToast("Failed to load settings.", "error");
     } finally {
@@ -69,6 +81,9 @@ export default function GradeSetting({
     const numVal = parseFloat(val);
 
     if (!isFloat || (val !== "" && numVal > 100)) return;
+
+    setIsDirty(true); // 🟢 บอกว่าข้อมูลมีการเปลี่ยนแปลงแล้วนะ
+    setIsSaved(false);
 
     setGradeSettings((prev) =>
       prev.map((item) =>
@@ -118,6 +133,8 @@ export default function GradeSetting({
 
       await apiClient.post("grade/settings", payload);
       showToast("Grade settings saved successfully!", "success");
+      setIsDirty(false); // 🟢 ข้อมูลตรงกับ Server แล้ว
+      setIsSaved(true); // 🟢 แสดง Badge สีเขียว
       fetchGradeSettings();
     } catch {
       showToast("Failed to save grade settings.", "error");
@@ -129,60 +146,115 @@ export default function GradeSetting({
   const handleDeleteAll = async () => {
     setLoading(true);
     try {
+      // 1. ลบที่ Backend
       await apiClient.delete("grade/settings/bulk", {
         data: { semesterId: Number(semesterId) },
       });
-      showToast("All grade settings deleted successfully!", "success");
-      fetchGradeSettings();
-    } catch {
-      showToast("Failed to delete grade settings.", "error");
+
+      showToast(t("All grade settings deleted successfully!"), "success");
+
+      // 2. รีเซ็ต UI กลับเป็นค่า Default 80, 75, 70...
+      const resetGrades = DEFAULT_GRADES.map((grade) => ({
+        grade: grade,
+        score: "",
+      }));
+
+      setGradeSettings(resetGrades);
+      setIsSaved(false);
+      setIsDirty(true); // เซตเป็น Dirty เพราะค่า Default ใหม่นี้ยังไม่ได้ถูกบันทึก
+    } catch (err) {
+      console.error("Delete Error:", err);
+      showToast(t("Failed to delete grade settings."), "error");
     } finally {
       setLoading(false);
+      setShowDeleteConfirm(false);
     }
   };
 
-
-
   // คำนวณคะแนนสูงสุดของเกรด F (คะแนนต่ำสุดที่มีในระบบ)
- const fMaxScore = gradeSettings.reduce((min, item) => {
-   if (item.score === "" || item.score === null) return min;
+  const fMaxScore = gradeSettings.reduce((min, item) => {
+    if (item.score === "" || item.score === null) return min;
 
-   const currentScore = Number(item.score);
-   // 🟢 ถ้า min ยังเป็น 0 (ค่าเริ่มต้น) ให้ใช้ค่าปัจจุบันไปก่อน
-   // หรือใช้ Infinity เป็นค่าเริ่มต้นแทน
-   return min === 0 ? currentScore : Math.min(min, currentScore);
- }, 0);
+    const currentScore = Number(item.score);
+    // 🟢 ถ้า min ยังเป็น 0 (ค่าเริ่มต้น) ให้ใช้ค่าปัจจุบันไปก่อน
+    // หรือใช้ Infinity เป็นค่าเริ่มต้นแทน
+    return min === 0 ? currentScore : Math.min(min, currentScore);
+  }, 0);
 
   return (
     <div className="p-2 max-w-2xl mx-auto space-y-6">
       {loading && <LoadingOverLay />}
 
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm gap-4">
-        <div>
-          <h2 className="text-2xl font-light text-slate-800 tracking-tight">
-            {t("Grade Cutoff")}
-          </h2>
-          <p className="text-[12px] font-light text-slate-400 uppercase tracking-widest mt-1">
-            {t("Configure minimum score for each grade")}
-          </p>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/80 backdrop-blur-md p-6 rounded-[2.5rem] border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] gap-6 transition-all duration-300">
+        {/* Left Section: Info & Badges */}
+        <div className="flex items-start gap-5">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-semibold text-slate-900 tracking-tight">
+                {t("Grade Cutoff")}
+              </h2>
+
+              {/* Dynamic Status Badges */}
+              <div className="flex items-center">
+                {!isSaved && isDirty ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider rounded-full border border-indigo-100 animate-pulse">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    {t("Ready to Setup")}
+                  </span>
+                ) : isDirty ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-bold uppercase tracking-wider rounded-full border border-amber-100">
+                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
+                    {t("Pending Save")}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider rounded-full border border-emerald-100">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                    {t("Saved")}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Dynamic Descriptions */}
+            {!isSaved ? (
+              <div className="flex items-center gap-2 text-[13px] font-medium text-indigo-500/90 bg-indigo-50/40 px-3 py-1.5 rounded-xl border border-indigo-100/30 w-fit">
+                <AlertCircle size={14} className="shrink-0" />
+                {t("This is the default score, you can change it as needed.")}
+              </div>
+            ) : isSaved && !isDirty ? (
+              <p className="text-sm text-slate-400 font-medium tracking-wide pl-1">
+                {t("Current configuration is synced with server")}
+              </p>
+            ) : null}
+          </div>
         </div>
-        <div className="flex gap-3">
+
+        {/* Right Section: Action Buttons */}
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          <button onClick={() => setShowDeleteConfirm(true)}>
+            <Trash2
+              size={18}
+              className="text-rose-500 hover:text-rose-700 transition-colors"
+            />
+          </button>
+
           <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2 bg-rose-50 text-rose-600 font-light text-[12px] uppercase tracking-widest rounded-2xl hover:bg-rose-100 flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+            onClick={handleSave}
+            disabled={!isDirty}
+            className={`flex-[2] lg:flex-none px-10 py-3 font-bold text-[11px] uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 transition-all duration-300 shadow-sm ${
+              isDirty
+                ? "bg-slate-900 text-white shadow-slate-200 hover:bg-indigo-600 hover:shadow-indigo-100 active:scale-95"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
+            }`}
           >
-            <AlertCircle size={16} />
-            {t("Clear All")}
+            <Save size={18} />
+            {t("Apply Settings")}
           </button>
         </div>
-        <button
-          onClick={handleSave}
-          className="w-full sm:w-auto px-8 py-3 bg-slate-900 text-white font-light text-[12px] uppercase tracking-widest rounded-2xl hover:bg-blue-600 flex items-center justify-center gap-2 shadow-xl shadow-slate-200 active:scale-95 transition-all group"
-        >
-          <Save size={18} className="group-hover:animate-bounce" />
-          {t("Save Settings")}
-        </button>
       </div>
 
       {/* Table Section */}

@@ -22,7 +22,6 @@ interface PloStat {
   ploAchievementPercentage: number;
 }
 
-
 export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
   const [isPercentage, setIsPercentage] = useState(false);
   const { t } = useTranslation("common");
@@ -52,17 +51,19 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
     ); // หรือแสดงข้อความว่าไม่มีข้อมูล
 
   return (
-    <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm mt-8">
+    <div className="bg-white p-8 rounded-[32px] mt-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
             <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
               <ChartBar size={22} />
             </div>
-           {t("PLO Achievement")}
+            {t("PLO Achievement")}
           </h2>
           <p className="text-sm text-slate-400 mt-1.5 font-medium">
-           {t("Analyze student performance across all Program Learning Outcomes")}
+            {t(
+              "Analyze student performance across all Program Learning Outcomes",
+            )}
           </p>
         </div>
 

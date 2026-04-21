@@ -15,7 +15,11 @@ interface WeightEntry {
   maxWeight: number;
 }
 
-export default function AssignmentCateWeight({ semesterId }: { semesterId: string }) {
+export default function AssignmentCateWeight({
+  semesterId,
+}: {
+  semesterId: string;
+}) {
   const { showToast } = useGlobalToast();
   const { t } = useTranslation("common");
   const { token } = useAuth();
@@ -108,20 +112,18 @@ export default function AssignmentCateWeight({ semesterId }: { semesterId: strin
 
   // 5. 🛠️ ฟังก์ชันลบที่แก้ไขแล้ว (Delete by ID)
   const handleRemove = async (category: string, id?: number) => {
-    // ถ้ามี ID แสดงว่าข้อมูลอยู่ใน Database แล้ว ให้ส่ง Delete Request
     if (id) {
       try {
-        await apiClient.delete(`/assignment/categoriesWeights/${id}`, {
+        // ตรวจสอบให้แน่ใจว่า path ตรงกับ backend เป๊ะๆ
+        await apiClient.delete(`/assignment/categoryWeights/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         showToast("Removed from database", "success");
       } catch {
         showToast("Failed to delete from server", "error");
-        return; // หยุดทำงานถ้าลบใน DB ไม่สำเร็จ
+        return;
       }
     }
-
-    // ลบออกจาก UI State (ใช้ category เป็นตัวอ้างอิง)
     setWeights((prev) => prev.filter((w) => w.category !== category));
   };
 

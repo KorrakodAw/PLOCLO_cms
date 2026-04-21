@@ -11,26 +11,162 @@ const parseIntSafe = (value: any) => {
   return isNaN(parsed) ? undefined : parsed;
 };
 
-router.get("/ById/:id", authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params; // 1. ดึง ID ออกจาก URL Params
+router.get(
+  "/ByInstructor/:instructorId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { instructorId } = req.params;
+      const { programId, page = "1", limit = "10" } = req.query;
 
-    const course = await prisma.course.findUnique({
-      where: {
-        id: Number(id),
-      },
-    });
+      // แปลงค่า Pagination
+      const p = Math.max(1, parseInt(String(page)));
+      const l = Math.max(1, parseInt(String(limit)));
+      const skip = (p - 1) * l;
 
-    if (!course) {
-      return res.status(404).json({ error: "Course not found" });
+      // 1. หา IDs ของวิชาที่อาจารย์สอน
+      const instructorAssignments = await prisma.courseInstructor.findMany({
+        where: { instructorId: Number(instructorId) },
+        select: { courseId: true },
+      });
+      const courseIds = instructorAssignments.map((item) => item.courseId);
+
+      // 2. เงื่อนไขการกรอง
+      const whereCondition: any = { id: { in: courseIds } };
+      if (programId) {
+        whereCondition.semesters = {
+          some: {
+            programOnCourses: {
+              some: {
+                type: "core",
+                program: { program_code: String(programId) },
+              },
+            },
+          },
+        };
+      }
+
+      // 3. รัน Query พร้อมกัน (Count + Data)
+      const [totalCount, rawCourses] = await Promise.all([
+        prisma.course.count({ where: whereCondition }),
+        prisma.course.findMany({
+          where: whereCondition,
+          skip: skip,
+          take: l,
+          include: {
+            semesters: {
+              include: {
+                programOnCourses: {
+                  where: {
+                    type: "core",
+                    ...(programId && {
+                      program: { program_code: String(programId) },
+                    }),
+                  },
+                  include: { program: true },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+      // 4. Transform ข้อมูล
+      const result = rawCourses
+        .map((course) => {
+          const programs = course.semesters.flatMap((sem) =>
+            sem.programOnCourses.map((poc) => ({
+              program_id: poc.program.id,
+              program_code: poc.program.program_code,
+              program_shortname_en: poc.program.program_shortname_en,
+              program_shortname_th: poc.program.program_shortname_th,
+              type: poc.type,
+            })),
+          );
+
+          const uniquePrograms = Array.from(
+            new Map(programs.map((p) => [p.program_id, p])).values(),
+          );
+
+          if (uniquePrograms.length === 0 && programId) return null;
+
+          return {
+            id: course.id,
+            name: course.name,
+            name_th: course.name_th,
+            code: course.code,
+            programs: uniquePrograms,
+          };
+        })
+        .filter(Boolean);
+
+      // 5. ส่งผลลัพธ์พร้อม Metadata ของ Pagination
+      res.json({
+        data: result,
+        pagination: {
+          totalItems: totalCount,
+          totalPages: Math.ceil(totalCount / l),
+          currentPage: p,
+          limit: l,
+        },
+      });
+    } catch (err) {
+      console.error("Error fetching core courses:", err);
+      res.status(500).json({ error: "Internal Server Error" });
     }
+  },
+);
 
-    res.json(course);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch course" });
-  }
-});
+router.get(
+  "/ById/:id",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params; // 1. ดึง ID ออกจาก URL Params
+
+      const course = await prisma.course.findUnique({
+        where: {
+          id: Number(id),
+        },
+      });
+
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+
+      res.json(course);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to fetch course" });
+    }
+  },
+);
+
+router.get(
+  "/byCsemester/:semesterId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { semesterId } = req.params;
+
+      const courseSemester = await prisma.courseSemester.findUnique({
+        where: { id: Number(semesterId) },
+        include: {
+          course: true,
+        },
+      });
+
+      if (!courseSemester) {
+        return res.status(404).json({ error: "Course semester not found" });
+      }
+
+      res.json(courseSemester.course);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to fetch course by semester" });
+    }
+  },
+);
 
 // POST / - สร้าง Master Course และจัดการ Semester/Section/Program
 router.post("/", authenticateToken, async (req: Request, res: Response) => {
@@ -511,6 +647,39 @@ router.get("/list", authenticateToken, async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error fetching courses via ProgramOnCourse:", error);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.patch("/:id", authenticateToken, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string);
+  const { name, name_th, credits, code } = req.body;
+
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid course ID" });
+
+  try {
+    const updatedCourse = await prisma.course.update({
+      where: { id },
+      data: {
+        name: name || undefined,
+        name_th: name_th || undefined,
+        code: code || undefined,
+        // 🟢 ใช้ new Prisma.Decimal เพื่อให้ตรงกับ Type ใน Schema
+        credits:
+          credits !== undefined ? new Prisma.Decimal(credits) : undefined,
+      },
+    });
+    res.json(updatedCourse);
+  } catch (err: any) {
+    console.error("Update Error Details:", err); // ดู Log ใน Terminal ว่ามันฟ้องอะไร
+
+    // 🚩 เช็คว่า Error เพราะรหัสวิชาซ้ำ (Unique Constraint) หรือไม่
+    if (err.code === "P2002") {
+      return res.status(400).json({ error: "Course code already exists" });
+    }
+
+    res
+      .status(500)
+      .json({ error: "Failed to update course", details: err.message });
   }
 });
 

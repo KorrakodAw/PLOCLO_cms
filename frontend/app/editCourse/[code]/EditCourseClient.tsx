@@ -55,7 +55,7 @@ export default function EditCourseClient({
   courseCode: string;
 }) {
   const router = useRouter();
-  const { isLoggedIn, token } = useAuth();
+  const { isLoggedIn, token, user } = useAuth();
   const { showToast } = useGlobalToast();
   const { t, i18n } = useTranslation("common");
   const lang = i18n.language;
@@ -74,6 +74,8 @@ export default function EditCourseClient({
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [showDuplicatePopup, setShowDuplicatePopup] = useState(false);
+
+  const isInstructor = user?.role === "instructor";
 
   const loadInitialData = useCallback(async () => {
     if (!token || !courseCode) return;
@@ -223,6 +225,35 @@ export default function EditCourseClient({
     }
   };
 
+  const saveEditedInfo = async (updated: formDataType) => {
+    if (!token || !formData) return;
+    setLoading(true);
+    try {
+      await apiClient.patch(
+        `/course/${formData.course_id}`,
+        {
+          name: updated.name,
+          name_th: updated.name_th,
+          code: updated.code,
+          // 🟢 ตรวจสอบให้แน่ใจว่าส่งไปเป็นตัวเลข (หรือจัดการที่ Backend ตามโค้ดข้างบน)
+          credits: updated.credits,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      showToast(t("Course information updated"), "success");
+
+      // 🟢 ถ้า loadInitialData() คือการไปดึงค่าใหม่จาก Server
+      // ตรวจสอบให้แน่ใจว่ามันจัดการเรื่อง State ของ formData ตัวเก่าด้วย
+      await loadInitialData();
+    } catch (err) {
+      console.error("Update failed:", err);
+      showToast(t("Update failed"), "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (error)
     return (
       <div className="p-20 text-center font-bold text-rose-500">{error}</div>
@@ -250,35 +281,44 @@ export default function EditCourseClient({
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-8 md:p-10 flex flex-col min-[1200px]:flex-row justify-between items-start gap-8">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">
+              {/* <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-50 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">
                 Course ID: {formData.id}
+              </div> */}
+              <div className="space-y-1">
+                {/* ส่วนรหัสวิชา - วางไว้ด้านบนเป็นหมวดหมู่ */}
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-orange-100 text-orange-600 text-[40px] font-bold rounded-full tracking-wider uppercase">
+                    {formData.code}
+                  </span>
+                  <div className="h-px flex-1 bg-slate-100 hidden md:block"></div>
+                </div>
+
+                {/* ชื่อวิชา */}
+                <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.1]">
+                  {lang === "en" ? formData.name : formData.name_th}
+                </h1>
               </div>
-              <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-                {lang === "en" ? formData.name : formData.name_th}
-                <span className="text-orange-500 block md:inline md:ml-4 opacity-70">
-                  ({formData.code})
-                </span>
-              </h1>
               <div className="flex flex-col gap-6 w-full">
                 {/* 1. Action Buttons Group */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={() => 
-                    {
-                      setLoading(true);
-                      router.push(
-                      `/editCourse/${courseCode}/instructors?courseId=${formData?.course_id}`,
-                    );}
-                    }
-                    className="group flex items-center gap-2 px-5 py-2.5 text-[11px] font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100 shadow-sm hover:shadow-blue-200 uppercase tracking-wider"
-                  >
-                    <UserPlus
-                      size={16}
-                      strokeWidth={2.5}
-                      className="group-hover:scale-110 transition-transform"
-                    />
-                    {t("Manage Instructors")}
-                  </button>
+                  {!isInstructor && (
+                    <button
+                      onClick={() => {
+                        setLoading(true);
+                        router.push(
+                          `/editCourse/${courseCode}/instructors?courseId=${formData?.course_id}`,
+                        );
+                      }}
+                      className="group flex items-center gap-2 px-5 py-2.5 text-[11px] font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-600 hover:text-white rounded-xl transition-all border border-blue-100 shadow-sm hover:shadow-blue-200 uppercase tracking-wider"
+                    >
+                      <UserPlus
+                        size={16}
+                        strokeWidth={2.5}
+                        className="group-hover:scale-110 transition-transform"
+                      />
+                      {t("Manage Instructors")}
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setShowEditPopup(true)}
@@ -504,10 +544,8 @@ export default function EditCourseClient({
           ]}
           onChange={(updated) => setFormData(updated)}
           onSave={() => {
-            // Implement save logic here (e.g., API call to update course)
+            saveEditedInfo(formData);
             setShowEditPopup(false);
-            showToast(t("Course information updated"), "success");
-            // Optionally, refresh data after saving
             loadInitialData();
           }}
           onClose={() => setShowEditPopup(false)}

@@ -97,7 +97,6 @@ export default function ViewChartPage() {
   const isStudent = user?.role === "student";
   const isGuest = user?.role === "guest";
 
-
   const updateSelections = (updates: Partial<typeof selections>) => {
     setSelections((prev) => ({ ...prev, ...updates }));
   };
@@ -431,28 +430,47 @@ export default function ViewChartPage() {
     if (selections.courses) {
       setChartYearParams(null);
       setChartSemesterParams(null);
-      try {
-        const yearData =
-          typeof selections.years === "string"
-            ? JSON.parse(selections.years)
-            : selections.years;
 
-        if (yearData && yearData.year) {
-          setChartCourseParams({
-            Csemester_id: selections.courses,
-            year: yearData.year,
-            semester: selections.semester,
-            courseId: selections.courses,
-            program_id: yearData.id, // 🟢 เพิ่ม program_id จาก yearData
-          });
+      // 1. ประกาศเป็น async function ภายใน useEffect
+      const updateParams = async () => {
+        try {
+          const yearData =
+            typeof selections.years === "string"
+              ? JSON.parse(selections.years)
+              : selections.years;
+
+          // 2. เรียกใช้ apiClient และรอข้อมูล (await)
+          const res = await apiClient.get(
+            `/course/byCsemester/${selections.courses}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
+
+          const courseInfo = res.data; // ข้อมูลที่ได้จาก backend
+
+          if (yearData && yearData.year && courseInfo) {
+            // 3. นำข้อมูลจาก res (courseInfo) มาใช้เซตค่า
+            setChartCourseParams({
+              Csemester_id: selections.courses,
+              year: yearData.year,
+              semester: selections.semester,
+              courseId: courseInfo.id,
+              program_id: yearData.id,
+            });
+          }
+        } catch (e) {
+          console.error("Error processing data:", e);
         }
-      } catch (e) {
-        console.error("Error parsing year data:", e);
-      }
+      };
+
+      // 4. สั่งรันฟังก์ชัน
+      updateParams();
     } else {
       setChartCourseParams(null);
     }
-  }, [selections.courses, selections.years, selections.semester]);
+  }, [selections.courses, selections.years, selections.semester, token]);
+  // 🟢 อย่าลืมใส่ token ใน dependency array ด้วยถ้ามันมีโอกาสเปลี่ยน
 
   const handleClearFilters = () => {
     if (isInstructor) {
@@ -525,7 +543,7 @@ export default function ViewChartPage() {
                 semester: "",
               })
             }
-            disabled={isInstructor || isStudent}
+            disabled={isInstructor}
           />
 
           {/* 2. Faculty */}
@@ -542,7 +560,7 @@ export default function ViewChartPage() {
                 semester: "",
               })
             }
-            disabled={!selections.university || isInstructor || isStudent}
+            disabled={!selections.university || isInstructor}
           />
 
           {/* 3. Program */}
@@ -558,7 +576,7 @@ export default function ViewChartPage() {
                 semester: "",
               })
             }
-            disabled={!selections.faculty || isStudent}
+            disabled={!selections.faculty}
           />
 
           {/* 4. Year */}
@@ -573,11 +591,11 @@ export default function ViewChartPage() {
                 courses: "",
               })
             }
-            disabled={!selections.program || isStudent}
+            disabled={!selections.program}
           />
 
           {/* 🟢 5. Semester (ซ่อนถ้าเป็น Guest) */}
-          {!isGuest && (
+          {!isGuest && !isStudent && (
             <DropdownSelect
               label="Semester"
               options={options.semester}
@@ -593,7 +611,7 @@ export default function ViewChartPage() {
           )}
 
           {/* 🟢 6. Course (ซ่อนถ้าเป็น Guest) */}
-          {!isGuest && (
+          {!isGuest && !isStudent && (
             <DropdownSelect
               label="Course"
               options={options.courses}

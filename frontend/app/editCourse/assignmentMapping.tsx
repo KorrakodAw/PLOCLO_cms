@@ -64,8 +64,6 @@ export default function AssignmentMapping({
     null,
   );
 
-
- 
   // --- 1. Fetch Data ---
   const fetchData = useCallback(async () => {
     if (!semesterId || !token) return; // 🟢 ตรวจสอบ semesterId
@@ -214,6 +212,8 @@ export default function AssignmentMapping({
       await handleRecalculateWeights(remaining);
     } catch {
       showToast("Delete failed", "error");
+    } finally {
+      fetchData(); // โหลดข้อมูลใหม่มาแสดง
       setLoading(false);
     }
   };

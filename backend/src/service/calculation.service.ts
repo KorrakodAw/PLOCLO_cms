@@ -2806,18 +2806,19 @@ export async function getStudentPloDetailedCumulative(
   tx: any,
   studentId: number,
 ) {
-  // 1. เตรียมข้อมูลพื้นฐาน - เพิ่มการ select name
+  // 1. ดึงข้อมูลพื้นฐานของนักเรียน
   const student = await tx.student.findUnique({
     where: { id: studentId },
     select: {
       program_id: true,
       student_code: true,
-      first_name: true, // 🟢 ดึงชื่อ
-      last_name: true, // 🟢 ดึงนามสกุล
+      first_name: true,
+      last_name: true,
     },
   });
   if (!student) throw new Error("Student not found");
 
+  // 2. หา Semester ทั้งหมดที่นักเรียนคนนี้มีคะแนน
   const scores = await tx.studentScore.findMany({
     where: { student_id: studentId },
     select: {
@@ -2838,36 +2839,32 @@ export async function getStudentPloDetailedCumulative(
     a.year !== b.year ? a.year - b.year : a.semester - b.semester,
   );
 
-  const tempPloData: Record<
-    string,
-    {
-      totalHighest: number;
-      totalRaw: number;
-      terms: {
-        year: number;
-        semester: number;
-        rawScore: number;
-        termHighest: number;
-      }[];
-    }
-  > = {};
+  // 🟢 FIX: ใช้ Promise.all เพื่อดึงข้อมูลทุก Semester พร้อมกัน (ลดโอกาสเกิด P2028)
+  const allSemesterData = await Promise.all(
+    uniqueSemesters.map(async (sem) => {
+      const [statsData, semesterData] = await Promise.all([
+        getPloStatsPerSemester(tx, student.program_id, sem.year, sem.semester),
+        getPloScoreAllStudentPerSemester(
+          tx,
+          student.program_id,
+          sem.year,
+          sem.semester,
+        ),
+      ]);
+      return {
+        year: sem.year,
+        semester: sem.semester,
+        statsData,
+        semesterData,
+      };
+    }),
+  );
 
-  // 2. สะสมข้อมูลรายเทอม (Raw Data)
-  for (const sem of uniqueSemesters) {
-    const { year, semester } = sem;
-    const statsData = await getPloStatsPerSemester(
-      tx,
-      student.program_id,
-      year,
-      semester,
-    );
+  const tempPloData: Record<string, any> = {};
+
+  // 3. ประมวลผลข้อมูลที่ดึงมาแล้วใน Memory (ไม่ต้อง Query เพิ่มในนี้แล้ว)
+  allSemesterData.forEach(({ year, semester, statsData, semesterData }) => {
     const semesterPlos = statsData.ploSemesterStats[0]?.plos || {};
-    const semesterData = await getPloScoreAllStudentPerSemester(
-      tx,
-      student.program_id,
-      year,
-      semester,
-    );
     const studentRecord = semesterData.find(
       (s: any) => s.student_id === studentId,
     );
@@ -2890,57 +2887,51 @@ export async function getStudentPloDetailedCumulative(
         termHighest,
       });
     });
-  }
+  });
 
   const totalHighestAll = Object.values(tempPloData).reduce(
-    (sum, data) => sum + data.totalHighest,
+    (sum, data: any) => sum + data.totalHighest,
     0,
   );
   const grandTotal = totalHighestAll || 1;
 
-  // 3. จัด Format และคำนวณแบบ Running Total
-  const result = Object.entries(tempPloData).map(([ploCode, data]) => {
-    const totalHighestPercentage = Number(
-      ((data.totalHighest / grandTotal) * 100).toFixed(2),
-    );
-    const ploAchievementPercentage = Number(
-      ((data.totalRaw / grandTotal) * 100).toFixed(2),
-    );
+  // 4. จัด Format ข้อมูล (Running Total)
+  const result = Object.entries(tempPloData).map(
+    ([ploCode, data]: [string, any]) => {
+      let runningRawScore = 0;
+      let runningHighestPossible = 0;
 
-    let runningRawScore = 0;
-    let runningHighestPossible = 0;
+      const breakdown = data.terms.map((t: any) => {
+        runningRawScore += t.rawScore;
+        runningHighestPossible += t.termHighest;
 
-    const breakdown = data.terms.map((t) => {
-      runningRawScore += t.rawScore;
-      runningHighestPossible += t.termHighest;
+        return {
+          name: `Y${t.year}/S${t.semester}`, // เพิ่มชื่อเทอมสำหรับใช้ใน Chart UI
+          year: t.year,
+          semester: t.semester,
+          // กลับไปใช้ชื่อเดิมที่คุณเคยใช้
+          termHighestPossible: Number(runningHighestPossible.toFixed(2)),
+          termHighestPossiblePercentage: Number(
+            ((runningHighestPossible / grandTotal) * 100).toFixed(2),
+          ),
+          rawScore: Number(runningRawScore.toFixed(2)),
+          contributionPercentage: Number(
+            ((runningRawScore / grandTotal) * 100).toFixed(2),
+          ),
+        };
+      });
 
       return {
-        year: t.year,
-        semester: t.semester,
-        termHighestPossible: Number(runningHighestPossible.toFixed(2)),
-        termHighestPossiblePercentage: Number(
-          ((runningHighestPossible / grandTotal) * 100).toFixed(2),
-        ),
-        rawScore: Number(runningRawScore.toFixed(2)),
-        contributionPercentage: Number(
-          ((runningRawScore / grandTotal) * 100).toFixed(2),
-        ),
+        ploCode,
+        totalHighest: Number(data.totalHighest.toFixed(2)),
+        ploAchievementRaw: Number(data.totalRaw.toFixed(2)),
+        breakdown,
       };
-    });
-
-    return {
-      ploCode,
-      totalHighest: Number(data.totalHighest.toFixed(2)),
-      totalHighestPercentage,
-      ploAchievementRaw: Number(data.totalRaw.toFixed(2)),
-      ploAchievementPercentage,
-      breakdown,
-    };
-  });
+    },
+  );
 
   return {
     studentId,
-    // 🟢 ส่งค่าชื่อและนามสกุลออกไปพร้อมกัน
     studentCode: student.student_code,
     studentName: `${student.first_name} ${student.last_name}`,
     totalHighestAll: Number(totalHighestAll.toFixed(2)),
