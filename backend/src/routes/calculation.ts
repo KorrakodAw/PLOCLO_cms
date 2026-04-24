@@ -39,6 +39,8 @@ import {
   getPloStatsPerYear,
   getPloStatsPerYearPercentage,
   getStudentPloDetailedCumulative,
+  getStudentPloAchievementSummary,
+  getProgramPloDetailedStatistics,
 } from "../service/ploCal";
 
 
@@ -599,6 +601,46 @@ router.get("/clo-plo/studentCumulative/all", authenticateToken, async (req, res)
     });
 
     res.json(resultPloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ err });
+  }
+});
+
+/*
+/////////////////////////////////////////////////////////////
+// test ค่า
+// GET http://localhost:9771/api/calculation/clo-plo/studentCumulative/test?studentId=ไอดีนักศึกษา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/studentCumulative/test", authenticateToken, async (req, res) => {
+  const { studentId} = req.query;
+  try {
+    const resultPlo = await prisma.$transaction(async (tx) => {
+      return await getStudentPloAchievementSummary(tx, Number(studentId));
+    });
+
+    res.json(resultPlo);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ err });
+  }
+});
+*/
+
+/////////////////////////////////////////////////////////////
+// คำนวณค่าสถิติ (Min, Max, Mean, Median) ของแต่ละ PLO ทั้งแบบ Raw และ Percentage ของนักเรียนทุกคนในหลักสูตรเดียวกัน
+// GET http://localhost:9771/api/calculation/clo-plo/studentCumulative/stats?programId=ไอดีหลักสูตร
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/studentCumulative/stats", authenticateToken, async (req, res) => {
+  const { programId} = req.query;
+  try {
+    const resultPlo = await prisma.$transaction(async (tx) => {
+      return await getProgramPloDetailedStatistics(tx, Number(programId));
+    });
+
+    res.json(resultPlo);
   } catch (err) {
     console.error(err);
     res.status(500).json({ err });

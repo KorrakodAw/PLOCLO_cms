@@ -1115,3 +1115,148 @@ export async function getStudentPloDetailedCumulative(
     ploDetailedStats: result
   };
 }
+
+/**
+ * ฟังก์ชันสรุปคะแนน PLO แบบย่อ: 
+ * คืนค่าเฉพาะคะแนนดิบสะสม และเปอร์เซ็นต์ความสำเร็จ (0-100%) ของแต่ละ PLO
+ */
+export async function getStudentPloAchievementSummary(
+  tx: any,
+  studentId: number
+) {
+  // 1. ดึงข้อมูลนักเรียนและโปรแกรม
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { program_id: true }
+  });
+  if (!student) throw new Error("Student not found");
+
+  // 2. หาเทอมที่มีคะแนน
+  const scores = await tx.studentScore.findMany({
+    where: { student_id: studentId },
+    select: { assignment: { select: { semester: { select: { year: true, semester: true } } } } }
+  });
+
+  const uniqueSemesters = Array.from(
+    new Map<string, SemesterInfo>(
+      scores.map((s: any) => [
+        `${s.assignment.semester.year}-${s.assignment.semester.semester}`, 
+        s.assignment.semester as SemesterInfo
+      ])
+    ).values()
+  );
+
+  // 3. ตัวแปรสำหรับรวมคะแนน (ใช้ Map เพื่อความเร็ว)
+  const ploSummary: Record<string, { totalRaw: number; totalHighest: number }> = {};
+
+  // 4. วนลูปดึงข้อมูลดิบมาบวกกัน
+  for (const sem of uniqueSemesters) {
+    const { year, semester } = sem;
+    const statsData = await getPloStatsPerSemester(tx, student.program_id, year, semester);
+    const semesterPlos = statsData.ploSemesterStats[0]?.plos || {};
+    const semesterData = await getPloScoreAllStudentPerSemester(tx, student.program_id, year, semester);
+    const studentRecord = semesterData.find((s: any) => s.student_id === studentId);
+
+    Object.entries(semesterPlos).forEach(([ploCode, detail]: [string, any]) => {
+      if (!ploSummary[ploCode]) {
+        ploSummary[ploCode] = { totalRaw: 0, totalHighest: 0 };
+      }
+      
+      const rawScore = studentRecord?.ploScores.find((p: any) => p.ploCode === ploCode)?.ploScore || 0;
+      const termHighest = detail.highestPossible || 0;
+
+      ploSummary[ploCode].totalRaw += rawScore;
+      ploSummary[ploCode].totalHighest += termHighest;
+    });
+  }
+
+  // 5. แปลงข้อมูลกลับเป็น Array และคำนวณเปอร์เซ็นต์ (Achievement)
+  const result = Object.entries(ploSummary).map(([ploCode, data]) => {
+    const totalHighest = data.totalHighest || 1; // กันหารด้วย 0
+    
+    return {
+      ploCode,
+      ploAchievementRaw: Number(data.totalRaw.toFixed(2)),
+      // เปอร์เซ็นต์ความสำเร็จเทียบกับตัวมันเอง (0-100%)
+      ploAchievementPercentage: Number(((data.totalRaw / totalHighest) * 100).toFixed(2))
+    };
+  });
+
+  return {
+    studentId,
+    ploDetailedStats: result
+  };
+}
+
+/**
+ * คำนวณค่าสถิติ (Min, Max, Mean, Median) ของแต่ละ PLO ทั้งแบบ Raw และ Percentage
+ * โดยใช้ข้อมูลจากนักเรียนทุกคนใน programId ที่กำหนด
+ */
+export async function getProgramPloDetailedStatistics(
+  tx: any,
+  programId: number
+) {
+  // 1. ดึงรายชื่อนักเรียนทุกคนใน Program นี้
+  const students = await tx.student.findMany({
+    where: { program_id: programId },
+    select: { id: true }
+  });
+
+  if (students.length === 0) {
+    return { programId, ploProgramStats: [], message: "No students found" };
+  }
+
+  // 2. เตรียมโครงสร้างเก็บกลุ่มข้อมูลคะแนน
+  // { "PLO1": { raws: [120, 150...], percentages: [30, 37.5...] } }
+  const ploDataGroup: Record<string, { raws: number[], percentages: number[] }> = {};
+
+  // 3. วนลูปเรียกใช้ getStudentPloAchievementSummary ของนักเรียนทุกคน
+  for (const student of students) {
+    const summary = await getStudentPloAchievementSummary(tx, student.id);
+    
+    summary.ploDetailedStats.forEach((stat: any) => {
+      if (!ploDataGroup[stat.ploCode]) {
+        ploDataGroup[stat.ploCode] = { raws: [], percentages: [] };
+      }
+      ploDataGroup[stat.ploCode].raws.push(stat.ploAchievementRaw);
+      ploDataGroup[stat.ploCode].percentages.push(stat.ploAchievementPercentage);
+    });
+  }
+
+  // 4. Helper Function สำหรับคำนวณสถิติ
+  const calculateStats = (values: number[]) => {
+    if (values.length === 0) return { lowest: 0, highest: 0, mean: 0, median: 0 };
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const sum = values.reduce((a, b) => a + b, 0);
+    const mean = sum / values.length;
+    
+    // คำนวณ Median
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 !== 0 
+      ? sorted[mid] 
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+
+    return {
+      lowest: Number(Math.min(...values).toFixed(2)),
+      highest: Number(Math.max(...values).toFixed(2)),
+      mean: Number(mean.toFixed(2)),
+      median: Number(median.toFixed(2))
+    };
+  };
+
+  // 5. สรุปผลลัพธ์แยกตาม PLO
+  const ploProgramStats = Object.entries(ploDataGroup).map(([ploCode, data]) => {
+    return {
+      ploCode,
+      studentCount: data.raws.length,
+      rawStats: calculateStats(data.raws),
+      percentageStats: calculateStats(data.percentages)
+    };
+  });
+
+  return {
+    programId,
+    ploProgramStats
+  };
+}
