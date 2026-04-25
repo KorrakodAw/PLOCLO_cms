@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import * as XLSX from "xlsx";
 import DropdownSelect from "./DropdownSelect";
+import { useGlobalToast } from "@/app/context/ToastContext";
 
 // Interface for the Manual Input Form
 interface FormData {
@@ -109,6 +110,7 @@ export default function FormPopup<T>({
   } = placeholderText;
 
   const { insert = "Insert", upload = "Upload" } = submitButtonText;
+  const { showToast } = useGlobalToast();
 
   const [formData, setFormData] = useState<FormData>({
     code: "",
@@ -198,7 +200,8 @@ export default function FormPopup<T>({
     const newErrors = validate();
     const isCodeValid = Codevalidate();
     if (!isCodeValid) {
-      newErrors.code = "Course code cannot contain special characters (like : / @ #)";
+      newErrors.code =
+        "Course code cannot contain special characters (like : / @ #)";
     }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -234,7 +237,10 @@ export default function FormPopup<T>({
       }
     } catch (error) {
       console.error(error);
-      alert("Upload failed!");
+      showToast(
+        "Failed to upload. Please check the file format and data.",
+        "error",
+      );
     } finally {
       // Optional: Clear the input value so the same file can be selected again
       e.target.value = "";

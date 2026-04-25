@@ -275,6 +275,55 @@ router.post("/", authenticateToken, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/test-paginate", async (req: Request, res: Response) => {
+  try {
+    const page = parseIntSafe(req.query.page) || 1;
+    const limit = parseIntSafe(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // 🟢 1. รับค่า search จาก Query String
+    const search = (req.query.search as string) || undefined;
+
+    // 🟢 2. สร้างเงื่อนไข Where สำหรับค้นหา
+    const where: any = search
+      ? {
+          OR: [
+            { code: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+            { name_th: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+    // 🟢 3. ใช้ 'where' ทั้งใน count และ findMany เพื่อให้ Pagination สัมพันธ์กับ Search
+    const [total, courses] = await prisma.$transaction([
+      prisma.course.count({ where }), // นับเฉพาะที่ตรงกับคำค้นหา
+      prisma.course.findMany({
+        where, // กรองเฉพาะที่ตรงกับคำค้นหา
+        skip,
+        take: limit,
+        orderBy: { id: "desc" },
+        include: {
+          semesters: true, // ดึง CourseSemester มาเป็น Array ตามที่ต้องการ
+        },
+      }),
+    ]);
+
+    res.json({
+      data: courses,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("Test Pagination Error:", err);
+    res.status(500).json({ error: "Test pagination failed" });
+  }
+});
+
 // GET /paginate/SectionId
 router.get(
   "/paginate",
@@ -382,6 +431,8 @@ router.get(
       const programId = parseIntSafe(req.query.programId);
       const programCode = req.query.programCode as string;
 
+      const search = req.query.search as string | undefined;
+
       const page = parseIntSafe(req.query.page) || 1;
       const limit = parseIntSafe(req.query.limit) || 10;
       const skip = (page - 1) * limit;
@@ -399,40 +450,78 @@ router.get(
 
       // --- กรณีที่ 1: กรองตามหลักสูตร (ใช้ Program Code เพื่อหาทุก Program ID ที่เกี่ยวข้อง) ---
       if (targetProgramCode) {
-        const where: Prisma.ProgramOnCourseWhereInput = {
-          program: {
-            program_code: targetProgramCode,
+        const where: Prisma.CourseWhereInput = {
+          // ระบบ Search
+          ...(search && {
+            OR: [
+              { code: { contains: search, mode: "insensitive" } },
+              { name: { contains: search, mode: "insensitive" } },
+              { name_th: { contains: search, mode: "insensitive" } },
+            ],
+          }),
+          // กรองวิชาที่อยู่ในหลักสูตรนี้ (ใช้ some เพื่อให้ได้ Course ที่ "มีอย่างน้อยหนึ่งเทอม" ตรงเงื่อนไข)
+          semesters: {
+            some: {
+              programOnCourses: {
+                some: {
+                  program: { program_code: targetProgramCode },
+                  type: "core",
+                },
+              },
+            },
           },
-          // คุณสามารถเพิ่ม type: "core" ตรงนี้ได้ถ้าต้องการกรองเฉพาะวิชาบังคับในหลักสูตร
-          type: "core",
         };
 
         const [total, items] = await prisma.$transaction([
-          prisma.programOnCourse.count({ where }),
-          prisma.programOnCourse.findMany({
+          prisma.course.count({ where }),
+          prisma.course.findMany({
             where,
             include: {
-              program: true,
-              semester: { include: { course: true } },
+              semesters: {
+                // 🟢 เลือกดึงเทอมที่ตรงกับหลักสูตรที่เราสนใจเท่านั้น
+                where: {
+                  programOnCourses: {
+                    some: { program: { program_code: targetProgramCode } },
+                  },
+                },
+                include: {
+                  programOnCourses: {
+                    include: { program: true },
+                  },
+                },
+                // 🟢 เรียงตาม ID ของเทอม เพื่อเอาเทอมล่าสุด
+                orderBy: { id: "desc" },
+              },
             },
             skip,
             take: limit,
-            orderBy: [{ program: { program_year: "desc" } }],
+            orderBy: { id: "desc" },
           }),
         ]);
 
         return res.json({
-          data: items.map((item) => ({
-            semester_id: item.semester_id,
-            program_id: item.program_id,
-            program_name: item.program.program_name_en,
-            program_year: item.program.program_year,
-            course_id: item.semester.course.id,
-            code: item.semester.course.code,
-            name: item.semester.course.name,
-            name_th: item.semester.course.name_th,
-            credits: item.semester.course.credits,
-          })),
+          data: items.map((course) => {
+            // 🟢 เลือกเอาเทอมแรกที่เจอ (ซึ่งเป็นเทอมล่าสุดเพราะสั่ง orderBy id: desc ไว้)
+            const latestSemester = course.semesters[0];
+            const progOnCourseInfo = latestSemester?.programOnCourses.find(
+              (poc) => poc.program.program_code === targetProgramCode,
+            );
+            const progInfo = progOnCourseInfo?.program;
+
+            return {
+              course_id: course.id,
+              code: course.code,
+              name: course.name,
+              name_th: course.name_th,
+              credits: course.credits,
+              // 🟢 ข้อมูลเทอมและหลักสูตรจะถูกดึงมาจาก Record ล่าสุดตัวเดียว
+              semester_id: latestSemester?.id,
+              program_id: progInfo?.id,
+              program_name: progInfo?.program_name_en,
+              program_year: progInfo?.program_year,
+              type: "core",
+            };
+          }),
           pagination: {
             total,
             page,
@@ -442,7 +531,7 @@ router.get(
         });
       }
 
-      // --- กรณีที่ 2: ไม่ระบุหลักสูตร (ดึงจาก Master Course และ Default Type เป็น core) ---
+      // --- กรณีที่ 2: ไม่ระบุหลักสูตร + ระบบ Search ---
       const courseWhere: Prisma.CourseWhereInput = {
         faculty:
           facultyId || universityId
@@ -451,6 +540,14 @@ router.get(
                 university_id: universityId || undefined,
               }
             : undefined,
+        // 🟢 เพิ่มระบบ Search ตรงนี้ด้วย
+        ...(search && {
+          OR: [
+            { code: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+            { name_th: { contains: search, mode: "insensitive" } },
+          ],
+        }),
       };
 
       const [total, courses] = await prisma.$transaction([
@@ -459,7 +556,7 @@ router.get(
           where: courseWhere,
           skip,
           take: limit,
-          orderBy: { code: "asc" },
+          orderBy: { id: "desc" }, // 🟢 เรียงตาม ID ล่าสุด
         }),
       ]);
 
@@ -470,7 +567,6 @@ router.get(
           name: c.name,
           name_th: c.name_th,
           credits: c.credits,
-          // 🟢 กำหนดเป็น "core" ตามที่คุณต้องการเมื่อเป็นการดึงจากตารางหลัก
           type: "core",
         })),
         pagination: {

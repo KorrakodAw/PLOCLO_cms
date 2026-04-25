@@ -44,6 +44,33 @@ router.post("/", authenticateToken, async (req, res) => {
   }
 });
 
+// Backend: instructor.router.ts
+router.post("/on-course/bulk", authenticateToken, async (req, res) => {
+  try {
+    const { courseId, instructorIds } = req.body;
+
+    if (!Array.isArray(instructorIds) || instructorIds.length === 0) {
+      return res.status(400).json({ error: "No instructors selected" });
+    }
+
+    // สร้างข้อมูลสำหรับบันทึกลงตารางกลาง
+    const data = instructorIds.map((id: number) => ({
+      courseId: Number(courseId),
+      instructorId: Number(id),
+    }));
+
+    const result = await prisma.courseInstructor.createMany({
+      data,
+      skipDuplicates: true, // ป้องกันกรณีแอบส่งตัวที่มีอยู่แล้วมา
+    });
+
+    res.status(201).json({ count: result.count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to assign instructors" });
+  }
+});
+
 // ✅ FIX: Changed path to "/:courseId" to match frontend
 // GET /instructorOnCourse/123
 router.get("/:courseId", authenticateToken, async (req, res) => {
@@ -72,28 +99,34 @@ router.get("/:courseId", authenticateToken, async (req, res) => {
   }
 });
 
-router.delete("/:courseId/:instructorId", authenticateToken, async (req, res) => {
-  try {
-    const { courseId, instructorId } = req.params;
+router.delete(
+  "/:courseId/:instructorId",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { courseId, instructorId } = req.params;
 
-    if (!courseId || !instructorId) {
-      return res.status(400).json({ error: "Missing required parameters" });
-    }
+      if (!courseId || !instructorId) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
 
-    await prisma.courseInstructor.delete({
-      where: {
-        courseId_instructorId: {
-          courseId: Number(courseId),
-          instructorId: Number(instructorId),
+      await prisma.courseInstructor.delete({
+        where: {
+          courseId_instructorId: {
+            courseId: Number(courseId),
+            instructorId: Number(instructorId),
+          },
         },
-      },
-    });
+      });
 
-    res.json({ message: "Instructor removed from course successfully" });
-  } catch (err: any) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to remove instructor from course" });
-  }
-});
+      res.json({ message: "Instructor removed from course successfully" });
+    } catch (err: any) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ error: "Failed to remove instructor from course" });
+    }
+  },
+);
 
 export default router;

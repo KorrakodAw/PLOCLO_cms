@@ -253,18 +253,28 @@ export default function CourseManagement({
     try {
       const data = await getCoursePaginate(token, page, limit, {
         universityId,
-        facultyId,
+        facultyId: facultyId,
         programCode: programId,
-        search: searchTerm, // 🟢 ส่งค่าค้นหาไปที่ Backend
+        search: searchTerm,
       });
+
       setCourses(data.data || []);
-      // ถ้า Backend คืนค่า total มาด้วย อย่าลืมอัปเดต Pagination state
+      setTotalPages(data.pagination.totalPages || 1);
     } catch {
       showToast("Error fetching courses", "error");
     } finally {
       setLoadingCourse(false);
     }
-  }, [isLoggedIn, token, page, universityId, facultyId, programId, searchTerm]); // 🟢 เพิ่ม searchTerm เป็น dependency
+  }, [
+    isLoggedIn,
+    token,
+    page,
+    universityId,
+    facultyId,
+    programId,
+    searchTerm,
+    showToast,
+  ]);
 
   const fetchCoursesByInstructor = useCallback(
     async (targetPage = 1) => {
@@ -298,12 +308,22 @@ export default function CourseManagement({
   );
 
   useEffect(() => {
+    console.log(courses);
+  });
+
+  useEffect(() => {
+    setPage(1);
+  }, [programId, facultyId, universityId, searchTerm]);
+
+  useEffect(() => {
     if (isInstructor) {
       fetchCoursesByInstructor(page);
     } else {
       fetchCourses();
+
+      // Reset to first page when switching to admin view
     }
-  }, [page, fetchCourses, fetchCoursesByInstructor]);
+  }, [searchTerm, page, fetchCourses, fetchCoursesByInstructor]);
 
   // --- ADD COURSE Handlers ---
 
@@ -487,23 +507,23 @@ export default function CourseManagement({
   //   }
   // };
 
-  const filteredCourses = useMemo(() => {
-    const searched = courses.filter((course) => {
-      const term = searchTerm.toLowerCase();
-      return (
-        course.name?.toLowerCase().includes(term) ||
-        course.code?.toLowerCase().includes(term) ||
-        course.name_th?.toLowerCase().includes(term)
-      );
-    });
+  // const filteredCourses = useMemo(() => {
+  //   const searched = courses.filter((course) => {
+  //     const term = searchTerm.toLowerCase();
+  //     return (
+  //       course.name?.toLowerCase().includes(term) ||
+  //       course.code?.toLowerCase().includes(term) ||
+  //       course.name_th?.toLowerCase().includes(term)
+  //     );
+  //   });
 
-    // Group by Code เพื่อไม่ให้วิชาเดิมโชว์ซ้ำหลายเซคชั่น
-    const uniqueData = Array.from(
-      new Map(searched.map((item) => [item.code, item])).values(),
-    );
+  //   // Group by Code เพื่อไม่ให้วิชาเดิมโชว์ซ้ำหลายเซคชั่น
+  //   const uniqueData = Array.from(
+  //     new Map(searched.map((item) => [item.code, item])).values(),
+  //   );
 
-    return uniqueData;
-  }, [courses, searchTerm]);
+  //   return uniqueData;
+  // }, [courses, searchTerm]);
 
   return (
     <div className="mt-5 p-5">
@@ -551,7 +571,7 @@ export default function CourseManagement({
       <div className="bg-white p-4 rounded-lg shadow-xl">
         {/* 🟢 PASS UNIQUE COURSES TO TABLE */}
 
-        <Table<Course> columns={courseColumns} data={filteredCourses} />
+        <Table<Course> columns={courseColumns} data={courses} />
 
         <div className="pt-4 flex justify-end">
           <PaginationControlButton

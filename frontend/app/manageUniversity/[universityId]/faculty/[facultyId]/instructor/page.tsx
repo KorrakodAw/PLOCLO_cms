@@ -122,6 +122,61 @@ export default function FacultyInstructorPage({ params }: PageProps) {
     }
   };
 
+  const handleUploadExcel = async (rows: any[]) => {
+    if (!token) return;
+
+    const instructorsToUpload = rows
+      .map((row) => {
+        // 🟢 ใช้การค้นหา Key แบบไม่สนใจ Space หรือตัวพิมพ์เล็กใหญ่
+        const getVal = (possibleKeys: string[]) => {
+          const foundKey = Object.keys(row).find((key) =>
+            possibleKeys.includes(key.trim()),
+          );
+          return foundKey ? String(row[foundKey]).trim() : "";
+        };
+
+        const full_thai_name = getVal(["Full Thai Name", "ชื่อ-นามสกุล (ไทย)"]);
+        const full_eng_name = getVal(["Full English Name", "Full Name (EN)"]);
+        const email = getVal(["Email", "อีเมล"]);
+        const phoneNum = getVal(["Phone", "เบอร์โทรศัพท์", "เบอร์โทร"]);
+
+        return {
+          full_thai_name,
+          full_eng_name,
+          email: email.toLowerCase(), // บังคับตัวเล็ก
+          phoneNum,
+          faculty_id: parseInt(facultyId),
+        };
+      })
+      .filter((inst) => {
+        // 🟢 ตรวจสอบ Format Email เบื้องต้นก่อนส่ง
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return inst.full_thai_name && inst.email && emailRegex.test(inst.email);
+      });
+
+    if (instructorsToUpload.length === 0) {
+      showToast(
+        "No valid data found. Please check Email format and Column names.",
+        "error",
+      );
+      return;
+    }
+
+    // ส่ง API ก้อนเดียวเหมือนเดิม...
+    try {
+      const res = await apiClient.post("/instructor/bulk", {
+        instructors: instructorsToUpload,
+      });
+      showToast(`Uploaded ${res.data.count} instructors`, "success");
+      fetchData();
+    } catch {
+      showToast(
+        "Upload failed. Database might rejected duplicate emails.",
+        "error",
+      );
+    }
+  };
+
   const handleUpdateInstructor = async () => {
     if (!selectedInstructor) return;
     try {
@@ -153,45 +208,6 @@ export default function FacultyInstructorPage({ params }: PageProps) {
       showToast("Failed to delete instructor", "error");
     }
   };
-
-  // --- User-to-Instructor Handlers (Commented Out) ---
-  /* const fetchSystemUsers = async () => {
-    try {
-      const res = await apiClient.get(`/users?role=instructor`);
-      setSystemUsers(res.data);
-    } catch {
-      showToast("Failed to fetch users", "error");
-    }
-  };
-
-  const handleOpenUserModal = () => {
-    fetchSystemUsers();
-    setShowUserModal(true);
-  };
-
-  const handleAddFromUser = async (user: Users) => {
-    if (!token) return;
-    try {
-      setLoading(true);
-      await apiClient.post("/instructor", {
-        full_thai_name: `${user.username} `,
-        full_eng_name: `${user.username} `,
-        email: user.email,
-        phoneNum: "",
-        faculty_id: parseInt(facultyId),
-        user_id: user.id,
-      });
-
-      showToast("User added as instructor", "success");
-      setShowUserModal(false);
-      fetchData();
-    } catch (err: any) {
-      showToast(err.response?.data?.error || "Failed to add instructor", "error");
-    } finally {
-      setLoading(false);
-    }
-  }; 
-  */
 
   // --- 3. Table Columns ---
   const columns: Column<Instructor>[] = [
@@ -250,7 +266,6 @@ export default function FacultyInstructorPage({ params }: PageProps) {
         ]}
       />
 
-
       {/* Header Card */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex justify-between items-start">
         <div>
@@ -298,6 +313,7 @@ export default function FacultyInstructorPage({ params }: PageProps) {
               showAbbreviationInputs={true}
               showCodeInput={false}
               onSubmit={handleCreateInstructor}
+              onSubmitExcel={handleUploadExcel}
             />
           </div>
         </div>
@@ -314,63 +330,6 @@ export default function FacultyInstructorPage({ params }: PageProps) {
           )}
         </div>
       </div>
-
-      {/* --- User Selection Modal (Commented Out) --- */}
-      {/* {showUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h3 className="text-xl font-bold">{t("Select User to Add")}</h3>
-              <button onClick={() => setShowUserModal(false)} className="text-gray-400 text-2xl">&times;</button>
-            </div>
-            <div className="p-4 border-b">
-              <input
-                type="text"
-                placeholder={t("Search by name or email...")}
-                className="w-full p-2 bg-gray-50 border rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20"
-                onChange={(e) => setUserSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <table className="w-full text-left">
-                <thead className="text-xs uppercase text-gray-400 font-bold border-b">
-                  <tr>
-                    <th className="pb-2">{t("Name")}</th>
-                    <th className="pb-2">{t("Email")}</th>
-                    <th className="pb-2 text-right">{t("Action")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {systemUsers
-                    .filter((u) => {
-                      const isAlreadyInstructor = instructors.some(
-                        (instructor) => instructor.email.toLowerCase() === u.email.toLowerCase()
-                      );
-                      const matchesSearch = u.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-                        u.username.toLowerCase().includes(userSearchTerm.toLowerCase());
-                      return !isAlreadyInstructor && matchesSearch;
-                    })
-                    .map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50 group">
-                        <td className="py-3 text-sm">{user.username}</td>
-                        <td className="py-3 text-sm text-gray-500">{user.email}</td>
-                        <td className="py-3 text-right">
-                          <button
-                            onClick={() => handleAddFromUser(user)}
-                            className="text-orange-600 font-bold text-xs uppercase hover:underline"
-                          >
-                            {t("Select")}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )} 
-      */}
 
       {/* Popups */}
       {showEditPopup && selectedInstructor && (
