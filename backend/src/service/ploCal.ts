@@ -1116,22 +1116,16 @@ export async function getStudentPloDetailedCumulative(
   };
 }
 
-/**
- * ฟังก์ชันสรุปคะแนน PLO แบบย่อ: 
- * คืนค่าเฉพาะคะแนนดิบสะสม และเปอร์เซ็นต์ความสำเร็จ (0-100%) ของแต่ละ PLO
- */
 export async function getStudentPloAchievementSummary(
   tx: any,
   studentId: number
 ) {
-  // 1. ดึงข้อมูลนักเรียนและโปรแกรม
   const student = await tx.student.findUnique({
     where: { id: studentId },
     select: { program_id: true }
   });
   if (!student) throw new Error("Student not found");
 
-  // 2. หาเทอมที่มีคะแนน
   const scores = await tx.studentScore.findMany({
     where: { student_id: studentId },
     select: { assignment: { select: { semester: { select: { year: true, semester: true } } } } }
@@ -1146,10 +1140,8 @@ export async function getStudentPloAchievementSummary(
     ).values()
   );
 
-  // 3. ตัวแปรสำหรับรวมคะแนน (ใช้ Map เพื่อความเร็ว)
   const ploSummary: Record<string, { totalRaw: number; totalHighest: number }> = {};
 
-  // 4. วนลูปดึงข้อมูลดิบมาบวกกัน
   for (const sem of uniqueSemesters) {
     const { year, semester } = sem;
     const statsData = await getPloStatsPerSemester(tx, student.program_id, year, semester);
@@ -1161,7 +1153,6 @@ export async function getStudentPloAchievementSummary(
       if (!ploSummary[ploCode]) {
         ploSummary[ploCode] = { totalRaw: 0, totalHighest: 0 };
       }
-      
       const rawScore = studentRecord?.ploScores.find((p: any) => p.ploCode === ploCode)?.ploScore || 0;
       const termHighest = detail.highestPossible || 0;
 
@@ -1170,15 +1161,16 @@ export async function getStudentPloAchievementSummary(
     });
   }
 
-  // 5. แปลงข้อมูลกลับเป็น Array และคำนวณเปอร์เซ็นต์ (Achievement)
+  // --- จุดสำคัญ: คำนวณหาคะแนนเต็มรวมของทุก PLO ก่อน ---
+  const totalHighestAll = Object.values(ploSummary).reduce((sum, data) => sum + data.totalHighest, 0);
+  const grandTotal = totalHighestAll || 1;
+
   const result = Object.entries(ploSummary).map(([ploCode, data]) => {
-    const totalHighest = data.totalHighest || 1; // กันหารด้วย 0
-    
     return {
       ploCode,
       ploAchievementRaw: Number(data.totalRaw.toFixed(2)),
-      // เปอร์เซ็นต์ความสำเร็จเทียบกับตัวมันเอง (0-100%)
-      ploAchievementPercentage: Number(((data.totalRaw / totalHighest) * 100).toFixed(2))
+      // เปอร์เซ็นต์ความสำเร็จเทียบกับ Grand Total (วิธีเดียวกับ Detailed Transcript)
+      ploAchievementPercentage: Number(((data.totalRaw / grandTotal) * 100).toFixed(2))
     };
   });
 
