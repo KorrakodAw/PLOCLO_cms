@@ -245,6 +245,70 @@ router.get(
   },
 );
 
+router.get("/year-semester", authenticateToken, async (req, res) => {
+  try {
+    // 1. ดึงค่าจาก req.query
+    const { programId, year, semester } = req.query;
+
+    // 2. ตรวจสอบค่าบังคับ (programId และ year ต้องมีเสมอ)
+    if (!programId || !year) {
+      return res.status(400).json({ error: "Missing programId or year" });
+    }
+
+    // 3. แปลงค่าเป็น Number อย่างปลอดภัย
+    const pId = parseInt(programId as string);
+    const y = parseInt(year as string);
+
+    // ตรวจสอบว่าแปลงสำเร็จไหม (ถ้าเป็น NaN ให้คืน 400)
+    if (isNaN(pId) || isNaN(y)) {
+      return res
+        .status(400)
+        .json({ error: "programId and year must be valid numbers" });
+    }
+
+    // 4. สร้าง Dynamic Filter สำหรับ Semester
+    const semesterFilter: any = { year: y };
+
+    // ถ้ามี semester และไม่ใช่ค่าว่าง ให้แปลงเป็นตัวเลขแล้วใส่ใน filter
+    if (semester && semester !== "") {
+      const s = parseInt(semester as string);
+      if (!isNaN(s)) {
+        semesterFilter.semester = s;
+      }
+    }
+
+    // 5. Query ข้อมูล
+    const students = await prisma.student.findMany({
+      where: {
+        program_id: pId,
+        scores: {
+          some: {
+            assignment: {
+              semester: semesterFilter, // จะเป็น { year: y } หรือ { year: y, semester: s }
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        student_code: true,
+        first_name: true,
+        last_name: true,
+      },
+      distinct: ["id"],
+      orderBy: { student_code: "asc" },
+    });
+
+    return res.json(students);
+  } catch (err: any) {
+    console.error("Database Error:", err.message);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      details: err.message, // ดูว่า Prisma บ่นเรื่องอะไร
+    });
+  }
+});
+
 /**
  * ✅ Standard CRUD (Single)
  */
@@ -366,7 +430,9 @@ router.get(
   },
 );
 
-router.get("/email/:email",authenticateToken, async (req, res) => {
+// เพิ่ม :programId/:year/:semester เข้าไปใน URL path
+
+router.get("/email/:email", authenticateToken, async (req, res) => {
   try {
     const email = req.params.email as string;
 

@@ -53,6 +53,7 @@ export default function SemesterStatsDashboard({
     scoreSemesterStatPercent: null,
     studentStat: null,
     studentStatPercent: null,
+    studentNames: null,
   });
 
   const fetchData = useCallback(async () => {
@@ -65,28 +66,38 @@ export default function SemesterStatsDashboard({
       scoreSemesterStatPercent: null,
       studentStat: null,
       studentStatPercent: null,
+      studentNames: null,
     });
     try {
       // 🚀 ใช้ Promise.all เพื่อดึงข้อมูลพร้อมกันทั้ง 4 APIs (เร็วขึ้นมาก)
-      const [stats, statsPercent, studentStats, studentStatsPercent] =
-        await Promise.all([
-          apiClient.get(`/calculation/clo-plo/semester/stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { programId, year, semester },
-          }),
-          apiClient.get(`/calculation/clo-plo/semester/stats/percentage`, {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { programId, year, semester },
-          }),
-          apiClient.get(`/calculation/clo-plo/allStudentSemester`, {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { programId, year, semester },
-          }),
-          apiClient.get(`/calculation/clo-plo/allStudentSemester/percentage`, {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { programId, year, semester },
-          }),
-        ]);
+      const [
+        stats,
+        statsPercent,
+        studentStats,
+        studentStatsPercent,
+        studentNames,
+      ] = await Promise.all([
+        apiClient.get(`/calculation/clo-plo/semester/stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { programId, year, semester },
+        }),
+        apiClient.get(`/calculation/clo-plo/semester/stats/percentage`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { programId, year, semester },
+        }),
+        apiClient.get(`/calculation/clo-plo/allStudentSemester`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { programId, year, semester },
+        }),
+        apiClient.get(`/calculation/clo-plo/allStudentSemester/percentage`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { programId, year, semester },
+        }),
+        apiClient.get(`/student/year-semester`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { programId, year, semester },
+        }),
+      ]);
 
       const ploStats = stats.data.ploSemesterStats?.[0]?.plos || null;
       const studentData = studentStats.data || [];
@@ -97,6 +108,7 @@ export default function SemesterStatsDashboard({
           statsPercent.data.ploSemesterStatsPercentage?.[0]?.plos || null,
         studentStat: studentData,
         studentStatPercent: studentStatsPercent.data || [],
+        studentNames: studentNames.data || null,
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -115,38 +127,82 @@ export default function SemesterStatsDashboard({
     ploScore: number; // เช่น 10.95, 20.25
   }
   const flattenedStudentData = useMemo(() => {
+    // 1. สร้าง Lookup Map จาก studentNames โดยใช้ student_code เป็น Key
+    // ช่วยให้ไม่ต้องวนลูปซ้อนลูป (Performance จะดีกว่า .find มาก)
+    const nameMap = new Map(
+      (data.studentNames || []).map(
+        (s: {
+          id: string;
+          first_name: string;
+          last_name: string;
+          student_code: string;
+        }) => [s.id, s],
+      ),
+    );
+
     const mappedData = (data.studentStat || []).map(
       (student: {
         student_id: string;
         student_code: string;
         student_name: string;
         ploScores: PLOScoreItem[];
-      }) => ({
-        student_id: student.student_id,
-        student_code: student.student_code,
-        student_name: student.student_name,
-        ploScores: student.ploScores || [],
-      }),
+      }) => {
+        // 2. ค้นหาชื่อจาก Map ที่เราเตรียมไว้
+        const nameDetail = nameMap.get(student.student_id);
+
+        return {
+          student_id: student.student_id,
+          student_code: nameDetail?.student_code,
+          student_name: nameDetail
+            ? `${nameDetail.first_name} ${nameDetail.last_name}`
+            : student.student_name, // ถ้าหาไม่เจอให้ใช้ค่าเดิม
+          ploScores: student.ploScores || [],
+        };
+      },
     );
+
     return mappedData;
-  }, [data.studentStat]); // เพิ่มไว้ด้านบนกับ State อื่นๆ
+    // 4. เพิ่ม data.studentNames ใน Dependency Array เพื่อให้ Update เมื่อชื่อโหลดเสร็จ
+  }, [data.studentStat, data.studentNames]);
 
   const flattenedStudentDataPercent = useMemo(() => {
+    // 1. เตรียม Map สำหรับดึงชื่อนักเรียน (Lookup Table)
+    const nameMap = new Map(
+      (data.studentNames || []).map(
+        (s: {
+          id: string;
+          first_name: string;
+          last_name: string;
+          student_code: string;
+        }) => [s.id, s],
+      ),
+    );
+
     const mappedData = (data.studentStatPercent || []).map(
       (student: {
         student_id: string;
         student_code: string;
         student_name: string;
         ploScores: PLOScoreItem[];
-      }) => ({
-        student_id: student.student_id,
-        student_code: student.student_code,
-        student_name: student.student_name,
-        ploScores: student.ploScores || [],
-      }),
+      }) => {
+        // 2. ค้นหาชื่อจริง-นามสกุลจาก Map
+        const nameDetail = nameMap.get(student.student_id);
+
+        return {
+          student_id: student.student_id,
+          student_code: nameDetail?.student_code,
+          // 3. รวมชื่อและนามสกุล ถ้าหาไม่เจอให้ใช้ student_name เดิม
+          student_name: nameDetail
+            ? `${nameDetail.first_name} ${nameDetail.last_name}`
+            : student.student_name,
+          ploScores: student.ploScores || [],
+        };
+      },
     );
+
     return mappedData;
-  }, [data.studentStatPercent]); // เพิ่มไว้ด้านบนกับ State อื่นๆ
+    // 4. เพิ่ม data.studentNames เข้าไปใน Dependency Array ด้วย
+  }, [data.studentStatPercent, data.studentNames]);
 
   const formattedChartData = useMemo(() => {
     if (!data.scoreSemesterStat) return [];

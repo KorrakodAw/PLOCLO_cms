@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ComposedChart,
   Bar,
@@ -22,7 +22,29 @@ interface PloStat {
   ploAchievementPercentage: number;
 }
 
-export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
+interface CumulativePloStat {
+  ploCode: string;
+  percentageStats: {
+    highest: number;
+    lowest: number;
+    mean: number;
+    median: number;
+  };
+  rawStats: {
+    highest: number;
+    lowest: number;
+    mean: number;
+    median: number;
+  };
+}
+
+export const PloAchievementChart = ({
+  data,
+  cumulativeData,
+}: {
+  data: PloStat[];
+  cumulativeData: CumulativePloStat[];
+}) => {
   const [isPercentage, setIsPercentage] = useState(false);
   const { t } = useTranslation("common");
 
@@ -42,6 +64,21 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
     ? "ploAchievementPercentage"
     : "ploAchievementRaw";
   const unit = isPercentage ? "%" : "";
+
+  // ภายใน PloAchievementChart Component
+  const cumulativeMap = useMemo(() => {
+    return cumulativeData.reduce(
+      (acc, curr) => {
+        acc[curr.ploCode] = curr;
+        return acc;
+      },
+      {} as Record<string, CumulativePloStat>,
+    );
+  }, [cumulativeData]);
+
+  useEffect(() => {
+    console.log(cumulativeData);
+  });
 
   if (data.length === 0)
     return (
@@ -171,6 +208,24 @@ export const PloAchievementChart = ({ data }: { data: PloStat[] }) => {
               dot={{ r: 6, fill: "#4f46e5", strokeWidth: 3, stroke: "#fff" }}
               activeDot={{ r: 10, strokeWidth: 0, fill: "#4f46e5" }}
               animationDuration={1500}
+            />
+
+            <Line
+              type="monotone"
+              // แก้ไขตรงนี้
+              dataKey={(entry) => {
+                const stat = cumulativeMap[entry.ploCode];
+                if (!stat) return null;
+
+                return isPercentage
+                  ? stat.percentageStats?.mean
+                  : stat.rawStats?.mean;
+              }}
+              name="Cumulative Average"
+              stroke="#16a34a"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#16a34a" }} // เพิ่มจุดเพื่อให้เห็นข้อมูลชัดขึ้น
+              strokeDasharray="5 5"
             />
           </ComposedChart>
         </ResponsiveContainer>

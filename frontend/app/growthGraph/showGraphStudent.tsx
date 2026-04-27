@@ -62,6 +62,7 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
 
   const students = studentProgramData?.students || [];
   const [graphData, setGraphData] = useState([] as any);
+  const [cumulativeStats, setCumulativeStats] = useState([] as any);
 
   const handleStudentClick = (studentId: string) => {
     setLoading(true);
@@ -74,6 +75,15 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
+        const cumulativeData = await apiClient.get(
+          `/calculation/clo-plo/studentCumulative/stats`,
+          {
+            params: { programId },
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        setCumulativeStats(cumulativeData.data?.ploProgramStats || []);
         setGraphData(res.data);
       } catch (error) {
         console.error("Error fetching graph data for student:", error);
@@ -123,7 +133,7 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
   };
 
   const detailedStats = graphData?.ploDetailedStats || [];
-  
+
   if (!programId) {
     return <NoData />;
   }
@@ -152,7 +162,7 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
               {t("Generating PLO Analysis...")}
             </p>
           </div>
-        ) : graphData ? (
+        ) : graphData && graphData.ploDetailedStats?.length > 0 ? (
           /* 🟢 Show Analytics when graphData exists */
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-6 py-5 bg-indigo-50/50 border border-indigo-100 rounded-[32px] transition-all hover:bg-indigo-50/80">
@@ -194,7 +204,10 @@ export default function ShowGraphStudent({ programId }: { programId: string }) {
               {/* Chart Card 1 */}
               <div className="flex flex-col bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex-1 min-h-[350px] w-full">
-                  <PloAchievementChart data={detailedStats} />
+                  <PloAchievementChart
+                    data={detailedStats}
+                    cumulativeData={cumulativeStats}
+                  />
                 </div>
               </div>
 
