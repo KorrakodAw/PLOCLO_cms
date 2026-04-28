@@ -48,6 +48,19 @@ export const PloAchievementChart = ({
   const [isPercentage, setIsPercentage] = useState(false);
   const { t } = useTranslation("common");
 
+  // เก็บสถานะการแสดงผลของแต่ละเส้น (เริ่มต้นให้เป็น true ทั้งหมด)
+  const [visibleLines, setVisibleLines] = useState({
+    mean: true,
+    highest: true,
+    lowest: true,
+    median: true,
+  });
+
+  // ฟังก์ชันสำหรับสลับสถานะ
+  const toggleLine = (key: keyof typeof visibleLines) => {
+    setVisibleLines((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // 1. Sort Data ตาม ploCode (เช่น PLO1, PLO2, PLO10)
   const sortedData = useMemo(() => {
     return [...data].sort((a, b) => {
@@ -89,45 +102,99 @@ export const PloAchievementChart = ({
 
   return (
     <div className="bg-white p-8 rounded-[32px] mt-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div>
+      {/* TOP SECTION: Title & Main Toggle */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+        <div className="flex-1">
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
             <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
               <ChartBar size={22} />
             </div>
             {t("PLO Achievement")}
           </h2>
-          <p className="text-sm text-slate-400 mt-1.5 font-medium">
+          <p className="text-sm text-slate-400 mt-1.5 font-medium leading-relaxed">
             {t(
               "Analyze student performance across all Program Learning Outcomes",
             )}
           </p>
         </div>
 
-        {/* Unit Toggle */}
-        <div className="flex bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/50">
-          <button
-            onClick={() => setIsPercentage(false)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
-              !isPercentage
-                ? "bg-white shadow-md text-indigo-600"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            <Hash size={14} strokeWidth={3} />
-            RAW
-          </button>
-          <button
-            onClick={() => setIsPercentage(true)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
-              isPercentage
-                ? "bg-white shadow-md text-indigo-600"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            <Percent size={14} strokeWidth={3} />
-            PERCENT
-          </button>
+        {/* Unit Switcher (RAW/PERCENT) - ย้ายมาขวาสุดให้ดูเป็น Global Toggle */}
+        <div className="flex bg-slate-100/80 p-1 rounded-2xl border border-slate-200/50 w-fit">
+          {[
+            { val: false, label: "RAW", icon: Hash },
+            { val: true, label: "PERCENT", icon: Percent },
+          ].map((btn) => (
+            <button
+              key={btn.label}
+              onClick={() => setIsPercentage(btn.val)}
+              className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[11px] font-black transition-all duration-300 ${
+                isPercentage === btn.val
+                  ? "bg-white shadow-sm text-indigo-600"
+                  : "text-slate-400 hover:text-slate-500"
+              }`}
+            >
+              <btn.icon size={13} strokeWidth={3} />
+              {btn.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* FILTER SECTION: Line Toggles - แยกออกมาเป็นแถวใหม่เพื่อความสะดวกในการกด */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8 pt-6 border-t border-slate-50">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {t("Benchmark Filters")}:
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {[
+            {
+              key: "highest",
+              label: "Max Score",
+              color: "#dc2626",
+              bg: "bg-red-50",
+            },
+            {
+              key: "mean",
+              label: "Average",
+              color: "#16a34a",
+              bg: "bg-green-50",
+            },
+            {
+              key: "median",
+              label: "Median",
+              color: "#2563eb",
+              bg: "bg-blue-50",
+            },
+            {
+              key: "lowest",
+              label: "Min Score",
+              color: "#f59e0b",
+              bg: "bg-amber-50",
+            },
+          ].map((item) => {
+            const isActive =
+              visibleLines[item.key as keyof typeof visibleLines];
+            return (
+              <button
+                key={item.key}
+                onClick={() =>
+                  toggleLine(item.key as keyof typeof visibleLines)
+                }
+                className={`group flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold transition-all duration-200 border-2 ${
+                  isActive
+                    ? `${item.bg} border-transparent`
+                    : "bg-transparent border-slate-100 text-slate-300 hover:border-slate-200"
+                }`}
+                style={{ color: isActive ? item.color : undefined }}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full transition-transform ${isActive ? "scale-110" : "scale-100 bg-slate-200"}`}
+                  style={{ backgroundColor: isActive ? item.color : undefined }}
+                />
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -210,13 +277,13 @@ export const PloAchievementChart = ({
               animationDuration={1500}
             />
 
+            {/* Average Line */}
             <Line
+              hide={!visibleLines.mean} // <--- เพิ่มตรงนี้
               type="monotone"
-              // แก้ไขตรงนี้
               dataKey={(entry) => {
                 const stat = cumulativeMap[entry.ploCode];
                 if (!stat) return null;
-
                 return isPercentage
                   ? stat.percentageStats?.mean
                   : stat.rawStats?.mean;
@@ -224,7 +291,61 @@ export const PloAchievementChart = ({
               name="Cumulative Average"
               stroke="#16a34a"
               strokeWidth={3}
-              dot={{ r: 4, fill: "#16a34a" }} // เพิ่มจุดเพื่อให้เห็นข้อมูลชัดขึ้น
+              dot={{ r: 4, fill: "#16a34a" }}
+              strokeDasharray="5 5"
+            />
+
+            {/* Highest Line */}
+            <Line
+              hide={!visibleLines.highest} // <--- เพิ่มตรงนี้
+              type="monotone"
+              dataKey={(entry) => {
+                const stat = cumulativeMap[entry.ploCode];
+                if (!stat) return null;
+                return isPercentage
+                  ? stat.percentageStats?.highest
+                  : stat.rawStats?.highest;
+              }}
+              name="Cumulative Highest"
+              stroke="#dc2626"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#dc2626" }}
+              strokeDasharray="5 5"
+            />
+
+            {/* Lowest Line */}
+            <Line
+              hide={!visibleLines.lowest} // <--- เพิ่มตรงนี้
+              type="monotone"
+              dataKey={(entry) => {
+                const stat = cumulativeMap[entry.ploCode];
+                if (!stat) return null;
+                return isPercentage
+                  ? stat.percentageStats?.lowest
+                  : stat.rawStats?.lowest;
+              }}
+              name="Cumulative Lowest"
+              stroke="#f59e0b"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#f59e0b" }}
+              strokeDasharray="5 5"
+            />
+
+            {/* Median Line */}
+            <Line
+              hide={!visibleLines.median} // <--- เพิ่มตรงนี้
+              type="monotone"
+              dataKey={(entry) => {
+                const stat = cumulativeMap[entry.ploCode];
+                if (!stat) return null;
+                return isPercentage
+                  ? stat.percentageStats?.median
+                  : stat.rawStats?.median;
+              }}
+              name="Cumulative Median"
+              stroke="#2563eb"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#2563eb" }}
               strokeDasharray="5 5"
             />
           </ComposedChart>

@@ -20,6 +20,7 @@ import { toPng } from "html-to-image";
 import * as XLSX from "xlsx";
 import { DashboardHeader } from "./CourseStats/courseComponents/DashboardHeader";
 import { DashboardControls } from "./CourseStats/courseComponents/DashboardControls";
+import DropdownSelect from "@/components/DropdownSelect";
 
 interface YearStatsDashboardProps {
   programId: string | number;
@@ -54,11 +55,44 @@ export default function YearStatsDashboard({
     studentNames: null, // สำหรับเก็บข้อมูลชื่อ-นามสกุลของนักเรียน (ถ้ามี API แยก)
   });
 
+  // 1. แยก State 2 ตัว
+  const [yearsList, setYearsList] = useState([]); // สำหรับเก็บตัวเลือกทั้งหมดใน Dropdown
+  const [selectedYear, setSelectedYear] = useState<string | number>(""); // สำหรับเก็บค่าที่เลือก ณ ปัจจุบัน
+
+  useEffect(() => {
+    const fetchYears = async () => {
+      if (!programId) return;
+      try {
+        const res = await apiClient.get(
+          `/program/YearsInProgram/${programId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        const yearsData = res.data; // [2567, 2566, 2565, 2564]
+
+        // ✅ เก็บปีทั้งหมดลงใน List เพื่อให้ Dropdown มี 4 ตัวเลือก
+        setYearsList(yearsData);
+
+        // ✅ ตั้งค่า "ปีที่เลือก" ให้เป็นปีล่าสุดแค่ตัวเดียว
+        if (yearsData.length > 0 && !selectedYear) {
+          setSelectedYear(yearsData[0].toString());
+        }
+      } catch (err) {
+        console.error("Error fetching years:", err);
+      }
+    };
+    fetchYears();
+  }, [programId, token]);
+
   const fetchData = useCallback(async () => {
-    if (!programId || !year || !token) return;
+    // 1. เปลี่ยนเงื่อนไขตรวจสอบจาก year เป็น selectedYear
+    if (!programId || !selectedYear || !token) return;
 
     setLoading(true);
-    // เคลียร์ข้อมูลเก่าก่อน เพื่อให้ระบบเช็ค hasNoData ได้ถูกต้อง
+
+    // เคลียร์ข้อมูลเก่า
     setData({
       scoreYearStat: null,
       scoreYearStatPercent: null,
@@ -66,8 +100,14 @@ export default function YearStatsDashboard({
       studentStatPercent: null,
       studentNames: null,
     });
+
     try {
-      // 🚀 ใช้ Promise.all เพื่อดึงข้อมูลพร้อมกันทั้ง 4 APIs (เร็วขึ้นมาก)
+      // เตรียม params โดยตรวจสอบให้แน่ใจว่าเป็นตัวเลข
+      const apiParams = {
+        programId,
+        year: Number(selectedYear), // 2. ใช้ selectedYear และแปลงเป็น Number
+      };
+
       const [
         stats,
         statsPercent,
@@ -77,26 +117,27 @@ export default function YearStatsDashboard({
       ] = await Promise.all([
         apiClient.get(`/calculation/clo-plo/year/stats`, {
           headers: { Authorization: `Bearer ${token}` },
-          params: { programId, year },
+          params: apiParams, // 3. ใช้ params ที่เตรียมไว้
         }),
         apiClient.get(`/calculation/clo-plo/year/stats/percentage`, {
           headers: { Authorization: `Bearer ${token}` },
-          params: { programId, year },
+          params: apiParams,
         }),
         apiClient.get(`/calculation/clo-plo/allStudentYear`, {
           headers: { Authorization: `Bearer ${token}` },
-          params: { programId, year },
+          params: apiParams,
         }),
         apiClient.get(`/calculation/clo-plo/allStudentYear/percentage`, {
           headers: { Authorization: `Bearer ${token}` },
-          params: { programId, year },
+          params: apiParams,
         }),
         apiClient.get(`/student/year-semester`, {
           headers: { Authorization: `Bearer ${token}` },
-          params: { programId, year },
+          params: apiParams,
         }),
       ]);
 
+      // การจัดการ Data (คงเดิม)
       const ploStats = stats.data.ploYearlyStats?.[0]?.plos || null;
       const studentData = studentStats.data || [];
 
@@ -106,7 +147,7 @@ export default function YearStatsDashboard({
           statsPercent.data.ploYearlyStatsPercentage?.[0]?.plos || null,
         studentStat: studentData,
         studentStatPercent: studentStatsPercent.data || [],
-        studentNames: studentNames.data || [], // เก็บชื่อ-นามสกุลของนักเรียน
+        studentNames: studentNames.data || [],
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -114,7 +155,8 @@ export default function YearStatsDashboard({
     } finally {
       setLoading(false);
     }
-  }, [programId, year, token, showToast]);
+    // 4. อัปเดต Dependency Array จาก year เป็น selectedYear
+  }, [programId, selectedYear, token, showToast]);
 
   // เมื่อ Props เปลี่ยน ให้โหลดข้อมูลใหม่
   useEffect(() => {
@@ -404,6 +446,21 @@ export default function YearStatsDashboard({
         dataMode={dataMode}
         setDataMode={setDataMode}
       />
+      <div>
+        <DropdownSelect
+          label="Select Academic Year"
+          options={
+            // ใช้ข้อมูลจาก yearsList มา map โดยตรง
+            yearsList.map((year: number) => ({
+              value: year.toString(),
+              label: `Academic Year ${year}`, // แสดงเป็น "Academic Year 2565"
+            }))
+          }
+          value={selectedYear}
+          // อัปเดต State เมื่อ User เปลี่ยนแปลงค่า
+          onChange={setSelectedYear}
+        />
+      </div>
 
       {/* Charts Grid Section */}
       <div

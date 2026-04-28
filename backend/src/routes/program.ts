@@ -51,6 +51,47 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 router.get(
+  "/YearsInProgram/:programId",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const { programId } = req.params;
+
+      if (!programId) {
+        return res.status(400).json({ error: "Program ID is required" });
+      }
+
+      // ใช้ findMany ร่วมกับ distinct เพื่อดึงปีที่ไม่ซ้ำกัน
+      // เราจะ query ผ่าน course_semester และกรองจาก relation program_on_course
+      const years = await prisma.courseSemester.findMany({
+        where: {
+          programOnCourses: {
+            some: {
+              program_id: Number(programId),
+            },
+          },
+        },
+        select: {
+          year: true,
+        },
+        distinct: ["year"], // เอาปีที่ไม่ซ้ำกัน
+        orderBy: {
+          year: "asc", // เรียงจากปีล่าสุดลงไป
+        },
+      });
+
+      // แปลงรูปแบบข้อมูลให้เป็น array ของตัวเลขง่ายๆ เช่น [2565, 2566, 2567]
+      const result = years.map((y) => y.year);
+
+      res.json(result);
+    } catch (err: any) {
+      console.error("Error fetching years:", err.message);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
+
+router.get(
   "/ByInstructor/:instructorId",
   authenticateToken,
   async (req: Request, res: Response) => {
