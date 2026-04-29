@@ -38,7 +38,7 @@ export default function Navbar({
   const pathname = usePathname();
 
   const { t } = useTranslation("common");
-  const { logout, user } = useAuth();
+  const { logout, user, isLoggedIn } = useAuth();
   const role = user?.role || "";
 
   useEffect(() => {
@@ -127,6 +127,7 @@ export default function Navbar({
   ];
 
   const handleLogout = () => {
+    setLoading(true);
     localStorage.removeItem("edit_fix_filters");
     localStorage.removeItem("token");
 
@@ -227,17 +228,21 @@ export default function Navbar({
                 </div>
               )}
 
-              <button
-                onClick={handleLogout}
-                title={!isOpen ? t("logout") : ""}
-                className={`flex items-center transition-colors duration-200 text-slate-400 hover:text-red-500
+              {isLoggedIn && (
+                <button
+                  onClick={handleLogout}
+                  title={!isOpen ? t("logout") : ""}
+                  className={`flex items-center transition-colors duration-200 text-slate-400 hover:text-red-500
                   ${!isOpen ? "justify-center w-full" : "justify-start gap-4"}`}
-              >
-                <LogOut size={22} className="shrink-0" />
-                {isOpen && (
-                  <span className="text-[15px] font-medium">{t("logout")}</span>
-                )}
-              </button>
+                >
+                  <LogOut size={22} className="shrink-0" />
+                  {isOpen && (
+                    <span className="text-[15px] font-medium">
+                      {t("logout")}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

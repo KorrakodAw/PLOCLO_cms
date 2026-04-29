@@ -278,5 +278,6 @@
   "Initial Standard Values": "Initial Standard Values",
   "Unsaved Changes": "Unsaved Changes",
   "Synced with Server": "Synced with Server",
-  "Current configuration is synced with server": "Current configuration is synced with server"
+  "Current configuration is synced with server": "Current configuration is synced with server",
+  "continue_as_guest": "Continue as Guest"
 }

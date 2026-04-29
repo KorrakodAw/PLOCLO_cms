@@ -308,10 +308,6 @@ export default function CourseManagement({
   );
 
   useEffect(() => {
-    console.log(courses);
-  });
-
-  useEffect(() => {
     setPage(1);
   }, [programId, facultyId, universityId, searchTerm]);
 
@@ -337,15 +333,15 @@ export default function CourseManagement({
     try {
       await addCourse(
         {
-          code: String(data.code),
-          name: String(data.nameEn),
-          name_th: String(data.nameTh),
+          code: String(data.nameEn),
+          name: String(data.abbrEn),
+          name_th: String(data.abbrTh),
           faculty_id: Number(selectedFaculty), // 🟢 ระบุเจ้าของวิชา
           program_id: Number(selectedProgram), // 🟢 ระบุหลักสูตรที่ใช้
           year: Number(selectedYear),
           semester: Number(selectedSemester),
           section: Number(selectedSection),
-          credits: 3,
+          credits: String(data.nameTh) || "3", // Default credits to 3 if not provided
         },
         token,
       );
@@ -534,9 +530,10 @@ export default function CourseManagement({
         <AddButton
           buttonText={t("create new course")}
           placeholderText={{
-            code: "Course Id (value.g. CS101)",
-            nameEn: "Course Name (EN)",
-            nameTh: "Course Name (TH)",
+            nameEn: "Course Id (value.g. CS101)",
+            nameTh: "Credits (value.g. 3)",
+            abbrEn: "Course Name (EN)",
+            abbrTh: "Course Name (TH)",
           }}
           submitButtonText={{
             insert: "Insert Course Section",
@@ -544,7 +541,8 @@ export default function CourseManagement({
           }}
           disableUniversity={isInstructor}
           disableFaculty={isInstructor}
-          showAbbreviationInputs={false}
+          showCodeInput={false}
+          showAbbreviationInputs={true}
           programOptions={programOptions}
           universityOptions={universityOptions}
           facultyOptions={facultyOptions}

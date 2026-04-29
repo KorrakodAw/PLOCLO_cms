@@ -1,27 +1,35 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiClient } from "../../utils/apiClient";
 import { useGlobalToast } from "@/app/context/ToastContext";
 import { useTranslation } from "next-i18next";
 import LoadingOverlay from "@/components/LoadingOverlay";
-import { AlertCircle, AlertTriangle, Save, Search } from "lucide-react";
+import { AlertCircle, AlertTriangle, Save, Search, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
 import AlertPopup from "@/components/AlertPopup";
 // --- Types ---
 interface PLO {
   id: number;
   code: string;
-  name_en: string;
-  name_th: string;
+  engname: string;
+  name: string;
   program_id: number;
 }
 
 interface CLO {
   id: number;
   code: string;
-  name_en: string;
+  name_th: string;
+  name: string;
 }
 
 // 🟢 FIX: Renamed prop to 'masterCourseId' to avoid confusion with Section ID
@@ -333,7 +341,7 @@ export default function CloPloMapping({
       });
 
       if (!hasCleared) {
-        showToast(t("No data to clear in this table"), "info");
+        showToast(t("No data to clear in this table"), "error");
         return prev; // ไม่ต้อง Update State ถ้าไม่มีอะไรให้เคลียร์
       }
 
@@ -344,6 +352,93 @@ export default function CloPloMapping({
       );
       return newGrid;
     });
+  };
+
+  // เมื่อข้อมูล filteredPlos โหลดเสร็จ หรือมีการเปลี่ยน Program
+  useEffect(() => {
+    if (filteredPlos && filteredPlos.length > 0 && !selectedPloInfo) {
+      const firstPlo = filteredPlos[0];
+      setSelectedPloInfo({
+        code: firstPlo.code,
+        name: lang === "th" ? firstPlo.name || firstPlo.engname : firstPlo.name,
+      });
+    }
+  }, [filteredPlos, lang]); // รันใหม่เมื่อข้อมูล PLO เปลี่ยน
+
+  const [selectedPloInfo, setSelectedPloInfo] = useState<{
+    code: string;
+    name: string;
+  } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+ 
+
+  const addExcel = (excelData: any[]) => {
+    // สร้าง Mapping ใหม่เพื่อไม่ให้ทับข้อมูลเดิมทั้งหมด หรือจะใช้ spread จากของเดิมก็ได้
+    const newMapping: { [key: string]: string | number } = { ...mappingGrid };
+    const newChangedKeys = new Set(changedKeys);
+
+    // สมมติว่า excelData[0] คือ Header: ["Course Learning Outcome (CLO)", "PLO1", "PLO2", ...]
+    const headers = excelData[0];
+
+    // วนลูปเริ่มจากแถวที่ 1 (ข้อมูลแถวแรก)
+    for (let i = 1; i < excelData.length; i++) {
+      const row = excelData[i];
+      const cloNameFromExcel = row[0]; // คอลัมน์แรกคือชื่อ CLO
+
+      // 1. ค้นหา CLO ในระบบที่มีชื่อตรงกับใน Excel
+      const targetClo = clos.find(
+        (c) => (c.name_th || c.name) === cloNameFromExcel,
+      );
+
+      if (targetClo) {
+        // 2. วนลูปตาม Headers ของ PLO (เริ่มคอลัมน์ที่ 1 เป็นต้นไป)
+        for (let j = 1; j < headers.length; j++) {
+          const ploCode = headers[j]; // เช่น "PLO1"
+          const weightValue = row[j]; // ค่าตัวเลข เช่น 50
+
+          // 3. ค้นหา PLO ในระบบที่มี Code ตรงกัน
+          const targetPlo = filteredPlos.find((p) => p.code === ploCode);
+
+          if (
+            targetPlo &&
+            weightValue !== undefined &&
+            weightValue !== null &&
+            weightValue !== ""
+          ) {
+            // 4. สร้าง Key ตามรูปแบบเดิมของคุณ
+            const key = `${targetClo.id}_${targetPlo.id}_${activeProgramId}_${semesterId}`;
+
+            // เก็บค่าลงใน Grid
+            newMapping[key] = weightValue.toString();
+            newChangedKeys.add(key);
+          }
+        }
+      }
+    }
+
+    // อัปเดต State ครั้งเดียว
+    setMappingGrid(newMapping);
+    setChangedKeys(newChangedKeys);
+    showToast("Imported successfully!", "success");
+  };
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const wsname = wb.SheetNames[0]; // เอาแผ่นแรก
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }); // แปลงเป็น Array of Arrays
+
+      addExcel(data);
+    };
+    reader.readAsBinaryString(file);
   };
 
   // --------------------------------------------------------
@@ -377,6 +472,26 @@ export default function CloPloMapping({
           >
             <AlertTriangle size={14} className="opacity-70" />
             {t("Clear Current")}
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportExcel}
+            accept=".xlsx, .xls"
+            className="hidden"
+          />
+
+          {/* Import Button: ปรับให้ดูเด่นขึ้นด้วยโทนสีที่สะอาดตา */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all active:scale-95 group"
+          >
+            <Upload
+              size={14}
+              className="group-hover:-translate-y-0.5 transition-transform"
+            />
+            IMPORT EXCEL
           </button>
 
           {/* Save Button: ปุ่มหลักที่โดดเด่น */}
@@ -415,80 +530,126 @@ export default function CloPloMapping({
       {/* Main Content Container */}
 
       <div className="space-y-6">
-        {/* --- 1. Program Selection Tabs --- */}
-        {Object.keys(groupedPlos).length > 1 && (
-          <div className="flex flex-wrap gap-2 p-2 bg-slate-100/50 rounded-[2rem] border border-slate-200 w-fit">
-            {Object.entries(groupedPlos).map(([pId, data]: [string, any]) => (
-              <button
-                key={pId}
-                onClick={() => setActiveProgramId(Number(pId))}
-                className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
-                  activeProgramId === Number(pId)
-                    ? "bg-white text-blue-600 shadow-md scale-105"
-                    : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
-                }`}
-              >
-                {/* 🟢 ดึงชื่อจาก data.info แทนการดึงจาก PLO ตัวแรก */}
-                {lang === "th"
-                  ? data.info?.program_shortname_th ||
-                    data.info?.program?.program_shortname_th
-                  : data.info?.program_shortname_en ||
-                    data.info?.program?.program_shortname_en}
+        {/* 🟢 PLO Info Display (Outside Table) */}
+      </div>
+      {/* --- 1. Program Selection Tabs --- */}
+      {Object.keys(groupedPlos).length > 1 && (
+        <div className="flex flex-wrap gap-2 p-2 bg-slate-100/50 rounded-[2rem] border border-slate-200 w-fit">
+          {Object.entries(groupedPlos).map(([pId, data]: [string, any]) => (
+            <button
+              key={pId}
+              onClick={() => setActiveProgramId(Number(pId))}
+              className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
+                activeProgramId === Number(pId)
+                  ? "bg-white text-blue-600 shadow-md scale-105"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
+              }`}
+            >
+              {/* 🟢 ดึงชื่อจาก data.info แทนการดึงจาก PLO ตัวแรก */}
+              {lang === "th"
+                ? data.info?.program_shortname_th ||
+                  data.info?.program?.program_shortname_th
+                : data.info?.program_shortname_en ||
+                  data.info?.program?.program_shortname_en}
 
-                <span className="ml-2 opacity-50">
-                  ({data.info?.program_year || data.info?.program?.program_year}
-                  )
-                </span>
-              </button>
-            ))}
+              <span className="ml-2 opacity-50">
+                ({data.info?.program_year || data.info?.program?.program_year})
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div
+        className={`mb-10 transition-all duration-500 transform ${selectedPloInfo ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 h-0 overflow-hidden"}`}
+      >
+        <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-5 flex items-center gap-5 shadow-sm">
+          <div className="bg-indigo-600 text-white w-16 h-16 rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-indigo-200 shrink-0">
+            <span className="text-[10px] font-black uppercase opacity-80">
+              Code
+            </span>
+            <span className="text-xl font-black">{selectedPloInfo?.code}</span>
           </div>
-        )}
+
+          <div className="flex-1">
+            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">
+              Program Learning Outcome Description
+            </h4>
+            <p className="text-slate-700 font-bold text-base leading-relaxed">
+              {selectedPloInfo?.name}
+            </p>
+          </div>
+        </div>
 
         {/* --- 2. The Matrix Table --- */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl overflow-hidden min-h-[400px]">
+        <div className="bg-white rounded-[2.5rem] mt-6 border border-slate-100 shadow-2xl overflow-hidden min-h-[400px]">
           <div className="overflow-x-auto custom-scrollbar">
             {masterCourseId && clos.length > 0 && filteredPlos.length > 0 ? (
-              <table className="w-full border-separate border-spacing-0">
+              <table className="w-full border-separate border-spacing-0 table-fixed">
+                {/* Added table-fixed for better control */}
                 <thead>
                   <tr>
-                    {/* Diagonal Header */}
-                    <th className="sticky left-0 top-0 z-50 bg-slate-50 border-b border-r border-slate-200 w-[120px] h-[70px]">
-                      <div className="relative w-full h-full">
-                        {/* SVG Line เดิมของคุณ */}
-                        <div className="absolute top-3 right-4 text-[10px] font-black text-slate-500">
-                          PLO
-                        </div>
-                        <div className="absolute bottom-3 left-4 text-[10px] font-black text-slate-500">
-                          CLO
-                        </div>
+                    {/* Diagonal Header - Increased width to fit more text */}
+                    <th className="sticky left-0 top-0 z-50 bg-slate-50 border-b border-r border-slate-200 w-[320px] h-[80px] p-6">
+                      <div className="flex items-center h-full">
+                        <span className="text-[14px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                          {t("Course Learning Outcome")} (CLO)
+                        </span>
                       </div>
                     </th>
 
-                    {/* PLO Columns - 🟢 ใช้ filteredPlos */}
-                    {filteredPlos.map((plo) => (
-                      <th
-                        key={plo.id}
-                        className="sticky top-0 z-40 border-b border-r border-slate-100 p-5 min-w-[100px] bg-slate-50/80 backdrop-blur-sm text-center"
-                      >
-                        <span className="text-sm font-black text-blue-600 uppercase">
-                          {plo.code}
-                        </span>
-                      </th>
-                    ))}
+                    {/* PLO Columns - เพิ่ม Mouse Events */}
+                    {filteredPlos.map((plo) => {
+                      const isSelected = selectedPloInfo?.code === plo.code;
 
-                    {/* Total Column Header */}
-                    <th className="sticky top-0 right-0 z-40 border-b border-slate-200 p-5 min-w-[110px] bg-slate-100 text-center text-[10px] font-black text-slate-600 uppercase tracking-widest shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.05)]">
-                      {t("Weight (%)")}
+                      return (
+                        <th
+                          key={plo.id}
+                          onClick={() =>
+                            setSelectedPloInfo({
+                              code: plo.code,
+                              name:
+                                lang === "th"
+                                  ? plo.name || plo.engname
+                                  : plo.name,
+                            })
+                          }
+                          className={`sticky top-0 z-40 border-b border-r p-3 w-[80px] transition-all duration-300 cursor-pointer text-center group
+        ${
+          isSelected
+            ? "bg-indigo-600 border-indigo-700"
+            : "bg-slate-50/80 backdrop-blur-sm border-slate-100 hover:bg-indigo-50"
+        }`}
+                        >
+                          <div className="relative">
+                            <span
+                              className={`text-[11px] font-black uppercase transition-colors
+          ${isSelected ? "text-white" : "text-blue-600"}`}
+                            >
+                              {plo.code}
+                            </span>
+
+                            {/* Tooltip เล็กๆ ตอน Hover เพื่อบอกให้รู้ว่ากดได้ */}
+                            {!isSelected && (
+                              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                Click for info
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+
+                    {/* Total Column Header - Compact */}
+                    <th className="sticky top-0 right-0 z-40 border-b border-slate-200 p-2 w-[100px] bg-slate-100 text-center text-[10px] font-black text-slate-600 uppercase tracking-widest shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.05)]">
+                      {t("Weight")}
                     </th>
                   </tr>
                 </thead>
-
                 <tbody className="divide-y divide-slate-50">
                   {clos.map((clo) => {
-                    // 🟢 แก้ไข: คำนวณ Total เฉพาะของ Program ที่เลือกอยู่
                     const currentProgramTotal = filteredPlos.reduce(
                       (sum, plo) => {
-                        // แก้ไข: เพิ่ม _${semesterId} เข้าไปให้ครบ 4 มิติตามที่เก็บใน State
                         const key = `${clo.id}_${plo.id}_${activeProgramId}_${semesterId}`;
                         return sum + (Number(mappingGrid[key]) || 0);
                       },
@@ -503,13 +664,24 @@ export default function CloPloMapping({
                         key={clo.id}
                         className="group hover:bg-slate-50/30 transition-colors"
                       >
+                        {/* CLO Name Cell - Wider, Bigger Text, and Wrapping enabled */}
                         <td className="sticky left-0 z-30 p-5 bg-white group-hover:bg-slate-50 border-r border-slate-100 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)] transition-colors">
-                          <span className="text-sm font-black text-slate-700">
-                            {clo.code}
-                          </span>
+                          <div className="w-full pr-4">
+                            {" "}
+                            {/* Container to ensure padding on the right */}
+                            <span className="text-sm md:text-base font-black text-slate-800 leading-snug block whitespace-normal break-words">
+                              {lang === "th"
+                                ? clo.name_th || clo.name
+                                : clo.name}
+                            </span>
+                            {/* Optional: Add the CLO Code if you want it to stand out */}
+                            <div className="text-[10px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter">
+                              {clo.code}
+                            </div>
+                          </div>
                         </td>
 
-                        {/* Weight Inputs - 🟢 ใช้ filteredPlos */}
+                        {/* Weight Inputs - Tidier Padding */}
                         {filteredPlos.map((plo) => {
                           const key = `${clo.id}_${plo.id}_${activeProgramId}_${semesterId}`;
                           const weight = mappingGrid[key] ?? "";
@@ -519,14 +691,14 @@ export default function CloPloMapping({
                           return (
                             <td
                               key={plo.id}
-                              className={`p-1.5 border-r border-slate-50 text-center ${hasValue ? "bg-blue-50/20" : ""}`}
+                              className={`p-1 border-r border-slate-50 text-center ${hasValue ? "bg-blue-50/10" : ""}`}
                             >
                               <input
                                 type="text"
-                                className={`w-full h-12 text-center text-lg font-black transition-all outline-none rounded-xl 
-                            ${hasValue ? "text-blue-600" : "text-slate-200 focus:text-slate-600"}
-                            ${isChanged ? "bg-amber-50 ring-2 ring-amber-200 text-amber-600" : "bg-transparent focus:bg-white focus:ring-4 focus:ring-slate-100"}
-                          `}
+                                className={`w-full h-10 text-center text-sm font-black transition-all outline-none rounded-lg 
+                          ${hasValue ? "text-blue-600" : "text-slate-200 focus:text-slate-500"}
+                          ${isChanged ? "bg-amber-50 ring-1 ring-amber-200 text-amber-600" : "bg-transparent focus:bg-white focus:ring-2 focus:ring-slate-100"}
+                        `}
                                 placeholder="0"
                                 value={
                                   weight !== "" ? Number(weight).toString() : ""
@@ -544,12 +716,12 @@ export default function CloPloMapping({
                           );
                         })}
 
-                        {/* Total Cell */}
+                        {/* Total Cell - Tidy and matches input height */}
                         <td
-                          className={`sticky right-0 z-30 p-5 text-center shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.05)] transition-all
+                          className={`sticky right-0 z-30 p-2 text-center shadow-[-4px_0_10px_-4px_rgba(0,0,0,0.05)] transition-all
                     ${isTotalValid ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}
                         >
-                          <span className="text-sm font-black">
+                          <span className="text-xs font-black">
                             {currentProgramTotal}%
                           </span>
                         </td>

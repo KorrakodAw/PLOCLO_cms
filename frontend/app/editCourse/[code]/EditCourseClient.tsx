@@ -537,9 +537,9 @@ export default function EditCourseClient({
           title={t("Edit Course Information")}
           data={formData}
           fields={[
+            { label: t("Course Code"), key: "code", type: "text" },
             { label: t("Course Name (EN)"), key: "name", type: "text" },
             { label: t("Course Name (TH)"), key: "name_th", type: "text" },
-            { label: t("Course Code"), key: "code", type: "text" },
             { label: t("credits"), key: "credits", type: "number" },
           ]}
           onChange={(updated) => setFormData(updated)}

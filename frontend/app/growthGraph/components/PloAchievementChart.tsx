@@ -254,11 +254,11 @@ export const PloAchievementChart = ({
               barSize={300}
             >
               {sortedData.map((entry, index) => {
-                const opacity = 0.5 + (index / sortedData.length) * 0.4;
+                const opacity = 0.5 + (index / sortedData.length) * 0.6;
                 return (
                   <Cell
                     key={`cell-${index}`}
-                    fill="#c65c2a"
+                    fill="#d40606"
                     fillOpacity={opacity}
                   />
                 );
@@ -307,9 +307,9 @@ export const PloAchievementChart = ({
                   : stat.rawStats?.highest;
               }}
               name="Cumulative Highest"
-              stroke="#dc2626"
+              stroke="#2b0363"
               strokeWidth={3}
-              dot={{ r: 4, fill: "#dc2626" }}
+              dot={{ r: 4, fill: "#2b0363" }}
               strokeDasharray="5 5"
             />
 

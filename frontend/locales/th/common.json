@@ -283,5 +283,6 @@
   "Initial Standard Values": "ค่ามาตรฐานเริ่มต้น",
   "Unsaved Changes": "ยังไม่ได้บันทึกการเปลี่ยนแปลง",
   "Synced with Server": "เชื่อมต่อข้อมูลกับเซิร์ฟเวอร์แล้ว",
-  "Current configuration is synced with server": "การตั้งค่าปัจจุบันตรงกับข้อมูลในระบบแล้ว"
+  "Current configuration is synced with server": "การตั้งค่าปัจจุบันตรงกับข้อมูลในระบบแล้ว",
+  "continue_as_guest": "เข้าสู่ระบบในฐานะผู้เยี่ยมชม"
 }

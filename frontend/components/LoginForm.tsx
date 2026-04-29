@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useGlobalToast } from "@/app/context/ToastContext";
 import axios from "axios";
 import { GoogleLogin } from "@react-oauth/google";
+import LoadingOverlay from "./LoadingOverlay";
 
 export default function LoginForm() {
   const { t } = useTranslation("common");
@@ -18,8 +19,10 @@ export default function LoginForm() {
   const { login, isLoggedIn } = useAuth();
   const router = useRouter();
   const { showToast } = useGlobalToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSuccess = async (response: any) => {
+    setIsLoading(true);
     try {
       // 1. ส่ง Google Credential ไปที่ Backend
       const res = await apiClient.post("users/auth/google/verify", {
@@ -62,6 +65,7 @@ export default function LoginForm() {
   };
 
   const handleSubmit = async () => {
+    setIsLoading(true);
     try {
       const res = await apiClient.post("/users/login", { email, password });
       await login(res.data.token);
@@ -74,89 +78,119 @@ export default function LoginForm() {
     }
   };
 
+  const handleGuestLogin = async () => {
+    setIsLoading(true);
+    try {
+      // Just use the standard login but with hidden guest credentials
+      const res = await apiClient.post("/users/login", {
+        email: "testGuest@gmail.com",
+        password: "test123",
+      });
+      await login(res.data.token);
+
+      router.replace("/");
+    } catch {
+      showToast("Guest login failed", "error");
+    }
+  };
+
   useEffect(() => {
     if (isLoggedIn) router.replace("/");
   }, [isLoggedIn, router]);
 
   return (
-    <div className="w-full flex flex-col items-center justify-center min-h-screen  p-4">
-      <form
-        className="w-full max-w-sm p-8 bg-white rounded-3xl shadow-xl border border-gray-100"
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit();
-        }}
-      >
-        <h2 className="text-3xl font-light text-center text-orange-600 mb-8">
-          {t("login")}
-        </h2>
+    <div className="w-full flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      {isLoading && <LoadingOverlay />}
+      <div className="w-full max-w-sm">
+        <form
+          className="w-full p-8 bg-white rounded-[2rem] shadow-2xl shadow-gray-200/50 border border-gray-100"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+        >
+          <h2 className="text-3xl font-light text-center text-orange-600 mb-10 tracking-tight">
+            {t("login")}
+          </h2>
 
-        {/* Email Field */}
-        <div className="mb-6">
-          <label className="block text-sm font-light text-gray-700 mb-1">
-            {t("email")}
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("enter_email")}
-            required
-            className="w-full px-4 py-2.5 border font-light border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
-          />
-        </div>
+          {/* Email Field */}
+          <div className="mb-5">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+              {t("email")}
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t("enter_email")}
+              required
+              className="w-full px-5 py-3 border font-light border-gray-200 rounded-2xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all"
+            />
+          </div>
 
-        {/* Password Field */}
-        <div className="mb-8 relative">
-          <label className="block text-sm font-light text-gray-700 mb-1">
-            {t("password")}
-          </label>
-          <input
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={t("enter_password")}
-            required
-            className="w-full px-4 py-2.5 pr-12 border font-light border-gray-300 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none"
-          />
+          {/* Password Field */}
+          <div className="mb-8 relative">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">
+              {t("password")}
+            </label>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("enter_password")}
+              required
+              className="w-full px-5 py-3 pr-12 border font-light border-gray-200 rounded-2xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all"
+            />
+            <button
+              type="button"
+              className="absolute right-4 top-[38px] text-gray-300 hover:text-orange-500 transition-colors"
+              onClick={() => setShowPassword((p) => !p)}
+            >
+              {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+            </button>
+          </div>
+
+          {/* Primary Action: Standard Login */}
+          <button
+            type="submit"
+            className="w-full py-4 bg-orange-500 font-bold text-white rounded-2xl hover:bg-orange-600 active:scale-[0.98] transition-all shadow-lg shadow-orange-200 mb-8"
+          >
+            {t("sign_in")}
+          </button>
+
+          {/* Divider */}
+          {/* <div className="relative flex items-center mb-8">
+            <div className="flex-grow border-t border-gray-100"></div>
+            <span className="flex-shrink mx-4 text-gray-300 text-[10px] font-bold uppercase tracking-widest">
+              {t("or")}
+            </span>
+            <div className="flex-grow border-t border-gray-100"></div>
+          </div> */}
+
+          {/* Secondary Action: Google Login */}
+          <div className="flex justify-center w-full overflow-hidden mb-2">
+            <GoogleLogin
+              onSuccess={handleSuccess}
+              onError={() => showToast("Google Login Failed", "error")}
+              useOneTap
+              theme="outline"
+              shape="pill"
+              width="320px" // กำหนดความกว้างให้คงที่เพื่อความสวยงาม
+            />
+          </div>
+        </form>
+
+        {/* Tertiary Action: Guest Login (วางไว้นอก Form เพื่อลดความสำคัญ) */}
+        <div className="mt-8 text-center">
           <button
             type="button"
-            className="absolute right-3 top-[37px] text-gray-400 hover:text-orange-500"
-            onClick={() => setShowPassword((p) => !p)}
+            onClick={handleGuestLogin}
+            className="text-xs font-medium text-gray-400 hover:text-orange-500 transition-all uppercase tracking-[0.15em]"
           >
-            {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
+            {t("continue_as_guest")}
           </button>
         </div>
-
-        {/* Standard Login Button */}
-        <button
-          type="submit"
-          className="w-full py-3 bg-orange-500 font-light text-white rounded-xl hover:bg-orange-600 transition-all shadow-md mb-6"
-        >
-          {t("sign_in")}
-        </button>
-
-        {/* Divider */}
-        <div className="relative flex items-center mb-6">
-          <div className="flex-grow border-t border-gray-300"></div>
-          <span className="flex-shrink mx-4 text-gray-400 text-sm uppercase">
-            {t("or")}
-          </span>
-          <div className="flex-grow border-t border-gray-300"></div>
-        </div>
-
-        {/* Google Login Button Wrapper */}
-        <div className="flex justify-center w-full overflow-hidden">
-          <GoogleLogin
-            onSuccess={handleSuccess}
-            onError={() => showToast("Google Login Failed", "error")}
-            useOneTap
-            theme="outline"
-            shape="pill"
-            width="100%"
-          />
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

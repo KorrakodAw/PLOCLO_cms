@@ -150,86 +150,88 @@ export default function ViewChartPage() {
             university: String(facultyData.university_id),
             faculty: String(facultyData.id),
           });
-        } else if (isStudent) {
-          // --- 🎓 Student Logic ---
+        }
+        // else if (isStudent) {
+        //   // --- 🎓 Student Logic ---
 
-          // 1. ดึงข้อมูลนักศึกษาจาก Email
-          const stdRes = await apiClient.get(`/student/email/${user.email}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const studentData = stdRes.data; // ในนี้จะมี program_id ของนักศึกษาคนนี้
+        //   // 1. ดึงข้อมูลนักศึกษาจาก Email
+        //   const stdRes = await apiClient.get(`/student/email/${user.email}`, {
+        //     headers: { Authorization: `Bearer ${token}` },
+        //   });
+        //   const studentData = stdRes.data; // ในนี้จะมี program_id ของนักศึกษาคนนี้
 
-          // 2. ดึงข้อมูล Program ของนักศึกษาคนนี้โดยเฉพาะ เพื่อเอา program_year จริงๆ
-          const studentProgramRes = await apiClient.get(
-            `/program/${studentData.program_id}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            },
-          );
-          const studentProgramData = studentProgramRes.data;
-          const targetYear = studentProgramData.program_year; // 🟢 ปีการศึกษาที่นักศึกษาสังกัด
+        //   // 2. ดึงข้อมูล Program ของนักศึกษาคนนี้โดยเฉพาะ เพื่อเอา program_year จริงๆ
+        //   const studentProgramRes = await apiClient.get(
+        //     `/program/${studentData.program_id}`,
+        //     {
+        //       headers: { Authorization: `Bearer ${token}` },
+        //     },
+        //   );
+        //   const studentProgramData = studentProgramRes.data;
+        //   const targetYear = studentProgramData.program_year; // 🟢 ปีการศึกษาที่นักศึกษาสังกัด
 
-          // 3. ดึงข้อมูล Faculty (เพื่อเอา university_id และชื่อคณะ)
-          const facRes = await apiClient.get(
-            `/faculty/${studentProgramData.faculty_id}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            },
-          );
-          const facultyData = facRes.data;
+        //   // 3. ดึงข้อมูล Faculty (เพื่อเอา university_id และชื่อคณะ)
+        //   const facRes = await apiClient.get(
+        //     `/faculty/${studentProgramData.faculty_id}`,
+        //     {
+        //       headers: { Authorization: `Bearer ${token}` },
+        //     },
+        //   );
+        //   const facultyData = facRes.data;
 
-          // 4. ดึงรายการปีการศึกษาทั้งหมดที่เปิดใน Program Code นี้ (เพื่อสร้างตัวเลือกใน Dropdown)
-          const yearRes = await apiClient.get(`/program/ByCodeForViewChart`, {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { programCode: studentProgramData.program_code },
-          });
+        //   // 4. ดึงรายการปีการศึกษาทั้งหมดที่เปิดใน Program Code นี้ (เพื่อสร้างตัวเลือกใน Dropdown)
+        //   const yearRes = await apiClient.get(`/program/ByCodeForViewChart`, {
+        //     headers: { Authorization: `Bearer ${token}` },
+        //     params: { programCode: studentProgramData.program_code },
+        //   });
 
-          const yearOptions = yearRes.data.map((item: any) => ({
-            label: item.program_year.toString(),
-            value: JSON.stringify({ id: item.id, year: item.program_year }),
-          }));
+        //   const yearOptions = yearRes.data.map((item: any) => ({
+        //     label: item.program_year.toString(),
+        //     value: JSON.stringify({ id: item.id, year: item.program_year }),
+        //   }));
 
-          // 🟢 5. หาตัวเลือก (Option) ที่มี year ตรงกับ studentProgramData.program_year
-          const studentYearOption =
-            yearOptions.find((opt: any) => {
-              try {
-                const val = JSON.parse(opt.value);
-                return val.year === targetYear;
-              } catch {
-                return false;
-              }
-            }) || yearOptions[0];
+        //   // 🟢 5. หาตัวเลือก (Option) ที่มี year ตรงกับ studentProgramData.program_year
+        //   const studentYearOption =
+        //     yearOptions.find((opt: any) => {
+        //       try {
+        //         const val = JSON.parse(opt.value);
+        //         return val.year === targetYear;
+        //       } catch {
+        //         return false;
+        //       }
+        //     }) || yearOptions[0];
 
-          // ✅ อัปเดต Options
-          setOptions((prev) => ({
-            ...prev,
-            university: universityOptions,
-            faculty: [
-              {
-                label: lang === "th" ? facultyData.name_th : facultyData.name,
-                value: String(facultyData.id),
-              },
-            ],
-            program: [
-              {
-                label:
-                  lang === "th"
-                    ? studentProgramData.program_shortname_th
-                    : studentProgramData.program_shortname_en,
-                value: String(studentProgramData.program_code),
-              },
-            ],
-            years: yearOptions,
-          }));
+        //   // ✅ อัปเดต Options
+        //   setOptions((prev) => ({
+        //     ...prev,
+        //     university: universityOptions,
+        //     faculty: [
+        //       {
+        //         label: lang === "th" ? facultyData.name_th : facultyData.name,
+        //         value: String(facultyData.id),
+        //       },
+        //     ],
+        //     program: [
+        //       {
+        //         label:
+        //           lang === "th"
+        //             ? studentProgramData.program_shortname_th
+        //             : studentProgramData.program_shortname_en,
+        //         value: String(studentProgramData.program_code),
+        //       },
+        //     ],
+        //     years: yearOptions,
+        //   }));
 
-          // ✅ ล็อกค่า Selections ทั้งหมดตามสังกัดของนักศึกษา
-          updateSelections({
-            university: String(facultyData.university_id),
-            faculty: String(facultyData.id),
-            program: String(studentProgramData.program_code),
-            years: studentYearOption ? studentYearOption.value : "", // 🟢 ล็อกปีการศึกษาที่ถูกต้อง
-          });
-        } else {
+        //   // ✅ ล็อกค่า Selections ทั้งหมดตามสังกัดของนักศึกษา
+        //   updateSelections({
+        //     university: String(facultyData.university_id),
+        //     faculty: String(facultyData.id),
+        //     program: String(studentProgramData.program_code),
+        //     years: studentYearOption ? studentYearOption.value : "", // 🟢 ล็อกปีการศึกษาที่ถูกต้อง
+        //   });
+        // }
+        else {
           setOptions((prev) => ({ ...prev, university: universityOptions }));
         }
       } catch (err) {
@@ -483,16 +485,18 @@ export default function ViewChartPage() {
         semester: "",
       });
       setChartYearParams(null);
-    } else if (isStudent) {
-      updateSelections({
-        university: selections.university,
-        faculty: selections.faculty,
-        program: selections.program,
-        years: selections.years,
-        courses: "",
-        semester: "",
-      });
-    } else {
+    }
+    // else if (isStudent) {
+    //   updateSelections({
+    //     university: selections.university,
+    //     faculty: selections.faculty,
+    //     program: selections.program,
+    //     years: selections.years,
+    //     courses: "",
+    //     semester: "",
+    //   });
+    // }
+    else {
       updateSelections({
         university: "",
         faculty: "",
