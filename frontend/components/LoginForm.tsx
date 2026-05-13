@@ -8,7 +8,7 @@ import { apiClient } from "../utils/apiClient";
 import { useTranslation } from "react-i18next";
 import { useGlobalToast } from "@/app/context/ToastContext";
 import axios from "axios";
-import { GoogleLogin } from "@react-oauth/google";
+import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import LoadingOverlay from "./LoadingOverlay";
 
 export default function LoginForm() {
@@ -21,7 +21,7 @@ export default function LoginForm() {
   const { showToast } = useGlobalToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSuccess = async (response: any) => {
+  const handleSuccess = async (response: CredentialResponse) => {
     setIsLoading(true);
     try {
       // 1. ส่ง Google Credential ไปที่ Backend
@@ -99,11 +99,11 @@ export default function LoginForm() {
   }, [isLoggedIn, router]);
 
   return (
-    <div className="w-full flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="w-full flex flex-col items-center justify-center min-h-screen p-4">
       {isLoading && <LoadingOverlay />}
       <div className="w-full max-w-sm">
         <form
-          className="w-full p-8 bg-white rounded-[2rem] shadow-2xl shadow-gray-200/50 border border-gray-100"
+          className="w-full p-8 bg-white rounded-[2.5rem] shadow-2xl shadow-gray-200/50 border border-gray-100"
           onSubmit={(e) => {
             e.preventDefault();
             handleSubmit();
@@ -153,43 +153,34 @@ export default function LoginForm() {
           {/* Primary Action: Standard Login */}
           <button
             type="submit"
-            className="w-full py-4 bg-orange-500 font-bold text-white rounded-2xl hover:bg-orange-600 active:scale-[0.98] transition-all shadow-lg shadow-orange-200 mb-8"
+            className="w-full py-4 bg-orange-500 font-bold text-white rounded-2xl hover:bg-orange-600 active:scale-[0.98] transition-all shadow-lg shadow-orange-200 mb-6"
           >
             {t("sign_in")}
           </button>
 
-          {/* Divider */}
-          {/* <div className="relative flex items-center mb-8">
-            <div className="flex-grow border-t border-gray-100"></div>
-            <span className="flex-shrink mx-4 text-gray-300 text-[10px] font-bold uppercase tracking-widest">
-              {t("or")}
-            </span>
-            <div className="flex-grow border-t border-gray-100"></div>
-          </div> */}
-
           {/* Secondary Action: Google Login */}
-          <div className="flex justify-center w-full overflow-hidden mb-2">
+          <div className="flex justify-center w-full overflow-hidden mb-8">
             <GoogleLogin
               onSuccess={handleSuccess}
               onError={() => showToast("Google Login Failed", "error")}
               useOneTap
               theme="outline"
               shape="pill"
-              width="320px" // กำหนดความกว้างให้คงที่เพื่อความสวยงาม
+              width="320px"
             />
           </div>
-        </form>
 
-        {/* Tertiary Action: Guest Login (วางไว้นอก Form เพื่อลดความสำคัญ) */}
-        <div className="mt-8 text-center">
-          <button
-            type="button"
-            onClick={handleGuestLogin}
-            className="text-xs font-medium text-gray-400 hover:text-orange-500 transition-all uppercase tracking-[0.15em]"
-          >
-            {t("continue_as_guest")}
-          </button>
-        </div>
+          {/* 🟢 Guest Login Button (Inside the bottom of the card) */}
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              className="w-full py-2.5 text-[11px] font-light text-gray-600 hover:text-orange-500 bg-transparent border border-gray-100 hover:border-orange-200 rounded-full transition-all uppercase tracking-[0.15em] shadow-sm hover:shadow-md"
+            >
+              {t("continue_as_guest")}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
