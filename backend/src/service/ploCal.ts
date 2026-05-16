@@ -13,6 +13,11 @@ import {
     getCloGradeSummaryPerCourse,
 } from "../service/cloCal";
 
+import {
+   getTotalScoreAndGradePerStudentPerCourse,
+   getTotalScoreAndGradeAllStudentPerCourse
+} from "../service/realScore";
+
 // PLO
 //---------------------------------------------------------------------------------------------------------------------------
 
@@ -200,6 +205,188 @@ export async function getPloPercentageAllStudentPerCourse(
   });
 
   return result;
+}
+
+/**
+ * สรุปจำนวน student ต่อเกรด และค่าเฉลี่ยคะแนน PLO แต่ละตัวแยกตามเกรด
+ * โดยอาศัยผลลัพธ์คะแนน PLO จากฟังก์ชัน getPloScoreAllStudentPerCourse
+ */
+export async function getPloGradeSummary(
+  tx: any,
+  CsemesterId: number,
+  courseId: number
+) {
+  // 1. ดึงคะแนน PLO ของนักเรียนทุกคนใน Course นี้
+  const ploStudents = await getPloScoreAllStudentPerCourse(tx, CsemesterId, courseId);
+
+  // 2. ดึงเกรดจริงและคะแนนรวมจริงของนักเรียนในวิชานี้มาทำเป็น Map เพื่อใช้จับคู่ความถูกต้อง
+  const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(tx, CsemesterId);
+  
+  const studentInfoMap = new Map<number, { grade: string; totalScore: number }>();
+  studentResults.forEach((s: any) => {
+    studentInfoMap.set(s.student_id, { grade: s.grade, totalScore: s.totalScore });
+  });
+
+  // 3. เตรียมโครงสร้างข้อมูลสำหรับจัดกลุ่มเกรด
+  const gradeSummary: Record<
+    string,
+    {
+      count: number;
+      categoryAverages: Record<string, number>; // ในที่นี้จะเก็บค่าเฉลี่ยแยกตาม ploCode
+      totalAverage: number;                    // ค่าเฉลี่ยคะแนนรวมจริงรายวิชาของเด็กกลุ่มเกรดนี้
+    }
+  > = {};
+
+  // 4. จัดกลุ่มคะแนน PLO ลงตามเกรดจริงของนักเรียน
+  for (const student of ploStudents) {
+    const info = studentInfoMap.get(student.student_id) || { grade: "F", totalScore: 0 };
+    const grade = info.grade;
+
+    if (!gradeSummary[grade]) {
+      gradeSummary[grade] = {
+        count: 0,
+        categoryAverages: {},
+        totalAverage: 0,
+      };
+    }
+
+    gradeSummary[grade].count += 1;
+    gradeSummary[grade].totalAverage += info.totalScore;
+
+    // สะสมคะแนนดิบของแต่ละ PLO
+    for (const plo of student.ploScores) {
+      if (!gradeSummary[grade].categoryAverages[plo.ploCode]) {
+        gradeSummary[grade].categoryAverages[plo.ploCode] = 0;
+      }
+      gradeSummary[grade].categoryAverages[plo.ploCode] += plo.ploScore;
+    }
+  }
+
+  // 5. คำนวณหาค่าเฉลี่ย PLO และค่าเฉลี่ยคะแนนรวมจริงต่อเกรด
+  for (const grade in gradeSummary) {
+    const summary = gradeSummary[grade];
+    
+    for (const ploCode in summary.categoryAverages) {
+      summary.categoryAverages[ploCode] = 
+        Number((summary.categoryAverages[ploCode] / summary.count).toFixed(2));
+    }
+    
+    summary.totalAverage = Number((summary.totalAverage / summary.count).toFixed(2));
+  }
+
+  // 6. เรียงลำดับผลลัพธ์ตามตัวอักษรของเกรด (A-Z)
+  const gradeSummarySorted = Object.keys(gradeSummary)
+    .sort((a, b) => a.localeCompare(b))
+    .reduce((acc, key) => {
+      acc[key] = gradeSummary[key];
+      return acc;
+    }, {} as typeof gradeSummary);
+
+  return gradeSummarySorted;
+}
+
+/**
+ * สรุปจำนวน student ต่อเกรด โดยแปลงค่าเฉลี่ย PLO เป็นเปอร์เซ็นต์
+ * อ้างอิงคะแนนเต็ม (highestPossible) แยกตาม programId และ ploCode จาก getPloStatsPerCourse
+ * และเปลี่ยน totalAverage เป็นผลรวมของเปอร์เซ็นต์เหล่านั้น
+ */
+export async function getPloGradeSummaryPercentage(
+  tx: any,
+  CsemesterId: number,
+  courseId: number
+) {
+  // 🛠️ 0) ดึงค่า highestPossible จาก getPloStatsPerCourse และแตกโครงสร้างออกมาเป็น Map เพื่อใช้ค้นหา
+  const statsResult = await getPloStatsPerCourse(tx, CsemesterId, courseId);
+  const highestPloMap = new Map<string, number>(); // key: "programId_ploCode"
+  
+  statsResult.ploStats.forEach((prog: any) => {
+    if (prog.plos) {
+      Object.entries(prog.plos).forEach(([ploCode, stat]: [string, any]) => {
+        highestPloMap.set(`${prog.programId}_${ploCode}`, stat.highestPossible);
+      });
+    }
+  });
+
+  // 1) ดึงคะแนน PLO ของนักเรียนทุกคนใน Course นี้ (โค้ดเดิม ไม่แตะต้อง)
+  const ploStudents = await getPloScoreAllStudentPerCourse(tx, CsemesterId, courseId);
+
+  // 2) ดึงเกรดจริงและคะแนนรวมจริงของนักเรียนในวิชานี้มาทำเป็น Map (โค้ดเดิม ไม่แตะต้อง)
+  const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(tx, CsemesterId);
+  
+  const studentInfoMap = new Map<number, { grade: string; totalScore: number }>();
+  studentResults.forEach((s: any) => {
+    studentInfoMap.set(s.student_id, { grade: s.grade, totalScore: s.totalScore });
+  });
+
+  // 3) เตรียมโครงสร้างข้อมูลสำหรับจัดกลุ่มเกรด (โค้ดเดิม ไม่แตะต้อง)
+  const gradeSummary: Record<
+    string,
+    {
+      count: number;
+      categoryAverages: Record<string, number>;
+      totalAverage: number;
+    }
+  > = {};
+
+  for (const student of ploStudents) {
+    const info = studentInfoMap.get(student.student_id) || { grade: "F", totalScore: 0 };
+    const grade = info.grade;
+
+    if (!gradeSummary[grade]) {
+      gradeSummary[grade] = {
+        count: 0,
+        categoryAverages: {},
+        totalAverage: 0,
+      };
+    }
+
+    gradeSummary[grade].count += 1;
+    gradeSummary[grade].totalAverage += info.totalScore; // ปล่อยให้สะสมไปก่อน แล้วเราจะไปคำนวณทับในพาสสุดท้าย
+
+    // รวมคะแนน PLO ต่อ grade
+    for (const plo of student.ploScores) {
+      if (!gradeSummary[grade].categoryAverages[plo.ploCode]) {
+        gradeSummary[grade].categoryAverages[plo.ploCode] = 0;
+      }
+
+      // 🛠️ [แก้ไขจุดที่ 1]: ดึงค่า highestPossible โดยใช้ความสัมพันธ์ของ programId ของเด็กคนนั้น + ploCode
+      const key = `${student.programId}_${plo.ploCode}`;
+      const highest = highestPloMap.get(key) || 1; // ใส่ || 1 กันการหารด้วยศูนย์ (Divide by Zero)
+      
+      // แปลงคะแนนดิบของนักเรียนคนนี้ให้เป็นเปอร์เซ็นต์ทันที ก่อนนำไปบวกรวมสะสมในกลุ่มเกรด
+      const studentPloPercentage = (plo.ploScore / highest) * 100;
+      
+      gradeSummary[grade].categoryAverages[plo.ploCode] += studentPloPercentage;
+    }
+  }
+
+  // 🛠️ 4) แก้ไขจุดคำนวณค่าเฉลี่ยต่อ grade ให้เป็น เปอร์เซ็นต์ และ ผลรวมเปอร์เซ็นต์
+  for (const grade in gradeSummary) {
+    const summary = gradeSummary[grade];
+    let totalPercentSum = 0; // ตัวแปรสำหรับสะสมผลรวมเปอร์เซ็นต์ของเกรดนี้
+
+    for (const ploCode in summary.categoryAverages) {
+      // เนื่องจากเราบวกสะสมในรูปแบบเปอร์เซ็นต์มาแล้ว การหารด้วย count จะได้ค่าเฉลี่ยเปอร์เซ็นต์ที่ถูกต้อง
+      const avgPercentage = summary.categoryAverages[ploCode] / summary.count;
+      summary.categoryAverages[ploCode] = Number(avgPercentage.toFixed(2));
+      
+      // นำเปอร์เซ็นต์ของ PLO แต่ละตัวมาบวกสะสมรวมกันใน totalAverage
+      totalPercentSum += avgPercentage;
+    }
+    
+    // เปลี่ยนมาเก็บผลรวมของเปอร์เซ็นต์แทนคะแนนเฉลี่ยดิบรวมรายวิชา
+    summary.totalAverage = Number(totalPercentSum.toFixed(2));
+  }
+
+  // 5) เรียงผลลัพธ์ตามตัวอักษรของ grade (โค้ดเดิม ไม่แตะต้อง)
+  const gradeSummarySorted = Object.keys(gradeSummary)
+    .sort((a, b) => a.localeCompare(b))
+    .reduce((acc, key) => {
+      acc[key] = gradeSummary[key];
+      return acc;
+    }, {} as typeof gradeSummary);
+
+  return gradeSummarySorted;
 }
 
 /////////////////////////////////////////////////////////////////////////

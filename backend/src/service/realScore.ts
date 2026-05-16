@@ -460,3 +460,92 @@ export async function getGradeSummaryPerCourse(tx: any, CsemesterId: number) {
 return gradeSummarySorted;
 
 }
+
+/**
+ * สรุปจำนวน student ต่อเกรด โดยแปลง categoryAverages เป็นเปอร์เซ็นต์
+ * อ้างอิงคะแนนเต็มจาก highestPossible ของฟังก์ชัน getRealScoreStatsPerCourse
+ * และเปลี่ยน totalAverage เป็นผลรวมของเปอร์เซ็นต์เหล่านั้น
+ */
+export async function getGradeSummaryPerCoursePercentage(tx: any, CsemesterId: number) {
+  // 0. เรียกใช้ฟังก์ชันเพื่อหา highestPossible ของแต่ละ category มาทำเป็น Map สำหรับค้นหา
+  const statsResult = await getRealScoreStatsPerCourse(tx, CsemesterId);
+  const highestCategoryMap: Record<string, number> = {};
+  
+  statsResult.categoryStats.forEach((stat: any) => {
+    highestCategoryMap[stat.category] = stat.highestPossible;
+  });
+
+  // 1. รวมข้อมูลตาม grade (โค้ดเดิมเป๊ะ ไม่มีการเปลี่ยนแปลง)
+  const { studentResults } = await getTotalScoreAndGradeAllStudentPerCourse(
+    tx,
+    CsemesterId,
+  );
+
+  const gradeSummary: Record<
+    string,
+    {
+      count: number;
+      categoryAverages: Record<string, number>;
+      totalAverage: number;
+    }
+  > = {};
+
+  for (const student of studentResults) {
+    const grade = student.grade;
+
+    if (!gradeSummary[grade]) {
+      gradeSummary[grade] = {
+        count: 0,
+        categoryAverages: {},
+        totalAverage: 0,
+      };
+    }
+
+    gradeSummary[grade].count += 1;
+
+    for (const c of student.categoryScores) {
+      if (!gradeSummary[grade].categoryAverages[c.category]) {
+        gradeSummary[grade].categoryAverages[c.category] = 0;
+      }
+      gradeSummary[grade].categoryAverages[c.category] += c.realScore;
+    }
+
+    gradeSummary[grade].totalAverage += student.totalScore;
+  }
+
+  // 🛠️ 2. แก้ไขเฉพาะจุดคำนวณค่าเฉลี่ยให้เป็น เปอร์เซ็นต์ และ ผลรวมเปอร์เซ็นต์
+  for (const grade in gradeSummary) {
+    const summary = gradeSummary[grade];
+    let totalPercentSum = 0; // ตัวแปรสะสมผลรวมเปอร์เซ็นต์ของเกรดนี้
+
+    for (const category in summary.categoryAverages) {
+      // 1) หาคะแนนดิบเฉลี่ยของหมวดนี้ก่อน
+      const rawAverage = summary.categoryAverages[category] / summary.count;
+      
+      // 2) ดึงค่า highestPossible ของหมวดนี้มาเป็นตัวหาร (ถ้าไม่มีให้ fallback เป็น 1 กันหารด้วย 0)
+      const highest = highestCategoryMap[category] || 1;
+      
+      // 3) แปลงเป็นเปอร์เซ็นต์ (0 - 100%)
+      const categoryPercentage = (rawAverage / highest) * 100;
+      
+      // บันทึกค่ากลับลงไปในรูปแบบเปอร์เซ็นต์
+      summary.categoryAverages[category] = Number(categoryPercentage.toFixed(2));
+      
+      // นำเปอร์เซ็นต์ที่ได้ไปบวกรวมใน totalPercentSum
+      totalPercentSum += categoryPercentage;
+    }
+    
+    // เปลี่ยนมาเก็บผลรวมของเปอร์เซ็นต์แทนการเฉลี่ยคะแนนรวมดิบ
+    summary.totalAverage = Number(totalPercentSum.toFixed(2));
+  }
+
+  // 5) เรียงผลลัพธ์ตามตัวอักษรของ grade (โค้ดเดิมเป๊ะ ไม่มีการเปลี่ยนแปลง)
+  const gradeSummarySorted = Object.keys(gradeSummary)
+    .sort((a, b) => a.localeCompare(b))
+    .reduce((acc, key) => {
+      acc[key] = gradeSummary[key];
+      return acc;
+    }, {} as typeof gradeSummary);
+
+  return gradeSummarySorted;
+}
