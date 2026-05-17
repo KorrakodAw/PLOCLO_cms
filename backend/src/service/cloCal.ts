@@ -605,3 +605,113 @@ export async function getCloGradeSummaryPerCourse(tx: any, CsemesterId: number) 
 
   return result;
 }
+
+/**
+ * สรุปจำนวน student ต่อเกรด โดยแปลงค่าเฉลี่ย CLO เป็นเปอร์เซ็นต์
+ * อ้างอิงคะแนนเต็มจาก highestPossible ของฟังก์ชัน getCloStatsPerCourse
+ * และเปลี่ยน totalAverage เป็นผลรวมของเปอร์เซ็นต์เหล่านั้น
+ */
+export async function getCloGradeSummaryPerCoursePercentage(tx: any, CsemesterId: number) {
+  const result = await prisma.$transaction(async (tx) => {
+    // 🛠️ 0) ดึงค่า highestPossible ของแต่ละ CLO จากฟังก์ชัน getCloStatsPerCourse
+    const statsResult = await getCloStatsPerCourse(tx, CsemesterId);
+    const highestCloMap: Record<string, number> = {};
+    
+    statsResult.cloStats.forEach((stat: any) => {
+      highestCloMap[stat.cloCode] = stat.highestPossible;
+    });
+
+    // 1) ใช้ผลลัพธ์จากฟังก์ชัน clo เดิม (โค้ดเดิม ไม่แตะต้อง)
+    const { cloScoresPerStudent } = await getCloScoreAllStudentPerCourse(
+      tx,
+      CsemesterId,
+    );
+
+    // 2) ดึง grade setting ของ course (โค้ดเดิม ไม่แตะต้อง)
+    const gradeSettings = await tx.gradeSetting.findMany({
+      where: { semester_id: Number(CsemesterId) },
+      orderBy: { score: "desc" },
+    });
+
+    // 3) จัดกลุ่มตาม grade (โค้ดเดิม ไม่แตะต้อง)
+    const gradeSummary: Record<
+      string,
+      {
+        count: number;
+        categoryAverages: Record<string, number>;
+        totalAverage: number;
+      }
+    > = {};
+
+    for (const student of cloScoresPerStudent) {
+      const totalScore = student.cloScores.reduce(
+        (sum, c) => sum + c.cloScore,
+        0,
+      );
+
+      let grade = "F";
+      for (const gs of gradeSettings) {
+        if (totalScore >= Number(gs.score)) {
+          grade = gs.grade;
+          break;
+        }
+      }
+
+      if (!gradeSummary[grade]) {
+        gradeSummary[grade] = {
+          count: 0,
+          categoryAverages: {},
+          totalAverage: 0,
+        };
+      }
+
+      gradeSummary[grade].count += 1;
+      gradeSummary[grade].totalAverage += totalScore;
+
+      for (const clo of student.cloScores) {
+        if (!gradeSummary[grade].categoryAverages[clo.cloCode]) {
+          gradeSummary[grade].categoryAverages[clo.cloCode] = 0;
+        }
+        gradeSummary[grade].categoryAverages[clo.cloCode] += clo.cloScore;
+      }
+    }
+
+    // 🛠️ 4) แก้ไขเฉพาะจุดคำนวณค่าเฉลี่ยต่อ grade ให้เป็น เปอร์เซ็นต์ และ ผลรวมเปอร์เซ็นต์
+    for (const grade in gradeSummary) {
+      const summary = gradeSummary[grade];
+      let totalPercentSum = 0; // ตัวแปรสำหรับสะสมผลรวมเปอร์เซ็นต์ของเกรดนี้
+
+      for (const cloCode in summary.categoryAverages) {
+        // หาคะแนนดิบเฉลี่ยของ CLO นี้ก่อน
+        const rawAverage = summary.categoryAverages[cloCode] / summary.count;
+        
+        // ดึงค่า highestPossible ของ CLO นี้จาก Map (ใส่ || 1 เพื่อกันหารด้วยศูนย์)
+        const highest = highestCloMap[cloCode] || 1;
+        
+        // แปลงเป็นเปอร์เซ็นต์ (0 - 100%)
+        const cloPercentage = (rawAverage / highest) * 100;
+        
+        // บันทึกค่ากลับลงไปในรูปแบบเปอร์เซ็นต์
+        summary.categoryAverages[cloCode] = Number(cloPercentage.toFixed(2));
+        
+        // นำเปอร์เซ็นต์ของ CLO ตัวนี้ไปบวกสะสมรวมกัน
+        totalPercentSum += cloPercentage;
+      }
+      
+      // เปลี่ยนมาเก็บผลรวมของเปอร์เซ็นต์แทนคะแนนเฉลี่ยดิบรวม
+      summary.totalAverage = Number(totalPercentSum.toFixed(2));
+    }
+
+    // 5) เรียงผลลัพธ์ตามตัวอักษรของ grade (โค้ดเดิม ไม่แตะต้อง)
+    const gradeSummarySorted = Object.keys(gradeSummary)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, key) => {
+        acc[key] = gradeSummary[key];
+        return acc;
+      }, {} as typeof gradeSummary);
+
+    return gradeSummarySorted;
+  });
+
+  return result;
+}

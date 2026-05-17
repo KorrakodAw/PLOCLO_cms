@@ -11,6 +11,7 @@ import {
   getCloStatsPerCourse,
   getCloStatsPercentagePerCourse,
   getCloGradeSummaryPerCourse,
+  getCloGradeSummaryPerCoursePercentage,
 } from "../service/cloCal";
 
 import {
@@ -22,6 +23,7 @@ import {
   getRealScoreStatsPerCourse,
   getRealScoreStatsPercentagePerCourse,
   getGradeSummaryPerCourse,
+  getGradeSummaryPerCoursePercentage,
 } from "../service/realScore";
 
 import {
@@ -34,6 +36,8 @@ import {
   getPloScoreAllStudentPerYearPercentage,
   getPloStatsPerCourse,
   getPloStatsPercentagePerCourse,
+  getPloGradeSummary,
+  getPloGradeSummaryPercentage,
   getPloStatsPerSemester,
   getPloStatsPerSemesterPercentage,
   getPloStatsPerYear,
@@ -199,6 +203,26 @@ router.get("/ass-clo/gradeSummary", authenticateToken, async (req, res) => {
   }
 });
 
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน clo ต่อเกรด, ผลรวมของค่าเฉลี่ย แบบ percentage
+// ตารางฟ้าใน TABEE
+// GET http://localhost:9771/api/calculation/ass-clo/gradeSummary/percentage?CsemesterId=ไอดีเทอม&courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get("/ass-clo/gradeSummary/percentage", authenticateToken, async (req, res) => {
+  const { CsemesterId } = req.query;
+  try {
+    const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+      return await getCloGradeSummaryPerCoursePercentage(tx, Number(CsemesterId));
+    });
+
+    res.json(resultCloPerStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
 // realScore
 //----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -340,6 +364,30 @@ router.get(
     try {
       const resultCloPerStudent = await prisma.$transaction(async (tx) => {
         return await getGradeSummaryPerCourse(tx, Number(CsemesterId));
+      });
+
+      res.json(resultCloPerStudent);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  },
+);
+
+/////////////////////////////////////////////////////////////////////////
+// สรุปจำนวน student ต่อเกรด, ค่าเฉลี่ยคะแนน category ต่อเกรด, ผลรวมของค่าเฉลี่ย แบบ percentage
+// ตารางเหลืองใน TABEE
+// GET http://localhost:9771/api/calculation/realScoreAndGrade/gradSummary/percentage?CsemesterId=ไอดีเทอม
+// Test result: OK
+/////////////////////////////////////////////////////////////////////////
+router.get(
+  "/realScoreAndGrade/gradSummary/percentage",
+  authenticateToken,
+  async (req, res) => {
+    const { CsemesterId } = req.query;
+    try {
+      const resultCloPerStudent = await prisma.$transaction(async (tx) => {
+        return await getGradeSummaryPerCoursePercentage(tx, Number(CsemesterId));
       });
 
       res.json(resultCloPerStudent);
@@ -589,6 +637,44 @@ router.get(
     }
   },
 );
+
+/////////////////////////////////////////////////////////////
+// Plo grade summary ใน 1 course
+// GET http://localhost:9771/api/calculation/clo-plo/course/grade-summary?CsemesterId=ไอดีเทอม&courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/course/grade-summary", authenticateToken, async (req, res) => {
+  const { CsemesterId, courseId } = req.query;
+  try {
+    const resultCloStudent = await prisma.$transaction(async (tx) => {
+      return await getPloGradeSummary(tx, Number(CsemesterId), Number(courseId));
+    });
+
+    res.json(resultCloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+/////////////////////////////////////////////////////////////
+// Plo grade summary ใน 1 course แบบ percentage โดยที่ highestPossible = 100%
+// GET http://localhost:9771/api/calculation/clo-plo/course/grade-summary/percentage?CsemesterId=ไอดีเทอม&courseId=ไอดีวิชา
+// Test result: OK
+/////////////////////////////////////////////////////////////
+router.get("/clo-plo/course/grade-summary/percentage", authenticateToken, async (req, res) => {
+  const { CsemesterId, courseId } = req.query;
+  try {
+    const resultCloStudent = await prisma.$transaction(async (tx) => {
+      return await getPloGradeSummaryPercentage(tx, Number(CsemesterId), Number(courseId));
+    });
+
+    res.json(resultCloStudent);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
 
 /////////////////////////////////////////////////////////////
 // คำนวณ Min, Max, Mean, Median, highestPossible ของ PLO แต่ละตัว ใน 1 semester (รวมทุก course ที่เรียนในเทอมนั้น)
