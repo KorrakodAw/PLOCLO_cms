@@ -12,6 +12,7 @@ import FormEditPopup from "../../components/EditPopup";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import AddButton from "@/components/AddButton";
 import { useTranslation } from "react-i18next";
+import * as XLSX from "xlsx";
 
 interface User {
   code: string;
@@ -119,6 +120,75 @@ export default function ManageAccount() {
     } catch (err: any) {
       const msg = err.response?.data?.error || "Failed to add user";
       showToast(msg, "error");
+    }
+  };
+
+  // 🟢 ปรับเปลี่ยนมารับ parameter เป็น rows: any[] ตามที่ Component ต้องการ
+  const handleUploadExcel = async (rows: unknown[]) => {
+    try {
+      const excelData = rows as any[];
+
+      if (excelData.length === 0) {
+        showToast("The Excel file is empty", "error");
+        return;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      // วนลูปเพื่อส่งข้อมูลไปลงทะเบียนทีละคน (อ้างอิงโครงสร้างเดียวกับ handleAddUser)
+      for (const row of excelData) {
+        // ⚠️ ตรวจสอบตัวพิมพ์เล็ก-พิมพ์ใหญ่ของหัวตาราง Excel ของคุณให้ตรงกับในเครื่องหมายคำพูดนะครับ
+        const username = row["Code"] || row["username"];
+        const email = row["NameEn"] || row["email"];
+        const password = row["NameTh"] || row["password"] || null;
+
+        // ตรวจสอบค่าที่จำเป็นก่อนส่ง
+        if (!username || !email) {
+          failCount++;
+          continue;
+        }
+
+        // ตรวจสอบกับ state 'users' หน้าบ้านว่า Email ซ้ำไหม
+        if (users.some((u) => u.email === email)) {
+          failCount++;
+          continue;
+        }
+
+        try {
+          const payload = {
+            username: String(username),
+            email: String(email),
+            password: password ? String(password) : null,
+          };
+
+          // ยิง API ลงทะเบียนผ่าน apiClient
+          await apiClient.post("/users/register", payload, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to register user ${username}:`, err);
+          failCount++;
+        }
+      }
+
+      // แจ้งเตือนสรุปผลการอัปโหลด
+      if (successCount > 0) {
+        showToast(`Successfully added ${successCount} users!`, "success");
+        fetchUsers(); // รีเฟรชรายชื่อใหม่
+      }
+
+      if (failCount > 0) {
+        showToast(
+          `Failed to add ${failCount} users (Skipped/Duplicate).`,
+          "error",
+        );
+      }
+    } catch (error) {
+      console.error("Excel processing error:", error);
+      showToast("Failed to process Excel data", "error");
     }
   };
 
@@ -238,7 +308,6 @@ export default function ManageAccount() {
   return (
     <ProtectedRoute roles={["Super_admin", "system_admin"]}>
       <div className="max-w-[1400px] flex flex-col mx-auto">
-
         {loading && <LoadingOverlay />}
         <div className="p-5 md:p-8">
           <div className="flex justify-between items-center mb-8 border-b pb-4">
@@ -254,6 +323,7 @@ export default function ManageAccount() {
               }}
               showAbbreviationInputs={false}
               onSubmit={handleAddUser}
+              onSubmitExcel={handleUploadExcel}
             />
           </div>
 

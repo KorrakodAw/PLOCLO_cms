@@ -360,19 +360,23 @@ export default function CloPloMapping({
       const firstPlo = filteredPlos[0];
       setSelectedPloInfo({
         code: firstPlo.code,
-        name: lang === "th" ? firstPlo.name || firstPlo.engname : firstPlo.name,
+        name: firstPlo.name,
+        engname: firstPlo.engname,
       });
     }
   }, [filteredPlos, lang]); // รันใหม่เมื่อข้อมูล PLO เปลี่ยน
 
+  useEffect(() => {
+    console.log(selectedPloInfo);
+  });
+
   const [selectedPloInfo, setSelectedPloInfo] = useState<{
     code: string;
     name: string;
+    engname: string;
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
- 
 
   const addExcel = (excelData: any[]) => {
     // สร้าง Mapping ใหม่เพื่อไม่ให้ทับข้อมูลเดิมทั้งหมด หรือจะใช้ spread จากของเดิมก็ได้
@@ -576,7 +580,7 @@ export default function CloPloMapping({
               Program Learning Outcome Description
             </h4>
             <p className="text-slate-700 font-bold text-base leading-relaxed">
-              {selectedPloInfo?.name}
+              {lang === "th" ? selectedPloInfo?.name : selectedPloInfo?.engname}
             </p>
           </div>
         </div>
@@ -608,10 +612,8 @@ export default function CloPloMapping({
                           onClick={() =>
                             setSelectedPloInfo({
                               code: plo.code,
-                              name:
-                                lang === "th"
-                                  ? plo.name || plo.engname
-                                  : plo.name,
+                              name: plo.name,
+                              engname: plo.engname,
                             })
                           }
                           className={`sticky top-0 z-40 border-b border-r p-3 w-[80px] transition-all duration-300 cursor-pointer text-center group

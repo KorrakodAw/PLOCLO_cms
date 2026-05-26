@@ -284,5 +284,7 @@
   "Unsaved Changes": "ยังไม่ได้บันทึกการเปลี่ยนแปลง",
   "Synced with Server": "เชื่อมต่อข้อมูลกับเซิร์ฟเวอร์แล้ว",
   "Current configuration is synced with server": "การตั้งค่าปัจจุบันตรงกับข้อมูลในระบบแล้ว",
-  "continue_as_guest": "เข้าสู่ระบบในฐานะผู้เยี่ยมชม"
+  "continue_as_guest": "เข้าสู่ระบบในฐานะผู้เยี่ยมชม",
+  "dashboard_title": "แดชบอร์ดสรุปผลลัพธ์ PLO รายปี — หลักสูตรปี {{curriculumYear}} [ปีการศึกษา {{academicYear}}]",
+  "semester_dashboard_title": "แดชบอร์ดสรุปผลลัพธ์ PLO รายภาคเรียน — ปีการศึกษา {{academicYear}} / ภาคเรียนที่ {{semester}} (หลักสูตรปี {{curriculumYear}})"
 }

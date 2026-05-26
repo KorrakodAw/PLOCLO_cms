@@ -41,10 +41,16 @@ export const PerformanceBalanceChart = ({
   const { t } = useTranslation("common");
 
   // 1. ดึงรายการเกรดจาก balanceData (ซึ่งเป็น Array ของ {grade, averages})
-  const uniqueGrades = useMemo(() => {
-    if (!balanceData || !Array.isArray(balanceData)) return [];
-    return balanceData.map((d) => d.grade);
-  }, [balanceData]);
+  // const uniqueGrades = useMemo(() => {
+  //   if (!balanceData || !Array.isArray(balanceData)) return [];
+  //   return balanceData.map((d) => d.grade);
+  // }, [balanceData]);
+   const dataMax = useMemo(() => {
+     if (!chartData.length) return 100;
+     return Math.max(...chartData.map((d) => d[maxScorePosKey] || 0));
+   }, [chartData, maxScorePosKey]);
+
+   const isPercent = dataMax === 100;
 
   // 2. รวมข้อมูลคะแนนเกรดเข้ากับ chartData เพื่อให้ Radar วาดเส้นได้
   const finalChartData = useMemo(() => {
@@ -58,23 +64,23 @@ export const PerformanceBalanceChart = ({
         typeof rawLabel === "string" ? rawLabel.replace(/\s+/g, "") : rawLabel;
 
       // วนลูปหาคะแนนของแต่ละเกรดจาก balanceData
-      balanceData?.forEach((item) => {
-        const score = item.averages?.[sanitizedLabel];
-        if (score !== undefined && score !== null) {
+      balanceData?.forEach((item: any) => {
+        const sourceAverages = isPercent
+          ? item.averagesPercentage
+          : item.averages;
+
+        const score = sourceAverages?.[sanitizedLabel];
+
+        if (score !== undefined) {
+          // ส่งค่าที่เลือกตามโหมดไปให้กราฟวาดเส้นเดียวจบ
           updatedPoint[`avg_grade_${item.grade}`] = Number(score);
         }
       });
-
       return updatedPoint;
     });
   }, [chartData, balanceData, xAxisKey]);
 
-  const dataMax = useMemo(() => {
-    if (!finalChartData.length) return 100;
-    return Math.max(...finalChartData.map((d) => d[maxScorePosKey] || 0));
-  }, [finalChartData, maxScorePosKey]);
-
-  const isPercent = dataMax === 100;
+ 
 
   return (
     <ResponsiveContainer width="100%" height="100%">

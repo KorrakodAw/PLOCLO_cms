@@ -22,6 +22,7 @@ import { NoDataAvailable } from "./courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./courseComponents/DashboardHeader";
 import { DashboardControls } from "./courseComponents/DashboardControls";
 import { GradeFilterGroup } from "./courseComponents/GradeFilterGroup";
+import { DashboardLoading } from "./courseComponents/DashboardLoading";
 
 interface CloStatsDashboardProps {
   CsemesterId: string;
@@ -51,6 +52,7 @@ export default function CloStatsDashboard({
     studentStatPercent: null,
     studentName: null,
     GradeSummary: null,
+    GradeSummaryPercent: null,
   });
 
   const fetchData = useCallback(async () => {
@@ -65,6 +67,7 @@ export default function CloStatsDashboard({
       studentStatPercent: null,
       studentName: null,
       GradeSummary: null,
+      GradeSummaryPercent: null,
     });
     try {
       // 🚀 ใช้ Promise.all เพื่อดึงข้อมูลพร้อมกันทั้ง 4 APIs (เร็วขึ้นมาก)
@@ -75,6 +78,7 @@ export default function CloStatsDashboard({
         studentStatsPercent,
         studentName,
         GradeSummary,
+        GradeSummaryPercent,
       ] = await Promise.all([
         apiClient.get(`/calculation/ass-clo/course/stats`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -99,6 +103,10 @@ export default function CloStatsDashboard({
           headers: { Authorization: `Bearer ${token}` },
           params: { CsemesterId },
         }),
+        apiClient.get(`/calculation/ass-clo/gradeSummary/percentage`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { CsemesterId },
+        }),
       ]);
 
       const cloStats = stats.data.cloStats || null;
@@ -112,6 +120,7 @@ export default function CloStatsDashboard({
           studentStatsPercent.data.cloPercentagePerStudent || [],
         studentName: studentName.data || [],
         GradeSummary: GradeSummary.data || null,
+        GradeSummaryPercent: GradeSummaryPercent.data || null,
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -251,14 +260,28 @@ export default function CloStatsDashboard({
   }, [data.scoreCloStatPercent]);
 
   const gradeCountData = useMemo(() => {
-    if (!data.GradeSummary) return [];
-    return Object.entries(data.GradeSummary).map(
-      ([grade, info]: [string, any]) => ({
+    if (!data.GradeSummary && !data.GradeSummaryPercent) return [];
+    const baseData = data.GradeSummary || data.GradeSummaryPercent || {};
+
+    return Object.entries(baseData).map(([grade, info]: [string, any]) => {
+      // 🟢 3. ดึงข้อมูล averages จากฝั่งปกติ (ถ้ามี)
+      const normalAverages = data.GradeSummary?.[grade]?.categoryAverages || {};
+
+      // 🟢 4. เจาะข้ามไปเอา averagesPercentage จากอีกฝั่งโดยใช้คีย์เกรดเดียวกัน
+      const percentageAverages =
+        data.GradeSummaryPercent?.[grade]?.categoryAverages || {};
+
+      return {
         grade: grade,
-        averages: info.categoryAverages || {}, // 🚩 เช็คว่าในนี้ Key เป็น "CLO1" หรือ "CLO 1"
-      }),
-    );
-  }, [data.GradeSummary]);
+        averages: normalAverages, // 📊 ค่าเฉลี่ยดิบปกติ (เช่น CLO1: 15)
+        averagesPercentage: percentageAverages, // 📈 ค่าเฉลี่ยแบบ % (เช่น CLO1: 75)
+      };
+    });
+  }, [data.GradeSummary, data.GradeSummaryPercent]); // 🟢 5. จับตาดู Dependency ทั้งสองตัว
+
+  // useEffect(() => {
+  //   console.log(gradeCountData);
+  // });
 
   const [displayMode, setDisplayMode] = useState<"chart" | "radar">("chart");
 
@@ -424,7 +447,6 @@ export default function CloStatsDashboard({
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
 
-
   const individualStudentData = useMemo(() => {
     if (!selectedStudentId) return null;
 
@@ -439,6 +461,10 @@ export default function CloStatsDashboard({
     Object.keys(data.scoreCloStat).length === 0 ||
     !data.studentStat ||
     (Array.isArray(data.studentStat) && flattenedTableData.length === 0);
+
+  if (loading) {
+    return <DashboardLoading />;
+  }
 
   if (hasNoData) {
     return (
@@ -464,7 +490,6 @@ export default function CloStatsDashboard({
         setDataMode={setDataMode}
       />
 
-      {/* Grade Toggles Section */}
       {/* Grade Toggles Container */}
       <GradeFilterGroup
         uniqueGrades={uniqueGrades}

@@ -40,6 +40,7 @@ export default function ViewChartPage() {
     faculty: [] as Option[],
     program: [] as Option[],
     years: [] as Option[],
+    academicYear: [] as Option[],
     courses: [] as Option[],
     semester: [] as Option[],
   });
@@ -49,6 +50,7 @@ export default function ViewChartPage() {
     faculty: "",
     program: "",
     years: "",
+    academicYear: "",
     courses: "",
     semester: "",
   });
@@ -319,43 +321,6 @@ export default function ViewChartPage() {
   }, [selections.program, token]);
 
   useEffect(() => {
-    const fetchSemesters = async () => {
-      if (!selections.years || !token) return;
-
-      try {
-        let selectedYear;
-        try {
-          const yearObj =
-            typeof selections.years === "string"
-              ? JSON.parse(selections.years)
-              : selections.years;
-          selectedYear = yearObj?.year;
-        } catch {
-          selectedYear = selections.years;
-        }
-
-        if (!selectedYear) return;
-
-        const res = await apiClient.get(`/course/unique/${selectedYear}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const semesterOptions = res.data.map((item: number) => ({
-          label: `${item}`,
-          value: String(item),
-        }));
-
-        setOptions((prev) => ({ ...prev, semester: semesterOptions }));
-      } catch (error) {
-        console.error("Fetch Semesters Error:", error);
-        showToast("Error fetching semesters", "error");
-      }
-    };
-
-    fetchSemesters();
-  }, [selections.years, token, showToast]);
-
-  useEffect(() => {
     const fetchCourses = async () => {
       if (!selections.years || !selections.semester || !token) return;
 
@@ -364,7 +329,7 @@ export default function ViewChartPage() {
         const res = await apiClient.get(`/course/list`, {
           headers: { Authorization: `Bearer ${token}` },
           params: {
-            year: yearObj.year,
+            year: selections.academicYear,
             semester: selections.semester,
             programId: yearObj.id,
           },
@@ -381,30 +346,37 @@ export default function ViewChartPage() {
     };
 
     fetchCourses();
-  }, [selections.years, selections.semester, token, lang]);
+  }, [
+    selections.years,
+    selections.semester,
+    selections.academicYear,
+    token,
+    lang,
+  ]);
 
-  useEffect(() => {
-    if (selections.years) {
-      setChartSemesterParams(null); // ล้างค่า Semester ทุกครั้งที่ Year เปลี่ยน
+  // useEffect(() => {
+  //   if (selections.years) {
+  //     setChartSemesterParams(null); // ล้างค่า Semester ทุกครั้งที่ Year เปลี่ยน
 
-      try {
-        const yearData =
-          typeof selections.years === "string"
-            ? JSON.parse(selections.years)
-            : selections.years;
+  //     try {
+  //       const yearData =
+  //         typeof selections.years === "string"
+  //           ? JSON.parse(selections.years)
+  //           : selections.years;
 
-        setChartYearParams({ id: yearData.id, year: yearData.year });
-      } catch (e) {
-        console.error(e);
-      }
-    } else {
-      setChartYearParams(null); // ล้างค่าถ้าไม่ได้เลือกปี
-    }
-  }, [selections.years]);
+  //       setChartYearParams({ id: yearData.id, year: selections.academicYear });
+  //     } catch (e) {
+  //       console.error(e);
+  //     }
+  //   } else {
+  //     setChartYearParams(null); // ล้างค่าถ้าไม่ได้เลือกปี
+  //   }
+  // }, [selections.years]);
 
   useEffect(() => {
     if (selections.semester) {
       setChartYearParams(null);
+      setChartSemesterParams(null);
       try {
         // 1. จัดการเรื่อง JSON String หรือ Object ให้ปลอดภัย
         const yearData =
@@ -416,7 +388,7 @@ export default function ViewChartPage() {
         if (yearData && yearData.year) {
           setChartSemesterParams({
             id: yearData.id,
-            year: yearData.year,
+            year: selections.academicYear, // 🟢 ใช้ academicYear ถ้ามี ไม่งั้นใช้ year
             semester: selections.semester,
           });
         }
@@ -426,7 +398,7 @@ export default function ViewChartPage() {
     } else {
       setChartSemesterParams(null);
     }
-  }, [selections.semester, selections.years]);
+  }, [selections.semester, selections.years, selections.academicYear]);
 
   useEffect(() => {
     if (selections.courses) {
@@ -455,7 +427,8 @@ export default function ViewChartPage() {
             // 3. นำข้อมูลจาก res (courseInfo) มาใช้เซตค่า
             setChartCourseParams({
               Csemester_id: selections.courses,
-              year: yearData.year,
+              year: selections.academicYear,
+              // year: yearData.year,
               semester: selections.semester,
               courseId: courseInfo.id,
               program_id: yearData.id,
@@ -471,7 +444,13 @@ export default function ViewChartPage() {
     } else {
       setChartCourseParams(null);
     }
-  }, [selections.courses, selections.years, selections.semester, token]);
+  }, [
+    selections.courses,
+    selections.years,
+    selections.semester,
+    selections.academicYear,
+    token,
+  ]);
   // 🟢 อย่าลืมใส่ token ใน dependency array ด้วยถ้ามันมีโอกาสเปลี่ยน
 
   const handleClearFilters = () => {
@@ -481,6 +460,7 @@ export default function ViewChartPage() {
         faculty: selections.faculty,
         program: "",
         years: "",
+        academicYear: "",
         courses: "",
         semester: "",
       });
@@ -502,6 +482,7 @@ export default function ViewChartPage() {
         faculty: "",
         program: "",
         years: "",
+        academicYear: "",
         courses: "",
         semester: "",
       });
@@ -512,6 +493,136 @@ export default function ViewChartPage() {
     setChartCourseParams(null);
     localStorage.removeItem("edit_fix_filters");
   };
+
+  // 🟢 useEffect ตัวที่ 1: สำหรับดึงปีทั้งหมดจาก API มาใส่ Dropdown (ทำงานเฉพาะตอนเปลี่ยนโครงการ)
+  useEffect(() => {
+    const fetchAcademicYears = async () => {
+      if (!selections.years) return;
+      const yearObj =
+        typeof selections.years === "string"
+          ? JSON.parse(selections.years)
+          : selections.years;
+
+      const yearId = yearObj?.id;
+
+      try {
+        const res = await apiClient.get(`/program/YearsInProgram/${yearId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const yearsData = res.data; // เช่น [2567, 2566, 2565]
+
+        // ตั้งค่าตัวเลือกใน Dropdown
+        setOptions((prev) => ({
+          ...prev,
+          academicYear: yearsData.map((y: number) => ({
+            value: y.toString(),
+            label: `Academic Year ${y}`,
+          })),
+        }));
+
+        // ถ้าหน้าเว็บเพิ่งโหลด และยังไม่มีการเลือกปี ให้ปักหมุดปีล่าสุด (ตัวแรก) ให้ก่อน
+        if (yearsData.length > 0 && !selections.academicYear) {
+          updateSelections({
+            academicYear: yearsData[0].toString(),
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching years:", err);
+      }
+    };
+
+    fetchAcademicYears();
+    // 🟢 คุมไว้เฉพาะ selections.years ตัวเดียวพอ ปีเปลี่ยนไม่ต้องมายิง API นี้ซ้ำ
+  }, [selections.years, token]);
+
+  // 🟢 useEffect ตัวที่ 2: อัปเดตพารามิเตอร์ของชาร์ต (ทำงานทุกครั้งที่เลือกปีใหม่)
+  useEffect(() => {
+    if (!selections.years) return;
+    if (selections.semester) return;
+    if (selections.courses) return;
+
+    const yearObj =
+      typeof selections.years === "string"
+        ? JSON.parse(selections.years)
+        : selections.years;
+
+    const yearId = yearObj?.id;
+
+    // 🟢 วิ่งมาทำงานตรงนี้ทุกครั้งที่ Book เปลี่ยนปีใน Dropdown ชาร์ตจะ Update ทันที!
+    if (yearId && selections.academicYear) {
+      setChartYearParams({
+        id: yearId,
+        year: selections.academicYear,
+      });
+    }
+  }, [selections.years, selections.academicYear, selections.courses]); // 👈 คอยจับตาดู selections.academicYear ไว้
+
+  useEffect(() => {
+    const fetchSemesters = async () => {
+      if (!selections.academicYear || !token) return;
+      const yearObj =
+        typeof selections.years === "string"
+          ? JSON.parse(selections.years)
+          : selections.years;
+
+      const yearId = yearObj?.id;
+
+      try {
+        const res = await apiClient.get(
+          `/course/unique/${yearId}/${selections.academicYear}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        const semesterOptions = res.data.map((item: number) => ({
+          // 🟢 ถ้า item คือ 3 ให้ใช้คำว่า "Summer" ถ้าไม่ใช่ให้โชว์เลขเทอมปกติ
+          label: item === 3 ? "Summer" : `${item}`,
+          value: String(item),
+        }));
+
+        setOptions((prev) => ({ ...prev, semester: semesterOptions }));
+      } catch (error) {
+        console.error("Fetch Semesters Error:", error);
+        showToast("Error fetching semesters", "error");
+      }
+    };
+
+    fetchSemesters();
+  }, [selections.academicYear, selections.years, token, showToast]);
+
+  const [uiYear, setUiYear] = useState<number>();
+
+  useEffect(() => {
+    // 🟢 1. ดักจับถ้าไม่มีค่า หรือเป็นค่าว่าง ไม่ต้องทำงานต่อ ป้องกันหน้าจอระเบิด
+    if (
+      !selections.years ||
+      selections.years === "undefined" ||
+      selections.years === ""
+    ) {
+      return;
+    }
+
+    let yearObj: any = null;
+
+    try {
+      // 🟢 2. แปลง JSON อย่างปลอดภัย
+      yearObj =
+        typeof selections.years === "string"
+          ? JSON.parse(selections.years)
+          : selections.years;
+    } catch (error) {
+      console.error("Error parsing selections.years:", error);
+      return; // ถ้าพังให้หยุดทำงานทันที
+    }
+
+    const year = yearObj?.year;
+
+    if (year) {
+      setUiYear(Number(year)); // มั่นใจว่าเป็น Number แน่นอน
+    }
+  }, [selections.years]);
 
   return (
     <ProtectedRoute
@@ -543,6 +654,7 @@ export default function ViewChartPage() {
                 faculty: "",
                 program: "",
                 years: "",
+                academicYear: "",
                 courses: "",
                 semester: "",
               })
@@ -560,6 +672,7 @@ export default function ViewChartPage() {
                 faculty: String(val),
                 program: "",
                 years: "",
+                academicYear: "",
                 courses: "",
                 semester: "",
               })
@@ -576,6 +689,7 @@ export default function ViewChartPage() {
               updateSelections({
                 program: String(val),
                 years: "",
+                academicYear: "",
                 courses: "",
                 semester: "",
               })
@@ -591,11 +705,27 @@ export default function ViewChartPage() {
             onChange={(val) =>
               updateSelections({
                 years: String(val),
+                academicYear: "",
                 semester: "",
                 courses: "",
               })
             }
             disabled={!selections.program}
+          />
+
+          <DropdownSelect
+            label="Academic Year"
+            options={options.academicYear}
+            value={selections.academicYear}
+            // อัปเดต State เมื่อ User เปลี่ยนแปลงค่า
+            onChange={(val) =>
+              updateSelections({
+                academicYear: String(val),
+                semester: "",
+                courses: "",
+              })
+            }
+            disabled={!selections.years}
           />
 
           {/* 🟢 5. Semester (ซ่อนถ้าเป็น Guest) */}
@@ -610,7 +740,7 @@ export default function ViewChartPage() {
                   courses: "",
                 })
               }
-              disabled={!selections.years}
+              disabled={!selections.academicYear}
             />
           )}
 
@@ -699,12 +829,14 @@ export default function ViewChartPage() {
       )}
       {chartYearParams && (
         <YearStatsDashboard
+          year={uiYear}
           programId={chartYearParams.id}
-          year={chartYearParams.year}
+          academicYear={chartYearParams.year}
         />
       )}
       {chartSemesterParams && (
         <SemesterStatsDashboard
+          showingYear={uiYear}
           programId={chartSemesterParams.id}
           year={chartSemesterParams.year}
           semester={chartSemesterParams.semester}

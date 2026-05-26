@@ -279,5 +279,7 @@
   "Unsaved Changes": "Unsaved Changes",
   "Synced with Server": "Synced with Server",
   "Current configuration is synced with server": "Current configuration is synced with server",
-  "continue_as_guest": "Continue as Guest"
+  "continue_as_guest": "Continue as Guest",
+  "dashboard_title": "Yearly PLO Performance Dashboard — {{curriculumYear}} Curriculum Pattern [AY {{academicYear}}]",
+  "semester_dashboard_title": "Semester PLO Performance Dashboard — AY {{academicYear}} / Sem {{semester}} ({{curriculumYear}} Curriculum)"
 }

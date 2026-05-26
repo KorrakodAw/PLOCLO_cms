@@ -23,22 +23,27 @@ import { DashboardLoading } from "./CourseStats/courseComponents/DashboardLoadin
 import { NoDataAvailable } from "./CourseStats/courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./CourseStats/courseComponents/DashboardHeader";
 import { DashboardControls } from "./CourseStats/courseComponents/DashboardControls";
+import { useTranslation } from "react-i18next";
 
 interface SemesterStatsDashboardProps {
   programId: string;
   year: string;
   semester: string;
+  showingYear?: string | number; // ถ้าต้องการส่งปีที่แสดงอยู่ใน Dashboard จากภายนอก (เช่น จาก page.tsx) ก็เพิ่ม prop นี้ได้ครับ
 }
 
 export default function SemesterStatsDashboard({
   programId,
   year,
   semester,
+  showingYear,
 }: SemesterStatsDashboardProps) {
   const graphRef = useRef<HTMLDivElement>(null);
   const { showToast } = useGlobalToast();
   const [loading, setLoading] = useState(false);
   const { token } = useAuth();
+  const { t, i18n } = useTranslation("common");
+  const lang = i18n.language;
 
   const [visibleLines, setVisibleLines] = useState<Record<string, boolean>>({
     maxScore: false,
@@ -361,7 +366,7 @@ export default function SemesterStatsDashboard({
   if (hasNoData) {
     return (
       <NoDataAvailable
-        alertMessage={`There is no PLO performance data recorded for the year ${year} semester ${semester}`}
+        alertMessage={`There is no PLO performance data recorded for the year ${showingYear} semester ${semester}`}
       />
     );
   }
@@ -372,7 +377,16 @@ export default function SemesterStatsDashboard({
 
       {/* Header Section */}
       <DashboardHeader
-        title={`Semester PLO Performance Dashboard - ${year} Semester ${semester}`}
+        title={t("semester_dashboard_title", {
+          academicYear: showingYear,
+          semester:
+            semester === "3"
+              ? lang === "th"
+                ? "ฤดูร้อน"
+                : "Summer"
+              : semester,
+          curriculumYear: year,
+        })}
         onSaveImage={handleCaptureGraph}
         onExportExcel={handleExportAllExcel}
       />

@@ -24,6 +24,7 @@ import { NoDataAvailable } from "./courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./courseComponents/DashboardHeader";
 import { DashboardControls } from "./courseComponents/DashboardControls";
 import { GradeFilterGroup } from "./courseComponents/GradeFilterGroup";
+import { DashboardLoading } from "./courseComponents/DashboardLoading";
 
 interface AssignmentStatsDashboardProps {
   CsemesterId: string;
@@ -53,6 +54,7 @@ export default function AssignmentStatsDashboard({
     studentStatPercent: null,
     studentName: null,
     GradeSummary: null,
+    GradeSummaryPercent: null,
   });
 
   const fetchData = useCallback(async () => {
@@ -67,6 +69,7 @@ export default function AssignmentStatsDashboard({
       studentStatPercent: null,
       studentName: null,
       GradeSummary: null,
+      GradeSummaryPercent: null,
     });
     try {
       // 🚀 ใช้ Promise.all เพื่อดึงข้อมูลพร้อมกันทั้ง 4 APIs (เร็วขึ้นมาก)
@@ -77,6 +80,7 @@ export default function AssignmentStatsDashboard({
         studentStatsPercent,
         studentName,
         GradeSummary,
+        GradeSummaryPercent,
       ] = await Promise.all([
         apiClient.get(`/calculation/realScoreAndGrade/stats`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -104,6 +108,10 @@ export default function AssignmentStatsDashboard({
           headers: { Authorization: `Bearer ${token}` },
           params: { CsemesterId },
         }),
+        apiClient.get(`/calculation/realScoreAndGrade/gradSummary/percentage`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { CsemesterId },
+        }),
       ]);
 
       const AssStats = stats.data.categoryStats || [];
@@ -117,6 +125,7 @@ export default function AssignmentStatsDashboard({
           studentStatsPercent.data.realScorePercentagePerStudent || [],
         studentName: studentName.data || [],
         GradeSummary: GradeSummary.data || null,
+        GradeSummaryPercent: GradeSummaryPercent.data || null,
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -259,14 +268,24 @@ export default function AssignmentStatsDashboard({
   }, [data.scoreAssStatPercent]);
 
   const gradeCountData = useMemo(() => {
-    if (!data.GradeSummary) return [];
-    return Object.entries(data.GradeSummary).map(
-      ([grade, info]: [string, any]) => ({
+    if (!data.GradeSummary && !data.GradeSummaryPercent) return [];
+    const baseData = data.GradeSummary || data.GradeSummaryPercent || {};
+
+    return Object.entries(baseData).map(([grade, info]: [string, any]) => {
+      // 🟢 3. ดึงข้อมูล averages จากฝั่งปกติ (ถ้ามี)
+      const normalAverages = data.GradeSummary?.[grade]?.categoryAverages || {};
+
+      // 🟢 4. เจาะข้ามไปเอา averagesPercentage จากอีกฝั่งโดยใช้คีย์เกรดเดียวกัน
+      const percentageAverages =
+        data.GradeSummaryPercent?.[grade]?.categoryAverages || {};
+
+      return {
         grade: grade,
-        averages: info.categoryAverages || {}, // 🚩 เช็คว่าในนี้ Key เป็น "CLO1" หรือ "CLO 1"
-      }),
-    );
-  }, [data.GradeSummary]);
+        averages: normalAverages, // 📊 ค่าเฉลี่ยดิบปกติ (เช่น CLO1: 15)
+        averagesPercentage: percentageAverages, // 📈 ค่าเฉลี่ยแบบ % (เช่น CLO1: 75)
+      };
+    });
+  }, [data.GradeSummary, data.GradeSummaryPercent]); // 🟢 5. จับตาดู Dependency
 
   const [displayMode, setDisplayMode] = useState<"chart" | "radar">("chart");
 
@@ -299,8 +318,6 @@ export default function AssignmentStatsDashboard({
     }
   };
 
-
-
   const handleExportAllExcel = () => {
     try {
       const workbook = XLSX.utils.book_new();
@@ -320,9 +337,7 @@ export default function AssignmentStatsDashboard({
         if (cateData && Array.isArray(cateData)) {
           cateData.forEach((clo: any) => {
             // ดึงค่า: ถ้าเป็นโหมด Percent ให้หา .percentage ก่อน ถ้าเป็นโหมด Score ให้หา .cloScore
-            const rawValue = isPercentage
-              ? (clo.percentage)
-              : clo.realScore;
+            const rawValue = isPercentage ? clo.percentage : clo.realScore;
 
             if (clo.category && rawValue !== undefined) {
               // ปรับทศนิยม 2 ตำแหน่ง และแปลงกลับเป็น Number
@@ -434,7 +449,6 @@ export default function AssignmentStatsDashboard({
   const activeChartData =
     dataMode === "score" ? formattedChartData : formattedChartDataPercent;
 
-
   const individualStudentData = useMemo(() => {
     if (!selectedStudentId) return null;
 
@@ -449,6 +463,10 @@ export default function AssignmentStatsDashboard({
     Object.keys(data.scoreAssStat).length === 0 ||
     !data.studentStat ||
     (Array.isArray(data.studentStat) && flattenedTableData.length === 0);
+
+  if (loading) {
+    return <DashboardLoading />;
+  }
 
   if (hasNoData) {
     return (

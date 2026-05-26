@@ -22,6 +22,8 @@ import * as XLSX from "xlsx";
 import { NoDataAvailable } from "./courseComponents/NoDataAvailable";
 import { DashboardHeader } from "./courseComponents/DashboardHeader";
 import { DashboardControls } from "./courseComponents/DashboardControls";
+import { GradeFilterGroup } from "./courseComponents/GradeFilterGroup";
+import { DashboardLoading } from "./courseComponents/DashboardLoading";
 
 interface PloStatsDashboardProps {
   CsemesterId: string;
@@ -53,6 +55,8 @@ export default function PloStatsDashboard({
     studentStat: null,
     studentStatPercent: null,
     studentName: null,
+    GradeSummary: null,
+    GradeSummaryPercent: null,
   });
 
   const fetchData = useCallback(async () => {
@@ -66,6 +70,8 @@ export default function PloStatsDashboard({
       studentStat: null,
       studentStatPercent: null,
       studentName: null,
+      GradeSummary: null,
+      GradeSummaryPercent: null,
     });
     try {
       // 🚀 ใช้ Promise.all เพื่อดึงข้อมูลพร้อมกันทั้ง 4 APIs (เร็วขึ้นมาก)
@@ -75,6 +81,8 @@ export default function PloStatsDashboard({
         studentStats,
         studentStatsPercent,
         studentName,
+        GradeSummary,
+        GradeSummaryPercent,
       ] = await Promise.all([
         apiClient.get(`/calculation/clo-plo/course/stats`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -95,6 +103,14 @@ export default function PloStatsDashboard({
         apiClient.get(`/student/semester-students/${CsemesterId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
+        apiClient.get(`/calculation/clo-plo/course/grade-summary`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { CsemesterId, courseId },
+        }),
+        apiClient.get(`/calculation/clo-plo/course/grade-summary/percentage`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { CsemesterId, courseId },
+        }),
       ]);
 
       const ploStats = stats.data.ploStats?.[0]?.plos || null;
@@ -108,6 +124,8 @@ export default function PloStatsDashboard({
         studentStatPercent:
           studentStatsPercent.data.ploPercentagePerStudent || [],
         studentName: studentName.data || [],
+        GradeSummary: GradeSummary.data || null,
+        GradeSummaryPercent: GradeSummaryPercent.data || null,
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -347,6 +365,26 @@ export default function PloStatsDashboard({
   //   console.log(data);
   // });
 
+  const gradeCountData = useMemo(() => {
+    if (!data.GradeSummary && !data.GradeSummaryPercent) return [];
+    const baseData = data.GradeSummary || data.GradeSummaryPercent || {};
+
+    return Object.entries(baseData).map(([grade, info]: [string, any]) => {
+      // 🟢 3. ดึงข้อมูล averages จากฝั่งปกติ (ถ้ามี)
+      const normalAverages = data.GradeSummary?.[grade]?.categoryAverages || {};
+
+      // 🟢 4. เจาะข้ามไปเอา averagesPercentage จากอีกฝั่งโดยใช้คีย์เกรดเดียวกัน
+      const percentageAverages =
+        data.GradeSummaryPercent?.[grade]?.categoryAverages || {};
+
+      return {
+        grade: grade,
+        averages: normalAverages, // 📊 ค่าเฉลี่ยดิบปกติ (เช่น CLO1: 15)
+        averagesPercentage: percentageAverages, // 📈 ค่าเฉลี่ยแบบ % (เช่น CLO1: 75)
+      };
+    });
+  }, [data.GradeSummary, data.GradeSummaryPercent]); // 🟢 5. จับตาดู Dependency ทั้งสองตัว
+
   const activeTableData =
     dataMode === "score" ? flattenedTableData : flattenedTableDataPercent;
 
@@ -361,12 +399,56 @@ export default function PloStatsDashboard({
     });
   }, [selectedStudentId, activeTableData]);
 
+  const uniqueGrades = useMemo(() => {
+    if (!data.GradeSummary) return [];
+
+    return Object.keys(data.GradeSummary)
+      .filter((key) => key !== "total") // 🟢 กรองคีย์ที่ไม่ใช่เกรดออกที่นี่
+      .sort((a, b) => {
+        const order: Record<string, number> = {
+          A: 1,
+          "B+": 2,
+          B: 3,
+          "C+": 4,
+          C: 5,
+          "D+": 6,
+          D: 7,
+          F: 8,
+        };
+        return (order[a] || 99) - (order[b] || 99);
+      });
+  }, [data.GradeSummary]);
+
+  const getGradeColor = (g: string) => {
+    const colors: Record<string, string> = {
+      // 🟢 กลุ่ม Top: เขียวเข้มตัดกับน้ำเงินสว่าง
+      A: "#064e3b", // Emerald 900 (เขียวเข้มจัด)
+      "B+": "#3b82f6", // Blue 500 (น้ำเงินสว่างสดใส)
+      B: "#1e3a8a", // Blue 900 (น้ำเงินเข้ม Navy)
+
+      // 🟡 กลุ่ม Mid: ม่วงสว่างตัดกับส้มทอง
+      "C+": "#a855f7", // Purple 500 (ม่วงสว่าง)
+      C: "#d97706", // Amber 600 (ส้มทองสว่าง)
+
+      // 🔴 กลุ่ม Risk: ชมพูเข้มตัดกับแดงสว่าง
+      "D+": "#be123c", // Rose 700 (ชมพูแดงเข้ม)
+      D: "#fb7185", // Rose 400 (ชมพูพาสเทลสว่าง)
+      F: "#450a0a", // Red 950 (แดงดำ - สื่อถึงจุดวิกฤต)
+    };
+
+    return colors[g] || "#64748b"; // Default: Slate 500
+  };
+
   // 2. ถ้าโหลดเสร็จแล้ว แต่ไม่มีข้อมูล (Check จากหลายๆ จุดเพื่อให้มั่นใจ)
   const hasNoData =
     !data.scorePloStat ||
     Object.keys(data.scorePloStat).length === 0 ||
     !data.studentStat ||
     (Array.isArray(data.studentStat) && flattenedTableData.length === 0);
+
+  if (loading) {
+    return <DashboardLoading />;
+  }
 
   if (hasNoData) {
     return (
@@ -389,6 +471,13 @@ export default function PloStatsDashboard({
         setVisibleLines={setVisibleLines}
         dataMode={dataMode}
         setDataMode={setDataMode}
+      />
+
+      <GradeFilterGroup
+        uniqueGrades={uniqueGrades}
+        visibleLines={visibleLines}
+        setVisibleLines={setVisibleLines}
+        getGradeColor={getGradeColor}
       />
 
       {/* Charts Grid Section */}
@@ -417,6 +506,7 @@ export default function PloStatsDashboard({
             <div className="h-112.5 w-full">
               <PerformanceTrendChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือก
+                balanceData={gradeCountData}
                 individualStudentData={individualStudentData}
                 xAxisKey="ploLabel"
                 allAvgKey="avgScore"
@@ -425,6 +515,7 @@ export default function PloStatsDashboard({
                 midScoreKey="midScore"
                 maxScorePosKey="fullScore"
                 visibleLines={visibleLines}
+                getGradeColor={getGradeColor}
               />
             </div>
           </div>
@@ -446,6 +537,7 @@ export default function PloStatsDashboard({
             <div className="h-112.5 w-full">
               <PerformanceBalanceChart
                 chartData={activeChartData} // 🟢 ใช้ข้อมูลที่ถูกเลือกเหมือนกัน
+                balanceData={gradeCountData}
                 individualStudentData={individualStudentData}
                 xAxisKey="ploLabel"
                 allAvgKey="avgScore"
@@ -454,6 +546,7 @@ export default function PloStatsDashboard({
                 midScoreKey="midScore"
                 maxScorePosKey="fullScore"
                 visibleLines={visibleLines}
+                getGradeColor={getGradeColor}
               />
             </div>
           </div>

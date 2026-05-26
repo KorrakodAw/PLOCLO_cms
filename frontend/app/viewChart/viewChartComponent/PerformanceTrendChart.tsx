@@ -42,16 +42,22 @@ export const PerformanceTrendChart = ({
   const { t } = useTranslation("common");
 
   // 1. เตรียมข้อมูลเกรดและคะแนนเฉลี่ยแต่ละด้าน
-  const gradeCountData = useMemo(() => {
-    if (!balanceData) return [];
-    // กรอง 'total' ออก และ Map ข้อมูลเกรด
-    return Object.entries(balanceData)
-      .filter(([key]) => key !== "total")
-      .map(([grade, info]: [string, any]) => ({
-        grade: grade,
-        averages: info.categoryAverages || {},
-      }));
-  }, [balanceData]);
+  // const gradeCountData = useMemo(() => {
+  //   if (!balanceData) return [];
+  //   // กรอง 'total' ออก และ Map ข้อมูลเกรด
+  //   return Object.entries(balanceData)
+  //     .filter(([key]) => key !== "total")
+  //     .map(([grade, info]: [string, any]) => ({
+  //       grade: grade,
+  //       averages: info.categoryAverages || {},
+  //     }));
+  // }, [balanceData]);
+    const dataMax = useMemo(() => {
+      if (!chartData.length) return 100;
+      return Math.max(...chartData.map((d) => d[maxScorePosKey] || 0));
+    }, [chartData, maxScorePosKey]);
+
+  const isPercent = dataMax === 100;
 
   // 2. รวมข้อมูลคะแนนเกรดเข้าไปใน chartData หลัก
   const finalChartData = useMemo(() => {
@@ -63,8 +69,15 @@ export const PerformanceTrendChart = ({
 
       // วนลูปเอาคะแนนจาก gradeCountData (ที่ส่งมาจาก Props balanceData) มาใส่
       balanceData?.forEach((item: any) => {
-        const score = item.averages[currentLabel];
+       
+        const sourceAverages = isPercent
+          ? item.averagesPercentage
+          : item.averages;
+
+        const score = sourceAverages?.[currentLabel];
+
         if (score !== undefined) {
+          // ส่งค่าที่เลือกตามโหมดไปให้กราฟวาดเส้นเดียวจบ
           updatedPoint[`avg_grade_${item.grade}`] = Number(score);
         }
       });
@@ -72,12 +85,7 @@ export const PerformanceTrendChart = ({
     });
   }, [chartData, balanceData, xAxisKey]);
 
-  const dataMax = useMemo(() => {
-    if (!chartData.length) return 100;
-    return Math.max(...chartData.map((d) => d[maxScorePosKey] || 0));
-  }, [chartData, maxScorePosKey]);
 
-  const isPercent = dataMax === 100;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -184,14 +192,22 @@ export const PerformanceTrendChart = ({
         )}
 
         {/* Dynamic Grade Lines */}
+        <YAxis
+          unit={isPercent ? "%" : ""}
+          domain={isPercent ? [0, 100] : ["auto", "auto"]}
+        />
+
+        {/* ตรงส่วน .map วาดเส้น Line */}
         {balanceData?.map((item: any) => {
           const key = `avg_grade_${item.grade}`;
           if (!visibleLines?.[key]) return null;
+
           return (
             <Line
               key={item.grade}
               dataKey={key}
-              name={`Grade ${item.grade}`}
+              // 🟢 ปรับตรง name: ให้แสดงหน่วย % หรือคะแนนดิบตามโหมดปัจจุบัน
+              name={`Grade ${item.grade} (${isPercent ? "%" : "Score"})`}
               stroke={getGradeColor?.(item.grade)}
               connectNulls={true}
               strokeWidth={2.5}

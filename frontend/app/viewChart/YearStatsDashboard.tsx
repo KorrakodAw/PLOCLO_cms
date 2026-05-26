@@ -21,20 +21,24 @@ import * as XLSX from "xlsx";
 import { DashboardHeader } from "./CourseStats/courseComponents/DashboardHeader";
 import { DashboardControls } from "./CourseStats/courseComponents/DashboardControls";
 import DropdownSelect from "@/components/DropdownSelect";
+import { useTranslation } from "react-i18next";
 
 interface YearStatsDashboardProps {
   programId: string | number;
-  year: string | number;
+  academicYear: string | number;
+  year?: string | number; // ถ้าจำเป็นต้องใช้ year แยกต่างหากก็เพิ่มได้ แต่ถ้า academicYear ครอบคลุมแล้วก็ไม่ต้อง
 }
 
 export default function YearStatsDashboard({
   programId,
+  academicYear,
   year,
 }: YearStatsDashboardProps) {
   const graphRef = useRef<HTMLDivElement>(null);
   const { showToast } = useGlobalToast();
   const [loading, setLoading] = useState(false);
   const { token, user } = useAuth();
+  const { t } = useTranslation("common");
 
   const isGuest = user?.role === "guest";
   const isStudent = user?.role === "student";
@@ -55,40 +59,40 @@ export default function YearStatsDashboard({
     studentNames: null, // สำหรับเก็บข้อมูลชื่อ-นามสกุลของนักเรียน (ถ้ามี API แยก)
   });
 
-  // 1. แยก State 2 ตัว
-  const [yearsList, setYearsList] = useState([]); // สำหรับเก็บตัวเลือกทั้งหมดใน Dropdown
-  const [selectedYear, setSelectedYear] = useState<string | number>(""); // สำหรับเก็บค่าที่เลือก ณ ปัจจุบัน
+  // // 1. แยก State 2 ตัว
+  // const [yearsList, setYearsList] = useState([]); // สำหรับเก็บตัวเลือกทั้งหมดใน Dropdown
+  // const [selectedYear, setSelectedYear] = useState<string | number>(""); // สำหรับเก็บค่าที่เลือก ณ ปัจจุบัน
 
-  useEffect(() => {
-    const fetchYears = async () => {
-      if (!programId) return;
-      try {
-        const res = await apiClient.get(
-          `/program/YearsInProgram/${programId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
+  // useEffect(() => {
+  //   const fetchYears = async () => {
+  //     if (!programId) return;
+  //     try {
+  //       const res = await apiClient.get(
+  //         `/program/YearsInProgram/${programId}`,
+  //         {
+  //           headers: { Authorization: `Bearer ${token}` },
+  //         },
+  //       );
 
-        const yearsData = res.data; // [2567, 2566, 2565, 2564]
+  //       const yearsData = res.data; // [2567, 2566, 2565, 2564]
 
-        // ✅ เก็บปีทั้งหมดลงใน List เพื่อให้ Dropdown มี 4 ตัวเลือก
-        setYearsList(yearsData);
+  //       // ✅ เก็บปีทั้งหมดลงใน List เพื่อให้ Dropdown มี 4 ตัวเลือก
+  //       setYearsList(yearsData);
 
-        // ✅ ตั้งค่า "ปีที่เลือก" ให้เป็นปีล่าสุดแค่ตัวเดียว
-        if (yearsData.length > 0 && !selectedYear) {
-          setSelectedYear(yearsData[0].toString());
-        }
-      } catch (err) {
-        console.error("Error fetching years:", err);
-      }
-    };
-    fetchYears();
-  }, [programId, token]);
+  //       // ✅ ตั้งค่า "ปีที่เลือก" ให้เป็นปีล่าสุดแค่ตัวเดียว
+  //       if (yearsData.length > 0 && !selectedYear) {
+  //         setSelectedYear(yearsData[0].toString());
+  //       }
+  //     } catch (err) {
+  //       console.error("Error fetching years:", err);
+  //     }
+  //   };
+  //   fetchYears();
+  // }, [programId, token]);
 
   const fetchData = useCallback(async () => {
     // 1. เปลี่ยนเงื่อนไขตรวจสอบจาก year เป็น selectedYear
-    if (!programId || !selectedYear || !token) return;
+    if (!programId || !token) return;
 
     setLoading(true);
 
@@ -105,7 +109,7 @@ export default function YearStatsDashboard({
       // เตรียม params โดยตรวจสอบให้แน่ใจว่าเป็นตัวเลข
       const apiParams = {
         programId,
-        year: Number(selectedYear), // 2. ใช้ selectedYear และแปลงเป็น Number
+        year: Number(academicYear), // 2. ใช้ selectedYear และแปลงเป็น Number
       };
 
       const [
@@ -156,7 +160,7 @@ export default function YearStatsDashboard({
       setLoading(false);
     }
     // 4. อัปเดต Dependency Array จาก year เป็น selectedYear
-  }, [programId, selectedYear, token, showToast]);
+  }, [programId, academicYear, token, showToast]);
 
   // เมื่อ Props เปลี่ยน ให้โหลดข้อมูลใหม่
   useEffect(() => {
@@ -434,7 +438,10 @@ export default function YearStatsDashboard({
 
       {/* Header Section */}
       <DashboardHeader
-        title={`Yearly PLO Performance Dashboard - ${year}`}
+        title={t("dashboard_title", {
+          curriculumYear: year,
+          academicYear: academicYear,
+        })}
         onSaveImage={handleCaptureGraph}
         onExportExcel={isGuest ? undefined : handleExportAllExcel}
       />
@@ -446,7 +453,7 @@ export default function YearStatsDashboard({
         dataMode={dataMode}
         setDataMode={setDataMode}
       />
-      <div>
+      {/* <div>
         <DropdownSelect
           label="Select Academic Year"
           options={
@@ -460,7 +467,7 @@ export default function YearStatsDashboard({
           // อัปเดต State เมื่อ User เปลี่ยนแปลงค่า
           onChange={setSelectedYear}
         />
-      </div>
+      </div> */}
 
       {/* Charts Grid Section */}
       <div

@@ -640,35 +640,37 @@ router.delete(
 );
 
 router.get(
-  "/unique/:year",
+  "/unique/:programId/:year", // 🟢 รับ 2 URL Path Parameters
   authenticateToken,
   async (req: Request, res: Response) => {
     try {
-      const { year } = req.params;
-      const { programId } = req.query; // รับจาก Query string เช่น ?programId=1
+      const { programId, year } = req.params;
 
-      if (!year) {
-        return res.status(400).json({ error: "Year is required" });
+      if (!programId || !year) {
+        return res
+          .status(400)
+          .json({ error: "Both programId and year are required" });
       }
 
-      // สร้าง Filter object
-      const whereClause: any = {
-        year: Number(year),
-      };
-
-      // 🟢 ถ้ามีการส่ง programId มา ให้เพิ่มเข้าไปในเงื่อนไขด้วย
-      if (programId) {
-        whereClause.program_id = Number(programId);
-      }
-
+      // 🟢 ตั้งเงื่อนไขการ Query
       const semesters = await prisma.courseSemester.findMany({
-        where: whereClause,
-        distinct: ["semester"], // 👈 พระเอก: ยุบ 1, 1, 1 ให้เหลือ 1
+        where: {
+          year: Number(year), // 1. กรองปีการศึกษา (เช่น 2026)
+
+          // 2. เจาะลึกเข้าตารางกลางเพื่อกรองเอาเฉพาะวิชาที่ผูกกับ Program ID นี้
+          programOnCourses: {
+            some: {
+              program_id: Number(programId), // คุมให้ได้แค่วิชาในหลักสูตรที่เลือก
+              // type: "core", // (ใส่ไว้กันเหนียว หรือเอาออกถ้าต้องการเลือกทุกประเภทวิชา)
+            },
+          },
+        },
+        distinct: ["semester"], // ยุบเทอมที่ซ้ำให้เหลือตัวเดียว
         select: {
           semester: true,
         },
         orderBy: {
-          semester: "asc",
+          semester: "asc", // เรียงจากเทอม 1 -> 2 -> 3
         },
       });
 
@@ -676,9 +678,11 @@ router.get(
       const result = semesters.map((s) => s.semester);
 
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching unique semesters:", error);
-      res.status(500).json({ error: "Internal Server Error" });
+      res
+        .status(500)
+        .json({ error: "Internal Server Error", details: error.message });
     }
   },
 );
