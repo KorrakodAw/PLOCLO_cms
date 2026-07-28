@@ -100,7 +100,7 @@ export default function CourseStatsDashboard({
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
-              Grade Distribution
+              Grade trends
             </h3>
           </div>
           <div className="h-87.5 w-full max-w-375">

@@ -527,43 +527,45 @@ export default function CourseManagement({
 
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-extralight">{t("course management")}</h1>
-        <AddButton
-          buttonText={t("create new course")}
-          placeholderText={{
-            nameEn: "Course Id (value.g. CS101)",
-            nameTh: "Credits (value.g. 3)",
-            abbrEn: "Course Name (EN)",
-            abbrTh: "Course Name (TH)",
-          }}
-          submitButtonText={{
-            insert: "Insert Course Section",
-            upload: "Upload Excel",
-          }}
-          disableUniversity={isInstructor}
-          disableFaculty={isInstructor}
-          showCodeInput={false}
-          showAbbreviationInputs={true}
-          programOptions={programOptions}
-          universityOptions={universityOptions}
-          facultyOptions={facultyOptions}
-          yearOptions={yearOptions}
-          semesterOptions={semesterOptions}
-          sectionOptions={sectionOptions}
-          selectedProgram={selectedProgram}
-          selectedFaculty={selectedFaculty}
-          selectedUniversity={selectedUniversity}
-          selectedYear={selectedYear}
-          selectedSemester={selectedSemester}
-          selectedSection={selectedSection}
-          onUniversityChange={(value) => setSelectedUniversity(String(value))}
-          onFacultyChange={(value) => setSelectedFaculty(String(value))}
-          onProgramChange={(value) => setSelectedProgram(String(value))}
-          onYearChange={(value) => setSelectedYear(String(value))}
-          onSemesterChange={(value) => setSelectedSemester(String(value))}
-          onSectionChange={(value) => setSelectedSection(String(value))}
-          onSubmit={handleAddCourse}
-          onSubmitExcel={handleAddCourseExcel}
-        />
+        {!isInstructor && (
+          <AddButton
+            buttonText={t("create new course")}
+            placeholderText={{
+              nameEn: "Course Id (value.g. CS101)",
+              nameTh: "Credits (value.g. 3)",
+              abbrEn: "Course Name (EN)",
+              abbrTh: "Course Name (TH)",
+            }}
+            submitButtonText={{
+              insert: "Insert Course Section",
+              upload: "Upload Excel",
+            }}
+            disableUniversity={isInstructor}
+            disableFaculty={isInstructor}
+            showCodeInput={false}
+            showAbbreviationInputs={true}
+            programOptions={programOptions}
+            universityOptions={universityOptions}
+            facultyOptions={facultyOptions}
+            yearOptions={yearOptions}
+            semesterOptions={semesterOptions}
+            sectionOptions={sectionOptions}
+            selectedProgram={selectedProgram}
+            selectedFaculty={selectedFaculty}
+            selectedUniversity={selectedUniversity}
+            selectedYear={selectedYear}
+            selectedSemester={selectedSemester}
+            selectedSection={selectedSection}
+            onUniversityChange={(value) => setSelectedUniversity(String(value))}
+            onFacultyChange={(value) => setSelectedFaculty(String(value))}
+            onProgramChange={(value) => setSelectedProgram(String(value))}
+            onYearChange={(value) => setSelectedYear(String(value))}
+            onSemesterChange={(value) => setSelectedSemester(String(value))}
+            onSectionChange={(value) => setSelectedSection(String(value))}
+            onSubmit={handleAddCourse}
+            onSubmitExcel={handleAddCourseExcel}
+          />
+        )}
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow-xl">

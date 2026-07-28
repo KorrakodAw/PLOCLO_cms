@@ -52,10 +52,10 @@ export const PerformanceTrendChart = ({
   //       averages: info.categoryAverages || {},
   //     }));
   // }, [balanceData]);
-    const dataMax = useMemo(() => {
-      if (!chartData.length) return 100;
-      return Math.max(...chartData.map((d) => d[maxScorePosKey] || 0));
-    }, [chartData, maxScorePosKey]);
+  const dataMax = useMemo(() => {
+    if (!chartData.length) return 100;
+    return Math.max(...chartData.map((d) => d[maxScorePosKey] || 0));
+  }, [chartData, maxScorePosKey]);
 
   const isPercent = dataMax === 100;
 
@@ -69,7 +69,6 @@ export const PerformanceTrendChart = ({
 
       // วนลูปเอาคะแนนจาก gradeCountData (ที่ส่งมาจาก Props balanceData) มาใส่
       balanceData?.forEach((item: any) => {
-       
         const sourceAverages = isPercent
           ? item.averagesPercentage
           : item.averages;
@@ -84,8 +83,6 @@ export const PerformanceTrendChart = ({
       return updatedPoint;
     });
   }, [chartData, balanceData, xAxisKey]);
-
-
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -149,7 +146,7 @@ export const PerformanceTrendChart = ({
         {/* Statistical Lines */}
         {visibleLines?.maxScore && (
           <Line
-            type="monotone"
+            type="linear"
             dataKey={maxScoreKey}
             name={t("maxScore")}
             stroke="#22c55e"
@@ -160,7 +157,7 @@ export const PerformanceTrendChart = ({
         )}
         {visibleLines?.minScore && (
           <Line
-            type="monotone"
+            type="linear"
             dataKey={minScoreKey}
             name={t("minScore")}
             stroke="#ef4444"
@@ -171,7 +168,7 @@ export const PerformanceTrendChart = ({
         )}
         {visibleLines?.allAvg && (
           <Line
-            type="monotone"
+            type="linear"
             dataKey={allAvgKey}
             name={t("averageScore")}
             stroke="#6366f1"
@@ -181,7 +178,7 @@ export const PerformanceTrendChart = ({
         )}
         {visibleLines?.midScore && (
           <Line
-            type="monotone"
+            type="linear"
             name={t("medianScore")}
             dataKey={midScoreKey}
             stroke="#f59e0b"
@@ -218,7 +215,7 @@ export const PerformanceTrendChart = ({
         {/* Individual Student Line */}
         {individualStudentData && (
           <Line
-            type="monotone"
+            type="linear"
             dataKey={(dataPoint) => {
               const currentLabel = (dataPoint[xAxisKey] || "").replace(
                 /\s+/g,

@@ -524,7 +524,7 @@ export default function ViewChartPage() {
         // ถ้าหน้าเว็บเพิ่งโหลด และยังไม่มีการเลือกปี ให้ปักหมุดปีล่าสุด (ตัวแรก) ให้ก่อน
         if (yearsData.length > 0 && !selections.academicYear) {
           updateSelections({
-            academicYear: yearsData[0].toString(),
+            // academicYear: yearsData[0].toString(),
           });
         }
       } catch (err) {

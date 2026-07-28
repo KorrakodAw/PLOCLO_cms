@@ -20,7 +20,7 @@ export async function addCourse(
     code: string;
     name: string;
     name_th?: string;
-    credits?: number;
+    credits?: number | string; // 🟢 ปรับให้รับ string | number
     faculty_id: string | number; // ยอมรับทั้งคู่
     year?: string | number; // 🟢 ปรับให้รับ string | number
     semester?: string | number; // 🟢 ปรับให้รับ string | number
